@@ -4,13 +4,12 @@ Created on 19 febuary 2026
 @author: Alex Fougeroux
 """
 
-import numpy as np
 import os
+import pandas as pd
 from config import SYMBOLS, OUTPUT_PATH
 from data.fetcher import fetch_ohlcv
 from data.features.pipeline import build_features
 from data.labeling.labeler import add_labels
-from data.preprocessing.builder import build_windows
 
 
 def process_symbol(symbol: str):
@@ -29,22 +28,24 @@ def process_symbol(symbol: str):
             - y: 1D array of labels
             - dates: Timestamps for each sample
     """
-    print(f"\n{'-' * 10}")
-    print(f"Working on {symbol}")
-    print(f"{'-' * 10}")
+    print(f"\n{'-' * 50}")
+    print(f"  Traitement de {symbol}")
+    print(f"{'-' * 50}")
 
     df = fetch_ohlcv(symbol)
     df = build_features(df)
     df = add_labels(df)
-    X, y, dates = build_windows(df)
+    df.insert(0, "symbol", symbol.replace("/", "_"))
 
-    print(f"Shape X : {X.shape}")
-    print(f"Shape y : {y.shape}")
+    print(f"  Lignes générées : {len(df)}")
+    print(f"  Colonnes        : {list(df.columns)}")
+    print(f"  Période         : {df.index[0].date()} → {df.index[-1].date()}")
     print(
-        f"Distribution : +1={np.sum(y == 1)} | 0={np.sum(y == 0)} | -1={np.sum(y == -1)}"
+        f"  Distribution    : +1={(df['label'] == 1).sum()} | "
+        f"0={(df['label'] == 0).sum()} | -1={(df['label'] == -1).sum()}"
     )
 
-    return X, y, dates
+    return df
 
 
 def main():
@@ -56,32 +57,31 @@ def main():
     """
     os.makedirs(OUTPUT_PATH, exist_ok=True)
 
-    all_X, all_y = [], []
+    all_dfs = []
 
     for symbol in SYMBOLS:
-        X, y, dates = process_symbol(symbol)
+        df = process_symbol(symbol)
 
-        # ----- Individual save per crypto ----- #
-        filename = symbol.replace("/", "_")
-        np.savez(
-            os.path.join(OUTPUT_PATH, f"{filename}_dataset.npz"),
-            X=X,
-            y=y,
-            dates=dates.astype(str),
-        )
+        # Sauvegarde CSV individuel
+        filename = symbol.replace("/", "_") + ".csv"
+        filepath = os.path.join(OUTPUT_PATH, filename)
+        df.to_csv(filepath)
+        print(f"  Sauvegardé → {filepath}")
 
-        all_X.append(X)
-        all_y.append(y)
+        all_dfs.append(df)
 
-    # ----- Save full dataset ----- #
-    full_X = np.concatenate(all_X, axis=0)
-    full_y = np.concatenate(all_y, axis=0)
+    # Sauvegarde CSV global
+    full_df = pd.concat(all_dfs)
+    full_path = os.path.join(OUTPUT_PATH, "full_dataset.csv")
+    full_df.to_csv(full_path)
 
-    np.savez(os.path.join(OUTPUT_PATH, "full_dataset.npz"), X=full_X, y=full_y)
-
-    print("\nDataset complet généré !")
-    print(f"   Shape final X : {full_X.shape}")
-    print(f"   Shape final y : {full_y.shape}")
+    print(f"\n{'-' * 50}")
+    print("  Dataset complet généré !")
+    print(f"  Fichiers individuels : {len(SYMBOLS)} CSVs")
+    print(f"  Dataset global       : {full_path}")
+    print(f"  Lignes totales       : {len(full_df)}")
+    print(f"  Colonnes             : {len(full_df.columns)}")
+    print(f"{'-' * 50}\n")
 
 
 if __name__ == "__main__":

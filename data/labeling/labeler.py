@@ -32,6 +32,6 @@ def add_labels(df: pd.DataFrame) -> pd.DataFrame:
     df.loc[future_return < -LABEL_THRESHOLD, "label"] = -1
 
     # ----- Remove last lign without label ----- #
-    df.dropna(subset=["label"], inplace=True)
+    df = df[:-PREDICTION_HORIZON]
 
     return df
