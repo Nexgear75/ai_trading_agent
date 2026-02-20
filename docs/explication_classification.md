@@ -20,7 +20,7 @@ Avec les constantes de `config.py` :
 
 ### 1. Calcul du rendement futur
 
-$$\mathrm{future{\_}return}(t) = \frac{P_{t+3}}{P_t} - 1$$
+$$\textrm{future-return}(t) = \frac{P_{t+3}}{P_t} - 1$$
 
 À chaque instant *t*, on regarde le prix de clôture 3 bougies plus tard et on calcule le rendement simple (pas le log-return). Avec un timeframe `1d`, ça revient à regarder 3 jours dans le futur.
 
