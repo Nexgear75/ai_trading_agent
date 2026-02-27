@@ -1,0 +1,270 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.org/schemas/ai-trading/metrics.schema.json",
+  "title": "AI Trading Pipeline - Metrics",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "run_id",
+    "strategy",
+    "folds",
+    "aggregate"
+  ],
+  "properties": {
+    "run_id": {
+      "type": "string"
+    },
+    "strategy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "strategy_type",
+        "name"
+      ],
+      "properties": {
+        "strategy_type": {
+          "type": "string",
+          "enum": [
+            "model",
+            "baseline"
+          ]
+        },
+        "name": {
+          "type": "string"
+        }
+      }
+    },
+    "folds": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "fold_id",
+          "period_test",
+          "threshold",
+          "prediction",
+          "trading"
+        ],
+        "properties": {
+          "fold_id": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "period_test": {
+            "$ref": "#/$defs/period"
+          },
+          "threshold": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "method"
+            ],
+            "properties": {
+              "method": {
+                "type": "string",
+                "enum": [
+                  "quantile_grid",
+                  "fixed_value",
+                  "none"
+                ]
+              },
+              "theta": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "selected_quantile": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0.0,
+                "maximum": 1.0
+              }
+            }
+          },
+          "prediction": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "mae",
+              "rmse",
+              "directional_accuracy"
+            ],
+            "properties": {
+              "mae": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0.0
+              },
+              "rmse": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0.0
+              },
+              "directional_accuracy": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0.0,
+                "maximum": 1.0
+              },
+              "spearman_ic": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": -1.0,
+                "maximum": 1.0
+              }
+            }
+          },
+          "trading": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "net_pnl",
+              "net_return",
+              "max_drawdown",
+              "profit_factor",
+              "n_trades"
+            ],
+            "properties": {
+              "net_pnl": {
+                "type": "number"
+              },
+              "net_return": {
+                "type": "number"
+              },
+              "max_drawdown": {
+                "type": "number",
+                "minimum": 0.0,
+                "maximum": 1.0
+              },
+              "sharpe": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "profit_factor": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0.0
+              },
+              "hit_rate": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0.0,
+                "maximum": 1.0
+              },
+              "n_trades": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "avg_trade_return": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "median_trade_return": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "exposure_time_frac": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0.0,
+                "maximum": 1.0
+              }
+            }
+          }
+        }
+      }
+    },
+    "aggregate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "prediction",
+        "trading"
+      ],
+      "properties": {
+        "prediction": {
+          "$ref": "#/$defs/aggregate_block"
+        },
+        "trading": {
+          "$ref": "#/$defs/aggregate_block"
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "period": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "start_utc",
+        "end_utc"
+      ],
+      "properties": {
+        "start_utc": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "end_utc": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "aggregate_block": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mean",
+        "std"
+      ],
+      "properties": {
+        "mean": {
+          "type": "object",
+          "additionalProperties": {
+            "type": [
+              "number",
+              "null"
+            ]
+          }
+        },
+        "std": {
+          "type": "object",
+          "additionalProperties": {
+            "type": [
+              "number",
+              "null"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

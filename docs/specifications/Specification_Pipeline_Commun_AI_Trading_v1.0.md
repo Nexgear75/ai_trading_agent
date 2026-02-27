@@ -90,6 +90,7 @@ But : imposer un pipeline unique (données, splits, coûts, backtest, métriques
   - Annexe C - Exemples (manifest.json, metrics.json)
   - Annexe D - Références (sélection)
   - Annexe E - Addendum v1.1: paramètres MVP et décisions best-practice
+  - Annexe F - Modèle Reinforcement Learning (PPO): spécification détaillée
 
 
 # Historique des versions
@@ -98,6 +99,7 @@ But : imposer un pipeline unique (données, splits, coûts, backtest, métriques
 | --- | --- | --- | --- |
 | 1.0 | 2026-02-27 | Équipe projet | Première spécification formelle (pipeline, features, coûts, artefacts). |
 | 1.1 | 2026-02-27 | Équipe projet | Addendum : résolution des ambiguïtés, paramètres MVP figés, décisions best-practice (voir Annexe E). |
+| 1.2 | 2026-02-27 | Équipe projet | Ajout du modèle Reinforcement Learning (PPO) : §1.1, §10, §11, Annexe E.2.9, E.2.10. |
 
 
 # 1. Objet et périmètre
@@ -114,6 +116,7 @@ Le but premier est une comparaison méthodologiquement robuste (éviter les fuit
 - GRU (régression) sur fenêtre temporelle.
 - LSTM (régression) sur fenêtre temporelle.
 - Transformer PatchTST (régression) sur fenêtre temporelle.
+- Reinforcement Learning PPO (décision directe Go/No-Go) sur fenêtre temporelle.
 
 ## 1.2 Baselines supportées
 
@@ -171,7 +174,7 @@ flowchart TD
   C --> D[Build Samples\nX_seq(N,L,F), y_t, meta]
   D --> E[Walk-Forward Splitter\n(train/val/test + embargo)]
   E -->|Fold i| F[Scaler fit sur TRAIN\ntransform val/test]
-  F --> G[Entraînement modèle\n(XGBoost/CNN/GRU/LSTM/PatchTST)]
+  F --> G[Entraînement modèle\n(XGBoost/CNN/GRU/LSTM/PatchTST/RL-PPO)]
   G --> H[Prédictions sur VALIDATION]
   H --> I[Calibration seuil θ\nobjectif trading\n(biais anti faux positifs)]
   I --> J[Prédictions sur TEST]
@@ -509,6 +512,7 @@ save(path) / load(path)    # optionnel mais recommandé
 - Entrée canonique: X_seq de shape (N, L, F) et y de shape (N,).
 - Sortie: y_hat de shape (N,), en float (prédiction de log-return).
 - XGBoost utilise l'adapter tabulaire standard X_tab = vec(X_seq).
+- Le modèle RL (PPO) ne prédit pas de log-return : il émet directement une action Go (1) ou No-Go (0). Sa sortie `predict()` retourne un vecteur d'actions binaires de shape (N,). Le pipeline bypass la calibration de θ pour ce modèle (voir §11.5).
 - Aucune fuite: le modèle ne doit pas accéder au test pendant fit, ni recalculer des scalers sur val/test.
 
 ## 10.3 Entraînement et early stopping
@@ -560,6 +564,18 @@ En cas d'ex-aequo, préférer le seuil le plus conservateur (plus haut quantile)
 ## 11.4 Cas des baselines
 
 Les baselines produisent directement des signaux ou des positions. Elles ne calibrent pas de seuil θ, sauf si explicitement défini (ex: SMA rule paramétrée).
+
+
+## 11.5 Cas du modèle RL (PPO)
+
+Le modèle RL produit directement une décision (action) Go/No-Go à chaque pas de temps, sans passer par une prédiction de rendement suivie d'un seuil θ. L'agent apprend une politique π(a|s) qui maximise le rendement cumulé net de coûts.
+
+**Conséquences sur le pipeline :**
+- La calibration du seuil θ (§11.1–11.3) est **bypassée** pour le modèle RL.
+- Le champ `threshold.method` dans metrics.json est fixé à `"none"` et `theta` = `null`.
+- Les métriques de prédiction (MAE, RMSE, Directional Accuracy) ne sont **pas applicables** et sont fixées à `null` dans metrics.json.
+- Les métriques de trading (§14.2) s'appliquent normalement.
+- La comparaison avec les autres modèles se fait uniquement sur les métriques de trading.
 
 
 # 12. Moteur de backtest commun et conventions de coûts
@@ -1126,7 +1142,7 @@ Le schéma suivant définit formellement le contenu attendu de manifest.json. Il
         },
         "name": {
           "type": "string",
-          "description": "Ex: xgboost_reg, cnn1d_reg, gru_reg, lstm_reg, patchtst_reg, no_trade, buy_hold, sma_rule."
+          "description": "Ex: xgboost_reg, cnn1d_reg, gru_reg, lstm_reg, patchtst_reg, rl_ppo, no_trade, buy_hold, sma_rule."
         },
         "framework": {
           "type": "string"
@@ -1419,15 +1435,24 @@ Le schéma suivant définit formellement le contenu attendu de metrics.json. Il 
             ],
             "properties": {
               "mae": {
-                "type": "number",
+                "type": [
+                  "number",
+                  "null"
+                ],
                 "minimum": 0.0
               },
               "rmse": {
-                "type": "number",
+                "type": [
+                  "number",
+                  "null"
+                ],
                 "minimum": 0.0
               },
               "directional_accuracy": {
-                "type": "number",
+                "type": [
+                  "number",
+                  "null"
+                ],
                 "minimum": 0.0,
                 "maximum": 1.0
               },
@@ -1880,6 +1905,15 @@ Les valeurs ci-dessous sont les **defaults MVP**. Elles sont toutes paramétrabl
 | Batch size (DL) | `training.batch_size` | `64` | §10.3 | |
 | Max epochs (DL) | `training.max_epochs` | `100` | §10.3 | Borné par early stopping. |
 | Sharpe annualisé | `metrics.sharpe_annualized` | `false` | §14.2 | Non annualisé dans le MVP. |
+| RL hidden sizes | `models.rl_ppo.hidden_sizes` | `[64, 64]` | Annexe E.2.10 | Policy et Value networks. |
+| RL clip epsilon | `models.rl_ppo.clip_epsilon` | `0.2` | Annexe E.2.10 | PPO clipping. |
+| RL gamma | `models.rl_ppo.gamma` | `0.99` | Annexe E.2.10 | Discount factor. |
+| RL GAE lambda | `models.rl_ppo.gae_lambda` | `0.95` | Annexe E.2.10 | Generalized Advantage Estimation. |
+| RL PPO inner epochs | `models.rl_ppo.n_epochs_ppo` | `4` | Annexe E.2.10 | Epochs par rollout. |
+| RL max episodes | `models.rl_ppo.max_episodes` | `200` | Annexe E.2.10 | Borné par early stopping sur val. |
+| RL rollout steps | `models.rl_ppo.rollout_steps` | `512` | Annexe E.2.10 | Steps par rollout. |
+| RL entropy coeff | `models.rl_ppo.entropy_coeff` | `0.01` | Annexe E.2.10 | Encouragement exploration. |
+| RL learning rate | `models.rl_ppo.learning_rate` | `3e-4` | Annexe E.2.10 | PPO-specific. |
 
 ### E.2 Décisions best-practice (non paramétrables)
 
@@ -1974,5 +2008,28 @@ Les architectures ci-dessous sont les defaults MVP. Tous les hyperparamètres so
 | **GRU** | 1 couche GRU (hidden=64, bidirectional=false) + Linear(1). Dropout=0.2 sur input. |
 | **LSTM** | 1 couche LSTM (hidden=64, bidirectional=false) + Linear(1). Dropout=0.2 sur input. |
 | **PatchTST** | Patch size=16, stride=8, d_model=64, n_heads=4, n_layers=2, ff_dim=128, dropout=0.2. |
+| **RL (PPO)** | Policy : MLP 2 couches (hidden=64, 64) + action head (2 actions : Go/No-Go). Value : MLP 2 couches (hidden=64, 64). Algorithme PPO (clip_epsilon=0.2, gamma=0.99, gae_lambda=0.95, n_epochs_ppo=4, batch_size=64). Reward = net_return du trade (coûts inclus) si Go, 0 si No-Go. |
 
 **Justification** : architectures légères, adaptées à L=128 et F=9. Le but est la comparaison méthodologique, pas le tuning architectural.
+
+#### E.2.10 — Modèle RL (PPO) : spécification complémentaire
+
+**Formulation MDP :**
+
+| Composante | Définition |
+|---|---|
+| **État** s_t | Fenêtre X_t ∈ R^{L×F} (aplatie en vecteur R^{L·F}) après scaling. |
+| **Action** a_t | Discrète : 0 = No-Go, 1 = Go (long). |
+| **Reward** r_t | Si a_t = 1 (Go) : r_net du trade (entrée Open[t+1], sortie Close[t+H], coûts inclus). Si a_t = 0 (No-Go) : 0. |
+| **Transition** | Déterministe : passage à la bougie suivante disponible (après t+H si trade ouvert, mode one_at_a_time). |
+| **Épisode** | Un fold walk-forward complet (train ou val ou test). |
+
+**Entraînement :**
+- L'agent est entraîné sur le fold train (les rewards sont calculés à partir des prix réels du train).
+- L'early stopping est basé sur le P&L net cumulé sur validation.
+- La politique est gelée après entraînement ; elle est évaluée en mode déterministe (argmax) sur le test.
+- L'entraînement se fait en épisodes (rollouts) sur la période train, avec `max_episodes` contrôlé par config.
+
+**Anti-fuite :** l'agent n'a accès qu'à l'état courant s_t (fenêtre passée). Les rewards ne sont observés qu'après exécution du trade. L'agent ne voit jamais les prix du test pendant l'entraînement.
+
+**Comparabilité :** l'agent RL utilise les mêmes données, features, coûts et moteur de backtest que les autres modèles. Seul le mécanisme de décision diffère (politique apprise vs prédiction + seuil).

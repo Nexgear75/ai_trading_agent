@@ -1,0 +1,72 @@
+{
+  "run_id": "20260227_120000_xgboost_reg",
+  "strategy": {
+    "strategy_type": "model",
+    "name": "xgboost_reg"
+  },
+  "folds": [
+    {
+      "fold_id": 0,
+      "period_test": {
+        "start_utc": "2024-07-01T00:00:00Z",
+        "end_utc": "2024-07-30T23:00:00Z"
+      },
+      "threshold": {
+        "method": "quantile_grid",
+        "theta": 0.0012,
+        "selected_quantile": 0.9
+      },
+      "prediction": {
+        "mae": 0.0041,
+        "rmse": 0.0062,
+        "directional_accuracy": 0.53,
+        "spearman_ic": 0.06
+      },
+      "trading": {
+        "net_pnl": 0.021,
+        "net_return": 0.021,
+        "max_drawdown": 0.08,
+        "sharpe": 0.9,
+        "profit_factor": 1.12,
+        "hit_rate": 0.54,
+        "n_trades": 38,
+        "avg_trade_return": 0.0006,
+        "median_trade_return": 0.0003,
+        "exposure_time_frac": 0.52
+      }
+    }
+  ],
+  "aggregate": {
+    "prediction": {
+      "mean": {
+        "mae": 0.0041,
+        "rmse": 0.0062,
+        "directional_accuracy": 0.53,
+        "spearman_ic": 0.06
+      },
+      "std": {
+        "mae": 0.0,
+        "rmse": 0.0,
+        "directional_accuracy": 0.0,
+        "spearman_ic": 0.0
+      }
+    },
+    "trading": {
+      "mean": {
+        "net_pnl": 0.021,
+        "max_drawdown": 0.08,
+        "profit_factor": 1.12,
+        "hit_rate": 0.54,
+        "n_trades": 38
+      },
+      "std": {
+        "net_pnl": 0.0,
+        "max_drawdown": 0.0,
+        "profit_factor": 0.0,
+        "hit_rate": 0.0,
+        "n_trades": 0.0
+      }
+    },
+    "notes": "Agrégats calculés sur 1 fold dans cet exemple."
+  }
+}
