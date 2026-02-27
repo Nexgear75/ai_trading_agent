@@ -2,3 +2,20 @@
 .idea/
 AGENTS.md
 __pycache__/
+
+# Artefacts de run (générés par le pipeline)
+runs/
+output/
+
+# Données brutes (volumineuses)
+data/raw/
+
+# Environnement
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# OS
+.DS_Store
+Thumbs.db
