@@ -90,7 +90,8 @@ But : imposer un pipeline unique (données, splits, coûts, backtest, métriques
   - Annexe C - Exemples (manifest.json, metrics.json)
   - Annexe D - Références (sélection)
   - Annexe E - Addendum v1.1: paramètres MVP et décisions best-practice
-  - Annexe F - Modèle Reinforcement Learning (PPO): spécification détaillée
+    - E.2.9 - Architectures DL par défaut
+    - E.2.10 - Modèle Reinforcement Learning (PPO): spécification détaillée
 
 
 # Historique des versions
@@ -213,6 +214,7 @@ Avant tout calcul de features, le pipeline exécute des contrôles QA qui doiven
 - Régularité temporelle: la grille de timestamps doit être uniforme au pas Δ (pas de doublons).
 - Gestion des trous: une bougie manquante doit être explicitement détectée (missing candle).
 - Gestion des outliers: les valeurs aberrantes extrêmes doivent être détectées (ex: prix négatif, volume nul prolongé).
+- Cohérence intra-bougie OHLC: vérifier que `H >= max(O, C)` et `L <= min(O, C)` pour chaque bougie. Toute violation est signalée comme anomalie.
 - Alignement multi-symboles (si applicable): toutes les séries sont réindexées sur la même grille temporelle.
 
 ## 4.3 Politique de traitement des trous (missing candles)
@@ -785,6 +787,7 @@ runs/<run_id>/
 │   ├── fold_01/
 │   │   └── ...
 │   └── ...
+├── summary_metrics.csv       (optionnel, agrégats inter-fold)
 ├── equity_curve.csv          (optionnel, stitched)
 └── report.html ou report.pdf (optionnel)
 ```
@@ -892,6 +895,7 @@ Le schéma suivant définit formellement le contenu attendu de manifest.json. Il
     "run_id",
     "created_at_utc",
     "pipeline_version",
+    "git_commit",
     "config_snapshot",
     "dataset",
     "label",
@@ -1298,6 +1302,9 @@ Le schéma suivant définit formellement le contenu attendu de manifest.json. Il
                     "type": "string"
                   },
                   "model_artifacts_dir": {
+                    "type": "string"
+                  },
+                  "equity_curve_csv": {
                     "type": "string"
                   }
                 }
@@ -1765,7 +1772,8 @@ Exemples minimaux (valeurs fictives) pour illustrer la structure. Ces fichiers s
           "preds_test_csv": "folds/fold_00/preds_test.csv",
           "trades_csv": "folds/fold_00/trades.csv",
           "metrics_fold_json": "folds/fold_00/metrics_fold.json",
-          "model_artifacts_dir": "folds/fold_00/model_artifacts/"
+          "model_artifacts_dir": "folds/fold_00/model_artifacts/",
+          "equity_curve_csv": "folds/fold_00/equity_curve.csv"
         }
       }
     ]
@@ -1833,17 +1841,27 @@ Exemples minimaux (valeurs fictives) pour illustrer la structure. Ces fichiers s
     "trading": {
       "mean": {
         "net_pnl": 0.021,
+        "net_return": 0.021,
         "max_drawdown": 0.08,
+        "sharpe": 0.9,
         "profit_factor": 1.12,
         "hit_rate": 0.54,
-        "n_trades": 38
+        "n_trades": 38,
+        "avg_trade_return": 0.0006,
+        "median_trade_return": 0.0003,
+        "exposure_time_frac": 0.52
       },
       "std": {
         "net_pnl": 0.0,
+        "net_return": 0.0,
         "max_drawdown": 0.0,
+        "sharpe": 0.0,
         "profit_factor": 0.0,
         "hit_rate": 0.0,
-        "n_trades": 0.0
+        "n_trades": 0.0,
+        "avg_trade_return": 0.0,
+        "median_trade_return": 0.0,
+        "exposure_time_frac": 0.0
       }
     },
     "notes": "Agrégats calculés sur 1 fold dans cet exemple."
@@ -1914,6 +1932,56 @@ Les valeurs ci-dessous sont les **defaults MVP**. Elles sont toutes paramétrabl
 | RL rollout steps | `models.rl_ppo.rollout_steps` | `512` | Annexe E.2.10 | Steps par rollout. |
 | RL entropy coeff | `models.rl_ppo.entropy_coeff` | `0.01` | Annexe E.2.10 | Encouragement exploration. |
 | RL learning rate | `models.rl_ppo.learning_rate` | `3e-4` | Annexe E.2.10 | PPO-specific. |
+| Mode backtest | `backtest.mode` | `one_at_a_time` | §12.1, E.2.3 | **Imposé MVP** — un seul trade actif à la fois. Non modifiable. |
+| Direction backtest | `backtest.direction` | `long_only` | §12.1 | **Imposé MVP** — pas de short. Non modifiable. |
+| Fraction de position | `backtest.position_fraction` | `1.0` | §12.4 | All-in (w=1), pas de levier. |
+| Équité initiale | `backtest.initial_equity` | `1.0` | §12.4 | Normalisée. |
+| RSI période | `features.params.rsi_period` | `14` | §6.3 | Constante de la formule, exposée en config. |
+| RSI epsilon | `features.params.rsi_epsilon` | `1e-12` | §6.3 | Évite division par zéro. |
+| EMA fast | `features.params.ema_fast` | `12` | §6.4 | Période EMA rapide. |
+| EMA slow | `features.params.ema_slow` | `26` | §6.4 | Période EMA lente. |
+| Vol windows | `features.params.vol_windows` | `[24, 72]` | §6.5 | Fenêtres de volatilité. |
+| Logvol epsilon | `features.params.logvol_epsilon` | `1e-8` | §6.2 | Évite log(0). |
+| Volatility ddof | `features.params.volatility_ddof` | `0` | §6.5 | Population std (ddof=0). |
+| XGBoost max_depth | `models.xgboost.max_depth` | `5` | §10 | |
+| XGBoost n_estimators | `models.xgboost.n_estimators` | `500` | §10 | |
+| XGBoost LR | `models.xgboost.learning_rate` | `0.05` | §10 | XGBoost-specific LR. |
+| XGBoost subsample | `models.xgboost.subsample` | `0.8` | §10 | Extension impl-defined. |
+| XGBoost colsample | `models.xgboost.colsample_bytree` | `0.8` | §10 | Extension impl-defined. |
+| XGBoost reg_alpha | `models.xgboost.reg_alpha` | `0.0` | §10 | Extension impl-defined. |
+| XGBoost reg_lambda | `models.xgboost.reg_lambda` | `1.0` | §10 | Extension impl-defined. |
+| CNN1D conv layers | `models.cnn1d.n_conv_layers` | `2` | E.2.9 | |
+| CNN1D filters | `models.cnn1d.filters` | `64` | E.2.9 | |
+| CNN1D kernel | `models.cnn1d.kernel_size` | `3` | E.2.9 | |
+| CNN1D dropout | `models.cnn1d.dropout` | `0.2` | E.2.9 | |
+| CNN1D pooling | `models.cnn1d.pool` | `global_avg` | E.2.9 | Extension impl-defined. |
+| GRU hidden | `models.gru.hidden_size` | `64` | E.2.9 | |
+| GRU layers | `models.gru.num_layers` | `1` | E.2.9 | |
+| GRU bidirectional | `models.gru.bidirectional` | `false` | E.2.9 | |
+| GRU dropout | `models.gru.dropout` | `0.2` | E.2.9 | |
+| LSTM hidden | `models.lstm.hidden_size` | `64` | E.2.9 | |
+| LSTM layers | `models.lstm.num_layers` | `1` | E.2.9 | |
+| LSTM bidirectional | `models.lstm.bidirectional` | `false` | E.2.9 | |
+| LSTM dropout | `models.lstm.dropout` | `0.2` | E.2.9 | |
+| PatchTST patch_size | `models.patchtst.patch_size` | `16` | E.2.9 | |
+| PatchTST stride | `models.patchtst.stride` | `8` | E.2.9 | |
+| PatchTST d_model | `models.patchtst.d_model` | `64` | E.2.9 | |
+| PatchTST n_heads | `models.patchtst.n_heads` | `4` | E.2.9 | |
+| PatchTST n_layers | `models.patchtst.n_layers` | `2` | E.2.9 | |
+| PatchTST ff_dim | `models.patchtst.ff_dim` | `128` | E.2.9 | |
+| PatchTST dropout | `models.patchtst.dropout` | `0.2` | E.2.9 | |
+| RL value_loss_coeff | `models.rl_ppo.value_loss_coeff` | `0.5` | E.2.10 | Extension impl-defined. |
+| RL deterministic eval | `models.rl_ppo.deterministic_eval` | `true` | E.2.10 | argmax at test time. |
+| Sharpe epsilon | `metrics.sharpe_epsilon` | `1e-12` | §14.2 | Évite division par zéro. |
+| Sauvegarde modèle | `artifacts.save_model` | `true` | §15.1 | Sauvegarder artefacts modèle par fold. |
+| Sauvegarde equity | `artifacts.save_equity_curve` | `true` | §15.1, E.2.8 | |
+| Sauvegarde prédictions | `artifacts.save_predictions` | `true` | §15.1, §16.2 | preds_val.csv + preds_test.csv. |
+| Output dir | `artifacts.output_dir` | `runs` | §15.1 | Racine des runs. |
+| Raw dir | `dataset.raw_dir` | `data/raw` | §4.1 | Répertoire des fichiers bruts. |
+| Robust quantile low | `scaling.robust_quantile_low` | `0.005` | §9.2 | Quantile inférieur (si robust activé). |
+| Robust quantile high | `scaling.robust_quantile_high` | `0.995` | §9.2 | Quantile supérieur (si robust activé). |
+| Rolling window | `scaling.rolling_window` | `720` | §9.3 | Fenêtre rolling z-score (non MVP). |
+| Deterministic torch | `reproducibility.deterministic_torch` | `true` | §16.1 | `torch.use_deterministic_algorithms()`. |
 
 ### E.2 Décisions best-practice (non paramétrables)
 

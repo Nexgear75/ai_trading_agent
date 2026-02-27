@@ -8,6 +8,7 @@
     "run_id",
     "created_at_utc",
     "pipeline_version",
+    "git_commit",
     "config_snapshot",
     "dataset",
     "label",
@@ -414,6 +415,9 @@
                     "type": "string"
                   },
                   "model_artifacts_dir": {
+                    "type": "string"
+                  },
+                  "equity_curve_csv": {
                     "type": "string"
                   }
                 }

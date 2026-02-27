@@ -140,7 +140,8 @@
           "preds_test_csv": "folds/fold_00/preds_test.csv",
           "trades_csv": "folds/fold_00/trades.csv",
           "metrics_fold_json": "folds/fold_00/metrics_fold.json",
-          "model_artifacts_dir": "folds/fold_00/model_artifacts/"
+          "model_artifacts_dir": "folds/fold_00/model_artifacts/",
+          "equity_curve_csv": "folds/fold_00/equity_curve.csv"
         }
       }
     ]

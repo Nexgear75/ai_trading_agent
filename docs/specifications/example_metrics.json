@@ -54,17 +54,27 @@
     "trading": {
       "mean": {
         "net_pnl": 0.021,
+        "net_return": 0.021,
         "max_drawdown": 0.08,
+        "sharpe": 0.9,
         "profit_factor": 1.12,
         "hit_rate": 0.54,
-        "n_trades": 38
+        "n_trades": 38,
+        "avg_trade_return": 0.0006,
+        "median_trade_return": 0.0003,
+        "exposure_time_frac": 0.52
       },
       "std": {
         "net_pnl": 0.0,
+        "net_return": 0.0,
         "max_drawdown": 0.0,
+        "sharpe": 0.0,
         "profit_factor": 0.0,
         "hit_rate": 0.0,
-        "n_trades": 0.0
+        "n_trades": 0.0,
+        "avg_trade_return": 0.0,
+        "median_trade_return": 0.0,
+        "exposure_time_frac": 0.0
       }
     },
     "notes": "Agrégats calculés sur 1 fold dans cet exemple."
