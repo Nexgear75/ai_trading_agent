@@ -27,10 +27,12 @@ Dépendances :
 ## Règles attendues
 - **Config-driven** : `min_warmup` lu depuis `config.window.min_warmup`.
 - **Strict code** : si des NaN sont détectés dans la zone valide (hors warmup), lever une erreur explicite — pas de remplissage silencieux.
+- **Assertion runtime min_warmup vs min_periods** : vérifier que `min_warmup >= max(f.min_periods for f in resolved_features)`. Cette assertion est un double-check runtime complémentaire à la validation statique de la config (tâche #003). Elle garantit que la zone de warmup couvre bien le nombre de NaN en tête de chaque feature instanciée (contrat `min_periods` = nombre de NaN en tête, cf. tâche #023).
 - **Anti-fuite** : le masque n'utilise aucune information future.
 
 ## Évolutions proposées
-- Implémenter une fonction `apply_warmup(features_df, valid_mask, min_warmup) -> final_mask` :
+- Implémenter une fonction `apply_warmup(features_df, valid_mask, min_warmup, feature_instances) -> final_mask` :
+  - **Assertion** : `min_warmup >= max(f.min_periods for f in feature_instances)`, sinon `ValueError` explicite.
   - Crée un masque warmup : `False` pour les `min_warmup` premières lignes, `True` ensuite.
   - Combine : `final_mask = warmup_mask & valid_mask`.
   - Vérifie l'absence de NaN dans `features_df[final_mask]`. Si NaN détecté → `ValueError`.
@@ -41,6 +43,7 @@ Dépendances :
 - [ ] Le masque final est la combinaison AND du masque warmup et du masque de trous.
 - [ ] Absence de NaN dans `features_df[final_mask]` vérifiée. NaN résiduel → `ValueError`.
 - [ ] `min_warmup` lu depuis la config (pas hardcodé).
+- [ ] `min_warmup < max(min_periods)` → `ValueError` explicite (assertion runtime).
 - [ ] Test : `min_warmup=200`, features avec 500 bougies sans trou → 300 samples valides.
 - [ ] Test : NaN injecté dans la zone post-warmup → erreur levée.
 - [ ] Test : combinaison avec trou dans les données → masque correct.

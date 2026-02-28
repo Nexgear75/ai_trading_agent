@@ -32,6 +32,7 @@ Dépendances :
 - **Strict code** : erreur explicite si un `required_params` d'une feature est absent de `config.features.params`.
 - **Config-driven** : la liste des features et leurs paramètres viennent de la config.
 - **Traçabilité** : `feature_version` est lu depuis `config.features.feature_version`.
+- **Exposer les instances** : `compute_features()` doit retourner (ou rendre accessible) la liste des instances `BaseFeature` résolues, afin que la tâche #014 puisse accéder à `min_periods` pour l'assertion runtime `min_warmup >= max(min_periods)`.
 
 ## Évolutions proposées
 - Créer `ai_trading/features/pipeline.py` :
