@@ -1,6 +1,6 @@
 # Tâche — Features de volatilité rolling (vol_24, vol_72)
 
-Statut : TODO
+Statut : DONE
 Ordre : 009
 Workstream : WS-3
 Milestone : M2
@@ -38,27 +38,27 @@ Implémenter les deux features de volatilité :
 - Un helper interne `_compute_logret_1(close)` peut être extrait dans `features/_helpers.py` si nécessaire.
 
 ## Critères d'acceptation
-- [ ] 2 classes enregistrées : `vol_24`, `vol_72` dans `FEATURE_REGISTRY`.
-- [ ] Résultat numérique identique à `np.std(..., ddof=0)` sur la fenêtre correspondante.
-- [ ] Convention `ddof=0` (écart-type population) lue depuis la config.
-- [ ] NaN aux positions t < n.
-- [ ] Les fenêtres sont lues depuis `config.features.params.vol_windows` (pas hardcodées).
-- [ ] Causalité vérifiée : modifier `close[t > T]` ne modifie pas `vol_n[t <= T]`.
-- [ ] Tests couvrent les scénarios nominaux + erreurs + bords.
-- [ ] Suite de tests verte après implémentation.
-- [ ] `ruff check` passe sans erreur.
+- [x] 2 classes enregistrées : `vol_24`, `vol_72` dans `FEATURE_REGISTRY`.
+- [x] Résultat numérique identique à `np.std(..., ddof=0)` sur la fenêtre correspondante.
+- [x] Convention `ddof=0` (écart-type population) lue depuis la config.
+- [x] NaN aux positions t < n.
+- [x] Les fenêtres sont lues depuis `config.features.params.vol_windows` (pas hardcodées).
+- [x] Causalité vérifiée : modifier `close[t > T]` ne modifie pas `vol_n[t <= T]`.
+- [x] Tests couvrent les scénarios nominaux + erreurs + bords.
+- [x] Suite de tests verte après implémentation.
+- [x] `ruff check` passe sans erreur.
 
 ## Pré-condition de démarrage
 - **Tous les tests existants sont GREEN** avant de commencer.
 - **Créer une branche dédiée** `task/009-volatility` depuis `Max6000i1`.
 
 ## Checklist de fin de tâche
-- [ ] Branche `task/009-volatility` créée depuis `Max6000i1`.
-- [ ] Tests RED écrits avant implémentation.
-- [ ] **Commit RED** : `[WS-3] #009 RED: tests volatilité rolling`.
-- [ ] Tests GREEN passants et reproductibles.
-- [ ] Critères d'acceptation tous satisfaits.
-- [ ] `ruff check ai_trading/ tests/` passe sans erreur.
-- [ ] Fichier de tâche mis à jour (statut DONE, critères cochés).
-- [ ] **Commit GREEN** : `[WS-3] #009 GREEN: volatilité rolling`.
-- [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-3] #009 — Features de volatilité rolling`.
+- [x] Branche `task/009-volatility` créée depuis `Max6000i1`.
+- [x] Tests RED écrits avant implémentation.
+- [x] **Commit RED** : `[WS-3] #009 RED: tests volatilité rolling`.
+- [x] Tests GREEN passants et reproductibles.
+- [x] Critères d'acceptation tous satisfaits.
+- [x] `ruff check ai_trading/ tests/` passe sans erreur.
+- [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
+- [x] **Commit GREEN** : `[WS-3] #009 GREEN: volatilité rolling`.
+- [x] **Pull Request ouverte** vers `Max6000i1` : `[WS-3] #009 — Features de volatilité rolling`.
