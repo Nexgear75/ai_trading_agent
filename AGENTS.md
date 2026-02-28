@@ -26,8 +26,8 @@ Pipeline commun AI Trading : comparaison rigoureuse de modèles ML/DL (XGBoost, 
 5. **Commit GREEN** : `git commit -m "[WS-X] #NNN GREEN: <résumé>"`
    Condition : tests GREEN + critères d'acceptation validés + checklist cochée.
 6. Aucun commit intermédiaire sauf refactoring mineur (tests verts).
-7. **Branche dédiée** : `task/NNN-short-slug` depuis `main`. Jamais de commit direct sur `main`.
-8. **Pull Request obligatoire** vers `main` après commit GREEN.
+7. **Branche dédiée** : `task/NNN-short-slug` depuis `Max6000i1`. Jamais de commit direct sur `Max6000i1`.
+8. **Pull Request obligatoire** vers `Max6000i1` après commit GREEN.
 
 ### Zéro ghost completion
 Ne jamais marquer une tâche `DONE` ni cocher `[x]` sans code + tests + exécution vérifiée.
