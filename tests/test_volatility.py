@@ -135,7 +135,7 @@ class TestNumericalCorrectness:
         instance = FEATURE_REGISTRY["vol_24"]()
         result = instance.compute(ohlcv, params)
 
-        close = ohlcv["close"].values
+        close = np.asarray(ohlcv["close"].values)
         logreturns = np.log(close[1:] / close[:-1])
 
         # pandas logret[t] = log(close[t]/close[t-1]) = logreturns[t-1]
@@ -155,7 +155,7 @@ class TestNumericalCorrectness:
         instance = FEATURE_REGISTRY["vol_72"]()
         result = instance.compute(ohlcv, params)
 
-        close = ohlcv["close"].values
+        close = np.asarray(ohlcv["close"].values)
         logreturns = np.log(close[1:] / close[:-1])
 
         # pandas logret[t] = logreturns[t-1]; rolling(72) at t uses logreturns[t-72..t-1]
@@ -172,7 +172,7 @@ class TestNumericalCorrectness:
         instance = FEATURE_REGISTRY["vol_24"]()
         result = instance.compute(ohlcv, params)
 
-        close = ohlcv["close"].values
+        close = np.asarray(ohlcv["close"].values)
         logreturns = np.log(close[1:] / close[:-1])
 
         for t in [24, 40, 60, 99]:
@@ -206,7 +206,8 @@ class TestDdofConfig:
         valid = ~result_0.isna() & ~result_1.isna()
         assert valid.sum() > 0
         assert not np.allclose(
-            result_0[valid].values, result_1[valid].values
+            np.asarray(result_0[valid].values),
+            np.asarray(result_1[valid].values),
         ), "ddof=0 and ddof=1 should produce different values"
 
     def test_ddof_1_numerical_match(self):
@@ -217,7 +218,7 @@ class TestDdofConfig:
         instance = FEATURE_REGISTRY["vol_24"]()
         result = instance.compute(ohlcv, params)
 
-        close = ohlcv["close"].values
+        close = np.asarray(ohlcv["close"].values)
         logreturns = np.log(close[1:] / close[:-1])
 
         t = 30
@@ -296,7 +297,8 @@ class TestCausality:
 
         # Modify future prices (t > 60)
         ohlcv_mod = ohlcv_orig.copy()
-        ohlcv_mod.iloc[61:, ohlcv_mod.columns.get_loc("close")] *= 999.0
+        close_col = list(ohlcv_mod.columns).index("close")
+        ohlcv_mod.iloc[61:, close_col] *= 999.0
 
         result_mod = instance.compute(ohlcv_mod, params)
 
@@ -317,7 +319,8 @@ class TestCausality:
         result_orig = instance.compute(ohlcv_orig, params)
 
         ohlcv_mod = ohlcv_orig.copy()
-        ohlcv_mod.iloc[120:, ohlcv_mod.columns.get_loc("close")] *= 999.0
+        close_col = list(ohlcv_mod.columns).index("close")
+        ohlcv_mod.iloc[120:, close_col] *= 999.0
 
         result_mod = instance.compute(ohlcv_mod, params)
 
@@ -422,7 +425,7 @@ class TestEdgeCases:
         # After warmup, volatility should be 0.0
         valid_values = result.dropna()
         assert len(valid_values) > 0
-        np.testing.assert_allclose(valid_values.values, 0.0, atol=1e-15)
+        np.testing.assert_allclose(np.asarray(valid_values.values), 0.0, atol=1e-15)
 
     def test_missing_param_raises(self):
         """#009 Missing required param must raise an error."""
@@ -467,3 +470,44 @@ class TestEdgeCases:
         assert np.isnan(result.iloc[50])
         assert np.isnan(result.iloc[71])
         assert not np.isnan(result.iloc[72])
+
+    def test_empty_dataframe_returns_empty_series(self):
+        """#009 Empty OHLCV → empty Series (no crash)."""
+        _import_volatility()
+        timestamps = pd.DatetimeIndex([], dtype="datetime64[ns]", freq="h")
+        ohlcv = pd.DataFrame(
+            {"open": [], "high": [], "low": [], "close": [], "volume": []},
+            index=timestamps,
+        )
+        params = _default_params()
+        for name in ("vol_24", "vol_72"):
+            instance = FEATURE_REGISTRY[name]()
+            result = instance.compute(ohlcv, params)
+            assert isinstance(result, pd.Series)
+            assert len(result) == 0
+
+    def test_single_bar_all_nan(self):
+        """#009 With only 1 bar, all values must be NaN."""
+        _import_volatility()
+        ohlcv = _make_ohlcv(1)
+        params = _default_params()
+        for name in ("vol_24", "vol_72"):
+            instance = FEATURE_REGISTRY[name]()
+            result = instance.compute(ohlcv, params)
+            assert len(result) == 1
+            assert result.isna().all()
+
+    def test_exact_window_bars_all_nan_vol_24(self):
+        """#009 With exactly 24 bars, vol_24 must be all NaN.
+
+        24 bars produce only 23 log-returns, which is less than the
+        required window of 24.
+        """
+        _import_volatility()
+        ohlcv = _make_ohlcv(24)
+        params = _default_params()
+        instance = FEATURE_REGISTRY["vol_24"]()
+        result = instance.compute(ohlcv, params)
+        assert result.isna().all(), (
+            "24 bars yield 23 logreturns < window 24 → all NaN expected"
+        )
