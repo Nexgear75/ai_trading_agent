@@ -20,6 +20,10 @@ dataset:
   end: "2026-01-01"               # Date fin (UTC, exclue)
   timezone: UTC
   raw_dir: data/raw               # Répertoire des fichiers bruts
+  ingestion:
+    page_limit: 1000              # Max candles per ccxt API request
+    max_retries: 3                # Nombre de tentatives avant échec
+    base_backoff_s: 1.0           # Backoff initial (secondes), doublé à chaque retry
 
 # --- QA (contrôles qualité) --------------------------------------------------
 qa:

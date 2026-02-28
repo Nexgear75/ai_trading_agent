@@ -7,7 +7,7 @@ candles, negative prices, OHLC inconsistencies, and prolonged zero volume.
 Reference: spec §4.2 — Contrôles qualité (QA) obligatoires.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import pandas as pd
 
@@ -41,10 +41,10 @@ class QAReport:
 
     passed: bool
     duplicate_count: int
-    missing_timestamps: list = field(default_factory=list)
-    ohlc_inconsistency_count: int = 0
-    zero_volume_streak_count: int = 0
-    irregular_delta_count: int = 0
+    missing_timestamps: list
+    ohlc_inconsistency_count: int
+    zero_volume_streak_count: int
+    irregular_delta_count: int
 
 
 def _validate_inputs(df: pd.DataFrame, timeframe: str) -> pd.Timedelta:

@@ -14,8 +14,9 @@ from pathlib import Path
 _VALID_LEVELS = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
 _VALID_FORMATS = {"text", "json"}
 
-# Store current format so add_file_handler can reuse it
-_current_fmt: str = "text"
+# Store current format so add_file_handler can reuse it.
+# None means setup_logging() has not been called yet.
+_current_fmt: str | None = None
 
 _TEXT_FORMAT = "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s"
 _TEXT_DATE_FORMAT = "%Y-%m-%dT%H:%M:%S"
@@ -70,7 +71,11 @@ def setup_logging(level: str, fmt: str) -> None:
     """
     global _current_fmt  # noqa: PLW0603
 
-    level_upper = level.upper() if isinstance(level, str) else level
+    if not isinstance(level, str):
+        raise TypeError(
+            f"level must be a str, got {type(level).__name__}"
+        )
+    level_upper = level.upper()
     if level_upper not in _VALID_LEVELS:
         raise ValueError(
             f"Invalid logging level {level!r}. "
@@ -106,6 +111,11 @@ def add_file_handler(run_dir: Path, filename: str) -> None:
     if not run_dir.is_dir():
         raise FileNotFoundError(
             f"run_dir does not exist or is not a directory: {run_dir}"
+        )
+
+    if _current_fmt is None:
+        raise RuntimeError(
+            "setup_logging() must be called before add_file_handler()"
         )
 
     log_path = run_dir / filename

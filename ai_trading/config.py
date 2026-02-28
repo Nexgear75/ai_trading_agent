@@ -53,6 +53,12 @@ class LoggingConfig(_StrictBase):
     file: str | None
 
 
+class IngestionConfig(_StrictBase):
+    page_limit: int = Field(ge=1)
+    max_retries: int = Field(ge=1)
+    base_backoff_s: float = Field(gt=0)
+
+
 class DatasetConfig(_StrictBase):
     exchange: str
     symbols: list[str]
@@ -61,6 +67,7 @@ class DatasetConfig(_StrictBase):
     end: str
     timezone: str
     raw_dir: str
+    ingestion: IngestionConfig
 
 
 class QAConfig(_StrictBase):

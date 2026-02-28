@@ -20,32 +20,13 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from ai_trading.config import PipelineConfig
+from ai_trading.data.timeframes import TIMEFRAME_DELTA as _TIMEFRAME_DELTA
 
 logger = logging.getLogger(__name__)
 
-# ccxt returns at most ~1000 candles per request
-_CCXT_PAGE_LIMIT = 1000
-
-# Retry parameters
-_MAX_RETRIES = 3
-_BASE_BACKOFF_S = 1.0
-
-# Mapping from config timeframe strings to millisecond durations
+# Derive millisecond mapping from the single source of truth (timeframes.py)
 _TIMEFRAME_MS: dict[str, int] = {
-    "1m": 60_000,
-    "3m": 180_000,
-    "5m": 300_000,
-    "15m": 900_000,
-    "30m": 1_800_000,
-    "1h": 3_600_000,
-    "2h": 7_200_000,
-    "4h": 14_400_000,
-    "6h": 21_600_000,
-    "8h": 28_800_000,
-    "12h": 43_200_000,
-    "1d": 86_400_000,
-    "3d": 259_200_000,
-    "1w": 604_800_000,
+    k: int(v.total_seconds() * 1000) for k, v in _TIMEFRAME_DELTA.items()
 }
 
 # Supported exchanges (MVP: binance only)
@@ -115,34 +96,38 @@ def _fetch_page_with_retry(
     timeframe: str,
     since: int,
     limit: int,
+    max_retries: int,
+    base_backoff_s: float,
 ) -> list[list]:
     """Fetch a single page of OHLCV data with retry + exponential backoff.
 
     Raises
     ------
     ConnectionError, ccxt.NetworkError, etc.
-        After _MAX_RETRIES exhausted.
+        After *max_retries* exhausted.
     """
     last_exc: BaseException | None = None
-    for attempt in range(_MAX_RETRIES):
+    for attempt in range(max_retries):
         try:
             return exchange.fetch_ohlcv(
                 symbol, timeframe, since=since, limit=limit
             )
         except (ConnectionError, ccxt.NetworkError, ccxt.ExchangeNotAvailable) as exc:
             last_exc = exc
-            wait = _BASE_BACKOFF_S * (2 ** attempt)
+            wait = base_backoff_s * (2 ** attempt)
             logger.warning(
                 "Fetch attempt %d/%d failed (%s), retrying in %.1fs",
                 attempt + 1,
-                _MAX_RETRIES,
+                max_retries,
                 exc,
                 wait,
             )
             time.sleep(wait)
 
     # All retries exhausted — re-raise the last exception
-    raise last_exc  # type: ignore[misc]
+    if last_exc is None:
+        raise RuntimeError("max_retries must be >= 1")
+    raise last_exc
 
 
 def _fetch_all_pages(
@@ -151,6 +136,9 @@ def _fetch_all_pages(
     timeframe: str,
     start_ms: int,
     end_ms: int,
+    page_limit: int,
+    max_retries: int,
+    base_backoff_s: float,
 ) -> list[list]:
     """Paginate through the exchange API to fetch all candles in [start, end[.
 
@@ -168,7 +156,9 @@ def _fetch_all_pages(
 
     while since < end_ms:
         page = _fetch_page_with_retry(
-            exchange, symbol, timeframe, since, _CCXT_PAGE_LIMIT
+            exchange, symbol, timeframe, since, page_limit,
+            max_retries=max_retries,
+            base_backoff_s=base_backoff_s,
         )
         if not page:
             break
@@ -314,7 +304,12 @@ def fetch_ohlcv(config: PipelineConfig) -> IngestionResult:
         ds.start,
         ds.end,
     )
-    rows = _fetch_all_pages(exchange, symbol_ccxt, ds.timeframe, start_ms, end_ms)
+    rows = _fetch_all_pages(
+        exchange, symbol_ccxt, ds.timeframe, start_ms, end_ms,
+        page_limit=ds.ingestion.page_limit,
+        max_retries=ds.ingestion.max_retries,
+        base_backoff_s=ds.ingestion.base_backoff_s,
+    )
 
     if not rows:
         raise ValueError(
