@@ -32,7 +32,7 @@ class LogReturn1(BaseFeature):
     def compute(self, ohlcv: pd.DataFrame, params: dict) -> pd.Series:
         """Compute 1-bar log-return from close prices."""
         close = ohlcv["close"]
-        return pd.Series(np.log(close / close.shift(1)), index=ohlcv.index)
+        return np.log(close / close.shift(1))
 
 
 @register_feature("logret_2")
@@ -48,7 +48,7 @@ class LogReturn2(BaseFeature):
     def compute(self, ohlcv: pd.DataFrame, params: dict) -> pd.Series:
         """Compute 2-bar log-return from close prices."""
         close = ohlcv["close"]
-        return pd.Series(np.log(close / close.shift(2)), index=ohlcv.index)
+        return np.log(close / close.shift(2))
 
 
 @register_feature("logret_4")
@@ -64,4 +64,4 @@ class LogReturn4(BaseFeature):
     def compute(self, ohlcv: pd.DataFrame, params: dict) -> pd.Series:
         """Compute 4-bar log-return from close prices."""
         close = ohlcv["close"]
-        return pd.Series(np.log(close / close.shift(4)), index=ohlcv.index)
+        return np.log(close / close.shift(4))
