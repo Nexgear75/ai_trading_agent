@@ -135,7 +135,7 @@ class TestNumericalCorrectness:
         instance = FEATURE_REGISTRY["vol_24"]()
         result = instance.compute(ohlcv, params)
 
-        close = ohlcv["close"].values
+        close = np.asarray(ohlcv["close"].values)
         logreturns = np.log(close[1:] / close[:-1])
 
         # pandas logret[t] = log(close[t]/close[t-1]) = logreturns[t-1]
@@ -155,7 +155,7 @@ class TestNumericalCorrectness:
         instance = FEATURE_REGISTRY["vol_72"]()
         result = instance.compute(ohlcv, params)
 
-        close = ohlcv["close"].values
+        close = np.asarray(ohlcv["close"].values)
         logreturns = np.log(close[1:] / close[:-1])
 
         # pandas logret[t] = logreturns[t-1]; rolling(72) at t uses logreturns[t-72..t-1]
@@ -172,7 +172,7 @@ class TestNumericalCorrectness:
         instance = FEATURE_REGISTRY["vol_24"]()
         result = instance.compute(ohlcv, params)
 
-        close = ohlcv["close"].values
+        close = np.asarray(ohlcv["close"].values)
         logreturns = np.log(close[1:] / close[:-1])
 
         for t in [24, 40, 60, 99]:
@@ -206,7 +206,8 @@ class TestDdofConfig:
         valid = ~result_0.isna() & ~result_1.isna()
         assert valid.sum() > 0
         assert not np.allclose(
-            result_0[valid].values, result_1[valid].values
+            np.asarray(result_0[valid].values),
+            np.asarray(result_1[valid].values),
         ), "ddof=0 and ddof=1 should produce different values"
 
     def test_ddof_1_numerical_match(self):
@@ -217,7 +218,7 @@ class TestDdofConfig:
         instance = FEATURE_REGISTRY["vol_24"]()
         result = instance.compute(ohlcv, params)
 
-        close = ohlcv["close"].values
+        close = np.asarray(ohlcv["close"].values)
         logreturns = np.log(close[1:] / close[:-1])
 
         t = 30
@@ -296,7 +297,8 @@ class TestCausality:
 
         # Modify future prices (t > 60)
         ohlcv_mod = ohlcv_orig.copy()
-        ohlcv_mod.iloc[61:, ohlcv_mod.columns.get_loc("close")] *= 999.0
+        close_col = list(ohlcv_mod.columns).index("close")
+        ohlcv_mod.iloc[61:, close_col] *= 999.0
 
         result_mod = instance.compute(ohlcv_mod, params)
 
@@ -317,7 +319,8 @@ class TestCausality:
         result_orig = instance.compute(ohlcv_orig, params)
 
         ohlcv_mod = ohlcv_orig.copy()
-        ohlcv_mod.iloc[120:, ohlcv_mod.columns.get_loc("close")] *= 999.0
+        close_col = list(ohlcv_mod.columns).index("close")
+        ohlcv_mod.iloc[120:, close_col] *= 999.0
 
         result_mod = instance.compute(ohlcv_mod, params)
 
@@ -422,7 +425,7 @@ class TestEdgeCases:
         # After warmup, volatility should be 0.0
         valid_values = result.dropna()
         assert len(valid_values) > 0
-        np.testing.assert_allclose(valid_values.values, 0.0, atol=1e-15)
+        np.testing.assert_allclose(np.asarray(valid_values.values), 0.0, atol=1e-15)
 
     def test_missing_param_raises(self):
         """#009 Missing required param must raise an error."""
