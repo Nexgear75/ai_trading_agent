@@ -280,15 +280,15 @@ La liste ci-dessous est le jeu de features minimal commun (MVP). Tout ajout de f
 
 | Feature | Définition (math) | Paramètres / notes |
 | --- | --- | --- |
-| `logret_1` | $\text{logret\_1}(t) = \log(C_t / C_{t-1})$ | Return log à 1 pas. |
-| `logret_2` | $\text{logret\_2}(t) = \log(C_t / C_{t-2})$ | Return log à 2 pas. |
-| `logret_4` | $\text{logret\_4}(t) = \log(C_t / C_{t-4})$ | Return log à 4 pas (ex: 4h si $\Delta$=1h). |
-| `vol_24` | $\text{vol\_24}(t) = \text{std}( \text{logret\_1}(t-i) )_{i=0..23}$ | Écart-type sur 24 pas (ddof=0). |
-| `vol_72` | $\text{vol\_72}(t) = \text{std}( \text{logret\_1}(t-i) )_{i=0..71}$ | Écart-type sur 72 pas (ddof=0). |
+| `logret_1` | $\text{logret\\_1}(t) = \log(C_t / C_{t-1})$ | Return log à 1 pas. |
+| `logret_2` | $\text{logret\\_2}(t) = \log(C_t / C_{t-2})$ | Return log à 2 pas. |
+| `logret_4` | $\text{logret\\_4}(t) = \log(C_t / C_{t-4})$ | Return log à 4 pas (ex: 4h si $\Delta$=1h). |
+| `vol_24` | $\text{vol\\_24}(t) = \text{std}( \text{logret\\_1}(t-i) )_{i=0..23}$ | Écart-type sur 24 pas (ddof=0). |
+| `vol_72` | $\text{vol\\_72}(t) = \text{std}( \text{logret\\_1}(t-i) )_{i=0..71}$ | Écart-type sur 72 pas (ddof=0). |
 | `logvol` | $\text{logvol}(t) = \log(V_t + \varepsilon)$ | $\varepsilon = 10^{-8}$ (évite log(0)). |
 | `dlogvol` | $\text{dlogvol}(t) = \text{logvol}(t) - \text{logvol}(t-1)$ | Différence première du log-volume. |
 | `rsi_14` | $\text{RSI}_{14}(t) = 100 - 100/(1 + RS_t)$ | $RS_t$ défini via lissage de Wilder (voir §6.3). |
-| `ema_ratio_12_26` | $\text{ema\_ratio}(t) = \text{EMA}_{12}(t) / \text{EMA}_{26}(t) - 1$ | EMA définie en §6.4, $\alpha = 2/(n+1)$. |
+| `ema_ratio_12_26` | $\text{ema\\_ratio}(t) = \text{EMA}_{12}(t) / \text{EMA}_{26}(t) - 1$ | EMA définie en §6.4, $\alpha = 2/(n+1)$. |
 
 
 ## 6.3 RSI (Relative Strength Index) - lissage de Wilder
@@ -359,10 +359,10 @@ La feature `ema_ratio_12_26` est définie comme $\text{EMA}_{12}(t) / \text{EMA}
 Pour une fenêtre $n$, la volatilité réalisée est définie comme l'écart-type population (ddof=0) des returns `logret_1` sur $n$ pas:
 
 $$
-\mu_t^{(n)} = \frac{1}{n} \sum_{i=0}^{n-1} \text{logret\_1}(t-i)
+\mu_t^{(n)} = \frac{1}{n} \sum_{i=0}^{n-1} \text{logret\\_1}(t-i)
 $$
 $$
-\text{vol}_n(t) = \sqrt{ \frac{1}{n} \sum_{i=0}^{n-1} \bigl(\text{logret\_1}(t-i) - \mu_t^{(n)}\bigr)^2 }
+\text{vol}_n(t) = \sqrt{ \frac{1}{n} \sum_{i=0}^{n-1} \bigl(\text{logret\\_1}(t-i) - \mu_t^{(n)}\bigr)^2 }
 $$
 
 Dans le MVP, $n \in \{24, 72\}$. Toute annualisation est exclue (non nécessaire pour comparer des modèles).
@@ -412,9 +412,9 @@ Aucune feature supplémentaire spécifique à XGBoost ne doit être ajoutée san
 ## 7.3 Métadonnées d'exécution (meta)
 
 Pour chaque décision $t$, le pipeline stocke les métadonnées nécessaires au backtest, indépendamment du modèle:
-- `decision_time` = $\text{close\_time}(t)$
-- `entry_time` = $\text{open\_time}(t+1)$
-- `exit_time` = $\text{close\_time}(t+H)$
+- `decision_time` = $\text{close\\_time}(t)$
+- `entry_time` = $\text{open\\_time}(t+1)$
+- `exit_time` = $\text{close\\_time}(t+H)$
 - `entry_price` = $O_{t+1}$
 - `exit_price` = $C_{t+H}$
 
@@ -459,28 +459,28 @@ Le découpage temporel est un composant critique. Il doit empêcher toute fuite 
 ## 8.2 Purge liée à l'horizon H (éviter le chevauchement des labels)
 
 La cible $y_t$ dépend de prix futurs jusqu'à $t+H$. Un split naïf qui coupe uniquement sur $t$ peut fuiter: des labels du train peuvent dépendre de prix situés dans la zone test. Le pipeline applique donc une règle stricte de validité:
-Un index $t$ peut appartenir au train/val si et seulement si $t+H \leq \text{train\_end}$ (après application de l'embargo).
+Un index $t$ peut appartenir au train/val si et seulement si $t+H \leq \text{train\\_end}$ (après application de l'embargo).
 
 
 **Règle de purge :** Soit `test_start` le début du test (indice de décision). On définit :
 
 $$
-\text{train\_end} = \text{test\_start} - \text{embargo\_bars}
+\text{train\\_end} = \text{test\\_start} - \text{embargo\\_bars}
 $$
 
 Un sample t est autorisé dans train/val si :
 
 $$
-t + H \leq \text{train\_end}
+t + H \leq \text{train\\_end}
 $$
 
 
 ## 8.3 Définition formelle des périodes par fold
 
 Pour chaque fold $k$, le splitter doit produire des périodes disjointes (train/val/test) en timestamps UTC:
-- $\text{train}_k = [T_{\text{train\_start}}, T_{\text{train\_end}}]$
+- $\text{train}_k = [T_{\text{train\\_start}}, T_{\text{train\\_end}}]$
 - $\text{val}_k$ = sous-intervalle terminal de $\text{train}_k$ (`val_frac_in_train`)
-- $\text{test}_k = [T_{\text{test\_start}}, T_{\text{test\_end}}]$
+- $\text{test}_k = [T_{\text{test\\_start}}, T_{\text{test\\_end}}]$
 
 Le `manifest.json` doit enregistrer précisément ces bornes pour audit.
 
@@ -652,16 +652,16 @@ Les valeurs 'par trade' round-trip se déduisent par: $f_{\text{rt}} \approx 2f$
 Soit $p_{\text{entry}} = O_{t+1}$ et $p_{\text{exit}} = C_{t+H}$. On modélise un slippage proportionnel (worst-case):
 
 $$
-p_{\text{entry\_eff}} = p_{\text{entry}} \cdot (1 + s)
+p_{\text{entry\\_eff}} = p_{\text{entry}} \cdot (1 + s)
 $$
 $$
-p_{\text{exit\_eff}} = p_{\text{exit}} \cdot (1 - s)
+p_{\text{exit\\_eff}} = p_{\text{exit}} \cdot (1 - s)
 $$
 
 On applique ensuite les frais sur les deux côtés (achat puis vente). Le multiplicateur net du trade est:
 
 $$
-M_{\text{net}} = (1 - f)^2 \cdot \frac{p_{\text{exit\_eff}}}{p_{\text{entry\_eff}}}
+M_{\text{net}} = (1 - f)^2 \cdot \frac{p_{\text{exit\\_eff}}}{p_{\text{entry\\_eff}}}
 $$
 
 Return net (simple): $r_{\text{net}} = M_{\text{net}} - 1$
