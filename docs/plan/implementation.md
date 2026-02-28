@@ -11,6 +11,7 @@
 ## Table des matières
 
 - [Vue d'ensemble](#vue-densemble)
+- [Cadre de Gates (Go/No-Go)](#cadre-de-gates-gono-go)
 - [Milestones et dépendances](#milestones-et-dépendances)
 - [WS-1 — Fondations et configuration](#ws-1--fondations-et-configuration)
 - [WS-2 — Ingestion des données et contrôle qualité](#ws-2--ingestion-des-données-et-contrôle-qualité)
@@ -26,6 +27,7 @@
 - [WS-12 — Reproductibilité et orchestration](#ws-12--reproductibilité-et-orchestration)
 - [Arborescence cible du code](#arborescence-cible-du-code)
 - [Conventions](#conventions)
+- [Annexe — Synthèse des gates](#annexe--synthèse-des-gates)
 
 
 ## Vue d'ensemble
@@ -38,15 +40,19 @@ flowchart LR
   end
   subgraph M2["Milestone 2 — Feature & Data Pipeline"]
     WS3[WS-3 Features]
+    GF{G-Features}
     WS4[WS-4 Datasets + Split]
+    GS{G-Split}
     WS5[WS-5 Scaling]
   end
   subgraph M3["Milestone 3 — Training Framework"]
     WS6[WS-6 Interface modèle]
     WS7[WS-7 Calibration θ]
+    GD{G-Doc}
   end
   subgraph M4["Milestone 4 — Evaluation Engine"]
     WS8[WS-8 Backtest]
+    GB{G-Backtest}
     WS9[WS-9 Baselines]
     WS10[WS-10 Métriques]
   end
@@ -54,6 +60,10 @@ flowchart LR
     WS11[WS-11 Artefacts]
     WS12[WS-12 Reproducibilité + Orchestrateur]
   end
+  WS3 --> GF --> WS4
+  WS4 --> GS --> WS5
+  WS8 --> GB --> WS9
+  WS7 --> GD
   M1 --> M2 --> M3 --> M4 --> M5
 ```
 
@@ -61,9 +71,86 @@ flowchart LR
 |---|---|---|---|
 | **M1** | WS-1, WS-2 | Config chargeable, données brutes téléchargées et QA passé | Données Parquet validées, config parsée sans erreur |
 | **M2** | WS-3, WS-4, WS-5 | Pipeline de features → datasets (N,L,F) → splits walk-forward → scaler | Tenseur X_seq reproductible, splits disjoints vérifiés |
-| **M3** | WS-6, WS-7 | Interface plug-in modèle, boucle d'entraînement, calibration θ | Modèle dummy réussit fit/predict/calibration sur données synthétiques |
+| **M3** | WS-6, WS-7 | Interface plug-in modèle, boucle d'entraînement, calibration θ | Dummy + 2 baselines réussissent fit/predict/calibration sur données synthétiques |
 | **M4** | WS-8, WS-9, WS-10 | Backtest commun, 3 baselines, métriques de prédiction et trading | Métriques cohérentes sur données synthétiques et baselines |
 | **M5** | WS-11, WS-12 | Artefacts conformes aux schémas JSON, orchestrateur bout-en-bout, Makefile, Docker | Run complet reproductible avec manifest.json + metrics.json valides, `make run-all` fonctionnel |
+
+
+## Cadre de Gates (Go/No-Go)
+
+Objectif : rendre les gates de milestone auditables, comparables entre runs, et réellement décisionnels.
+
+Les gates sont organisés en deux niveaux :
+- **Gates de milestone (M1–M5)** : points de décision GO/NO-GO aux frontières entre milestones. Bloquants pour la progression.
+- **Gates intra-milestone (G-Features, G-Split, G-Backtest, G-Doc)** : points de vérification intermédiaires au sein d'un milestone. Ils détectent les défauts structurels au plus tôt, avant qu'ils ne se propagent aux étapes suivantes. Bloquants pour les WS en aval au sein du même milestone.
+- **Gate transversal anti-fuite (G-Leak)** : vérification continue appliquée à chaque étape manipulant des données temporelles. Intégré dans les critères de chaque gate intra-milestone et de milestone.
+
+### Gates de milestone (M1–M5)
+
+| Milestone | Critères de gate | Seuil / règle de décision | Preuves attendues | Décision |
+|---|---|---|---|---|
+| **M1** | Configuration et données sources prêtes | `0` erreur de validation config, `0` erreur QA bloquante, `>= 95%` de couverture de tests sur modules WS-1/WS-2 (mesurée via `pytest --cov=ai_trading.config --cov=ai_trading.data --cov-fail-under=95`) | Log de chargement config, rapport QA, `pytest` ciblé WS-1/WS-2 avec couverture, hash SHA-256 des données, rapport `gate_report_M1.json` | `GO` si les 3 seuils sont atteints, sinon `NO-GO` |
+| **M2** | Pipeline data/feature causale et sans fuite | `0` fuite détectée par tests split/embargo, `100%` de disjonction train/val/test, reproductibilité `X_seq` bit-à-bit identique (même seed, même plateforme ; tolérance `atol=1e-7` pour cross-plateforme float32), taux de NaN hors warmup `= 0%` | Rapport de validation split/embargo, test anti-leakage, snapshot config, test de reproductibilité features | `GO` si les 4 seuils sont atteints |
+| **M3** | Framework d'entraînement exploitable | `fit/predict` OK pour `>= 3` stratégies (dummy + 2 baselines parmi no_trade, buy_hold, sma_rule — les modèles ML/DL réels sont hors scope plan, cf. §10), calibration `theta` exécutable sur `100%` des folds valides (avec DummyModel), bypass `theta` fonctionnel pour `output_type == "signal"`, `0` crash entraînement sur `3` seeds (`42, 43, 44`) | Logs d'entraînement, courbes/pertes, artefact de calibration, tests unitaires WS-6/WS-7, `pytest` ciblé WS-6/WS-7/WS-9 | `GO` si exécution complète sans crash, calibration disponible pour `output_type == "regression"`, et bypass validé pour baselines |
+| **M4** | Evaluation trading robuste | **M4-framework (scope plan)** : (a) Déterminisme backtest : delta Sharpe **non-annualisé** absolu `<= 0.02` et delta MDD absolu `<= 0.5` point de pourcentage entre `2` runs même seed (DummyModel + données synthétiques). (b) Pipeline complet sans crash pour DummyModel + 3 baselines (no_trade, buy_hold, sma_rule). (c) Métriques cohérentes : no_trade → `net_pnl=0, n_trades=0, MDD=0` ; buy_hold → `n_trades=1` ; sma_rule → `n_trades >= 0`. (d) `>= 95%` couverture tests WS-8/WS-9/WS-10. **M4-performance (post-intégration modèle réel, hors scope plan)** : Non-régression vs baseline de référence : Sharpe **non-annualisé** stratégie `>=` Sharpe baseline `- 0.05`, MDD stratégie `<=` MDD baseline `+ 1.0` pp, retour cumulé stratégie `>=` baseline `- 2.0` pp — évalué via `scripts/compare_runs.py` (WS-12.5) | Journaux de trades, equity curves, tests d'intégration backtest, tableau comparatif stratégie vs baselines (M4-performance uniquement) | `GO` si M4-framework (a+b+c+d) atteint. M4-performance évalué séparément post-intégration modèle |
+| **M5** | Readiness de livraison | Reproductibilité e2e : `>= 95%` des champs numériques clés de `metrics.json` dans une tolérance relative `<= 1%` (même seed, cross-plateforme). **Champs numériques clés** : dans `aggregate` — `trading.mean.*` et `trading.std.*` (net_pnl, net_return, max_drawdown, sharpe, profit_factor, hit_rate, n_trades, avg_trade_return, median_trade_return, exposure_time_frac), `prediction.mean.*` et `prediction.std.*` (mae, rmse, directional_accuracy, spearman_ic — si applicable) ; par fold — `theta`, `n_trades`, `net_pnl`, `sharpe`, `max_drawdown`. Conformité artefacts : `100%` de validation JSON Schema. Exécution : `make run-all` + pipeline CI en succès (`0` job rouge) | Exécution CI verte, validation JSON Schema, dossier d'artefacts complet, logs d'orchestrateur, rapport de gate `gate_report_M5.json` | `GO` si les 3 seuils sont atteints, sinon `NO-GO` |
+
+### Gates intra-milestone
+
+Objectif : détecter les défauts structurels **au sein** d'un milestone, avant qu'ils ne se propagent aux Work Streams en aval. Chaque gate intra-milestone est un point de vérification bloquant : les WS en aval ne doivent pas commencer tant que le gate n'est pas `GO`.
+
+| Gate | Position | Critères | Seuil / règle de décision | Preuves attendues | Décision |
+|---|---|---|---|---|---|
+| **G-Features** | Après WS-3.7, avant WS-4.1 | Features causales, complètes et sans fuite | (1) `9` features enregistrées dans `FEATURE_REGISTRY`, (2) `0` NaN hors zone warmup sur un dataset synthétique de `>= 500` bougies, (3) audit de causalité réussi : modification des prix `t > T` → features identiques pour `t <= T` (tolérance `atol=0`), (4) `feature_version` tracée pour chaque feature, (5) `>= 90%` couverture tests WS-3.* (`pytest --cov=ai_trading.features --cov-fail-under=90`) | `pytest` ciblé features avec couverture, log d'audit de causalité, rapport `gate_report_G_Features.json` | `GO` si les 5 critères sont atteints |
+| **G-Split** | Après WS-4.6, avant WS-5.1 | Splits causaux, disjoints, embargo correct | (1) `100%` disjonction temporelle train/val/test par fold (aucun timestamp partagé), (2) purge E2E validée : `max(t + H × Δ for t in train_val_samples) < test_start` pour chaque fold, (3) `>= 1` fold valide après troncation et filtrage, (4) tenseur `X_seq` reproductible bit-à-bit (même seed, `atol=1e-7`), (5) taux de NaN dans `X_seq` et `y` = `0%`, (6) test anti-fuite scaler : indices `X_train` strictement disjoints de `X_val ∪ X_test` | Rapport split/embargo E2E, test de reproductibilité tenseur, rapport `gate_report_G_Split.json` | `GO` si les 6 critères sont atteints |
+| **G-Backtest** | Après WS-8.4, avant WS-9.1 | Moteur de backtest déterministe et correct | (1) Déterminisme : `2` runs identiques (même seed, DummyModel, données synthétiques) → `trades.csv` identiques byte-à-byte (SHA-256), equity curves identiques (`atol=1e-10`), (2) cohérence equity-trades : `E_final == E_0 * Π(1 + w * r_net_i)` à `atol=1e-8`, (3) mode `one_at_a_time` respecté : aucun trade actif n'est interrompu par un nouveau Go (test sur séquence de signaux denses), (4) modèle de coûts correct : résultat numérique identique au calcul à la main sur `>= 3` cas de test, (5) `trades.csv` parseable et colonnes conformes | Tests déterminisme + cohérence + coûts, SHA-256 des CSVs, rapport `gate_report_G_Backtest.json` | `GO` si les 5 critères sont atteints |
+| **G-Doc** | Après WS-7.4, avant gate M3 | Contrat plug-in et registres complets | (1) `output_type` déclaré et correct pour `>= 4` stratégies (dummy + 3 baselines), (2) `execution_mode` valeur par défaut `"standard"` sauf `BuyHoldBaseline` (`"single_trade"`), (3) `set(VALID_STRATEGIES) == set(MODEL_REGISTRY)` (cohérence registres), (4) docstrings conformes au contrat `BaseModel` (shapes, types, contraintes) sur `base.py`, `dummy.py` et les 3 baselines, (5) bypass θ fonctionnel pour `output_type == "signal"` sur données synthétiques | Tests unitaires registres + attributs, `pytest` ciblé WS-6/WS-7/WS-9, rapport inspection docstrings, rapport `gate_report_G_Doc.json` | `GO` si les 5 critères sont atteints |
+
+### Gate transversal anti-fuite (G-Leak)
+
+Objectif : garantir l'absence de fuite d'information temporelle (look-ahead) à **chaque** étape du pipeline manipulant des données. Contrairement aux gates ponctuels, G-Leak est une **vérification continue** intégrée dans les tests et dans chaque gate intra-milestone et de milestone.
+
+| Étape | Vérification anti-fuite | Test automatisé |
+|---|---|---|
+| **Features** (WS-3) | Aucune feature à t ne dépend de données `t' > t` | Test de perturbation : modifier `Close[t > T]` → features identiques pour `t <= T` (`atol=0`). Inclus dans G-Features critère (3). |
+| **Labels** (WS-4.1) | `y_t` n'utilise que `Open[t+1]` et `Close[t+H]` — pas de prix pour `t' > t+H` | Test unitaire : masquer les prix `t > t+H` → `y_t` identique |
+| **Splits** (WS-4.5–4.6) | Aucun timestamp test dans train/val. Purge correcte. | Test E2E : `max(t + H × Δ for t in train_val) < test_start`. Inclus dans G-Split critère (2). |
+| **Scaling** (WS-5) | `scaler.fit()` n'a jamais vu d'indices val/test | Assertion : `set(indices_fit) ⊂ set(indices_train)` et `set(indices_fit) ∩ set(indices_val ∪ indices_test) == ∅`. Inclus dans G-Split critère (6). |
+| **Calibration θ** (WS-7) | θ calibré uniquement sur val, jamais sur test | Test : modifier `y_hat_test` arbitrairement → θ identique. Inclus dans gate M3. |
+| **Backtest** (WS-8) | Signaux à t ne dépendent pas des prix `t' > t` | Test de perturbation généralisé (cf. WS-12.2 test de causalité). Inclus dans G-Backtest critère (1). |
+| **Baselines** (WS-9) | SMA causale (backward-looking uniquement) | Test : modifier `Close[t > T]` → signaux SMA identiques pour `t <= T`. Inclus dans WS-9.3. |
+
+Règle d'intégration : chaque gate (intra-milestone ou milestone) **inclut implicitement la vérification G-Leak** pour les étapes qu'il couvre. Un gate ne peut pas être `GO` si une fuite est détectée dans son périmètre, même si tous les autres critères sont satisfaits.
+
+### Gate de performance (G-Perf) — post-MVP
+
+Objectif : détecter les régressions de performance (temps d'exécution, mémoire) qui indiqueraient des implémentations sous-optimales (boucles Python naïves au lieu de vectorisation NumPy, copies mémoire inutiles, etc.).
+
+| Critère | Seuil | Condition de mesure | Priorité |
+|---|---|---|---|
+| Temps d'exécution pipeline complet | `<= 120 s` (CPU, dataset synthétique 2000 bougies, 3 folds, DummyModel) | Mesuré par `time make run` avec fixture CI standard | Post-MVP |
+| Temps d'exécution feature pipeline | `<= 5 s` (2000 bougies, 9 features) | Mesuré par benchmark pytest (`pytest-benchmark`) | Post-MVP |
+| Pic mémoire résidente | `<= 2 GB` (dataset synthétique 2000 bougies) | Mesuré par `tracemalloc` ou `/usr/bin/time -v` | Post-MVP |
+| Scalabilité linéaire | Doubler N_bougies → temps `<= 2.5x` (tolérance 25% pour overhead) | Benchmark paramétré sur `[1000, 2000, 4000]` bougies | Post-MVP |
+
+**Règles** :
+- G-Perf n'est **pas bloquant** pour les gates de milestone MVP. Il est informatif et produit un rapport `gate_report_G_Perf.json`.
+- Les seuils sont calibrés sur un run CPU (pas de GPU). Ils seront ajustés après les premiers runs sur données réelles.
+- La cible Makefile `gate-perf` (cf. WS-12.6) exécute les benchmarks et génère le rapport.
+- Un dépassement de seuil émet un **warning** dans le gate report, pas un `NO-GO`.
+
+### Règles transverses (applicables à tous les gates)
+
+Règles transverses (applicables à tous les gates — milestone et intra-milestone) :
+- Qualité code : `ruff`, `mypy` et `pytest` doivent être verts avant décision de gate. **Pré-requis outillage** : `mypy` doit être configuré dans `pyproject.toml` (section `[tool.mypy]`, `python_version = "3.11"`, `disallow_untyped_defs = true`, `warn_return_any = true`). `pytest-cov` doit être activé (`--cov=ai_trading --cov-report=term-missing`) pour les gates exigeant un seuil de couverture.
+- Comparaison baseline : utiliser exactement la même période test, les mêmes coûts et la même convention de calcul métrique.
+- Evidences minimales : chaque gate doit produire des traces horodatées (logs + artefacts) dans le `run_dir`.
+- Données de test : les gates M1-M5 et les gates intra-milestone doivent être **vérifiables sur données synthétiques** (fixture CI, cf. WS-12.4) sans accès réseau. Les vérifications sur données réelles Binance sont complémentaires mais non bloquantes pour la décision de gate.
+- Format des preuves : chaque gate produit un fichier `gate_report_<ID>.json` dans `reports/` (ou dans le `run_dir` pour les gates nécessitant un run) contenant : `date_utc`, `pipeline_version`, `gate`, résultats par critère (`criterion`, `threshold`, `actual`, `passed`), et statut global `GO`/`NO-GO`. Convention de nommage : `gate_report_M1.json` à `gate_report_M5.json` pour les milestones, `gate_report_G_Features.json`, `gate_report_G_Split.json`, `gate_report_G_Backtest.json`, `gate_report_G_Doc.json` pour les intra-milestone.
+- Automatisation : les cibles Makefile `gate-m1` à `gate-m5` et `gate-features`, `gate-split`, `gate-backtest`, `gate-doc`, `gate-perf` (cf. WS-12.6) exécutent les vérifications automatisables et génèrent les rapports.
+- Anti-fuite (G-Leak) : aucun gate ne peut être `GO` si une fuite temporelle est détectée dans son périmètre, même si tous les autres critères sont satisfaits.
+- Statut intermédiaire : utiliser `GO avec réserves` uniquement si un plan d'action daté est documenté.
+- Ordre d'exécution : au sein d'un milestone, les gates intra-milestone sont exécutés **avant** le gate de milestone. Un gate de milestone ne peut être `GO` que si tous les gates intra-milestone de son périmètre sont `GO`.
 
 
 ## Milestones et dépendances
@@ -87,13 +174,15 @@ graph TD
   T34 --> T36
   T35 --> T36
   T36 --> T37[WS-3.7 Warmup + validation]
-  T37 --> T41[WS-4.1 Label y_t]
+  T37 --> GF{G-Features}
+  GF --> T41[WS-4.1 Label y_t]
   T41 --> T42[WS-4.2 Sample builder N,L,F]
   T42 --> T43[WS-4.3 Adapter tabulaire XGBoost]
   T42 --> T44[WS-4.4 Metadata meta]
   T44 --> T45[WS-4.5 Walk-forward splitter]
   T45 --> T46[WS-4.6 Embargo + purge]
-  T46 --> T51[WS-5.1 Standard scaler]
+  T46 --> GS{G-Split}
+  GS --> T51[WS-5.1 Standard scaler]
   T51 --> T52[WS-5.2 Robust scaler]
   T51 --> T53[WS-5.3 Rolling z-score\npost-MVP]
   T11 --> T61[WS-6.1 Interface BaseModel]
@@ -107,6 +196,7 @@ graph TD
   T71 --> T72[WS-7.2 Objectif + contraintes]
   T72 --> T73[WS-7.3 Fallback θ]
   T72 --> T74[WS-7.4 Bypass RL/baselines]
+  T74 --> GD{G-Doc}
   T44 --> T81[WS-8.1 Trade execution]
   T81 --> T72
   T73 --> T82[WS-8.2 Cost model]
@@ -114,11 +204,12 @@ graph TD
   T81 --> T82
   T82 --> T83[WS-8.3 Equity curve]
   T83 --> T84[WS-8.4 Trade journal CSV]
-  T84 --> T91[WS-9.1 No-trade]
-  T84 --> T92[WS-9.2 Buy & hold]
-  T84 --> T93[WS-9.3 SMA rule]
-  T84 --> T101[WS-10.1 Métriques prédiction]
-  T84 --> T102[WS-10.2 Métriques trading]
+  T84 --> GB{G-Backtest}
+  GB --> T91[WS-9.1 No-trade]
+  GB --> T92[WS-9.2 Buy & hold]
+  GB --> T93[WS-9.3 SMA rule]
+  GB --> T101[WS-10.1 Métriques prédiction]
+  GB --> T102[WS-10.2 Métriques trading]
   T101 --> T103[WS-10.3 Agrégation inter-fold]
   T102 --> T103
   T103 --> T111[WS-11.1 Arborescence run]
@@ -307,6 +398,17 @@ graph TD
 | **Dépendances** | WS-3.6, WS-2.3 |
 
 
+### Gate intra-milestone : G-Features
+
+| Champ | Valeur |
+|---|---|
+| **Position** | Après WS-3.7, avant WS-4.1 |
+| **Objectif** | Vérifier que le pipeline de features est complet, causal et sans fuite avant de construire les datasets |
+| **Critères** | (1) `9` features enregistrées dans `FEATURE_REGISTRY`. (2) `0` NaN hors zone warmup sur dataset synthétique `>= 500` bougies. (3) Audit de causalité (G-Leak/Features) : modification des prix `t > T` → features identiques pour `t <= T` (`atol=0`). (4) `feature_version` tracée. (5) `>= 90%` couverture tests WS-3.* |
+| **Automatisation** | `make gate-features` → `pytest tests/test_features.py -v --cov=ai_trading.features --cov-fail-under=90` + test de causalité + génération `reports/gate_report_G_Features.json` |
+| **Décision** | `GO` si les 5 critères sont atteints. Bloquant pour WS-4. |
+
+
 ---
 
 
@@ -408,6 +510,17 @@ Avec `train_days=180`, `test_days=30`, `step_days=30`, `embargo_bars=4`, `H=4`, 
 | `purge_cutoff` | **Exclusive** (règle `t + H × Δ <= purge_cutoff`) | `2024-06-29 00:00` |
 
 **Micro-gaps inter-fold (A-10)** : même avec `step_days == test_days` (cas MVP), un micro-gap de `Δ` (1h pour le MVP) existe entre la fin du test d'un fold et le début du test du fold suivant (artefact de la convention de bornes inclusives + embargo). Exemple : `test_end[0] = 2024-07-29 03:00`, `test_start[1] = 2024-07-29 04:00` → gap de 1h. Ce micro-gap est attendu et documenté ; l'equity stitchée (WS-10.3) est maintenue constante durant ces gaps.
+
+
+### Gate intra-milestone : G-Split
+
+| Champ | Valeur |
+|---|---|
+| **Position** | Après WS-4.6, avant WS-5.1 |
+| **Objectif** | Vérifier que les datasets et splits sont causaux, disjoints et reproductibles avant le scaling |
+| **Critères** | (1) `100%` disjonction temporelle train/val/test par fold (aucun timestamp partagé). (2) Purge E2E (G-Leak/Splits) : `max(t + H × Δ for t in train_val_samples) < test_start` pour chaque fold. (3) `>= 1` fold valide après troncation et filtrage. (4) Tenseur `X_seq` reproductible bit-à-bit (même seed, `atol=1e-7`). (5) `0%` NaN dans `X_seq` et `y`. (6) Anti-fuite scaler (G-Leak/Scaling) : assertion `set(indices_train) ∩ set(indices_val ∪ indices_test) == ∅` préparée (effectivement vérifiée après WS-5.1) |
+| **Automatisation** | `make gate-split` → `pytest tests/test_dataset.py tests/test_splitter.py -v --cov=ai_trading.data --cov-fail-under=90` + test E2E split/embargo + test reproductibilité tenseur + génération `reports/gate_report_G_Split.json` |
+| **Décision** | `GO` si les 6 critères sont atteints. Bloquant pour WS-5. |
 
 
 ---
@@ -532,6 +645,17 @@ Avec `train_days=180`, `test_days=30`, `step_days=30`, `embargo_bars=4`, `H=4`, 
 | **Dépendances** | WS-7.2 |
 
 
+### Gate intra-milestone : G-Doc
+
+| Champ | Valeur |
+|---|---|
+| **Position** | Après WS-7.4, avant gate M3 |
+| **Objectif** | Vérifier que le contrat plug-in, les registres et les attributs structurels sont complets et cohérents avant de valider le milestone M3 |
+| **Critères** | (1) `output_type` déclaré et correct pour `>= 4` stratégies (dummy + 3 baselines) : `DummyModel.output_type == "regression"`, `NoTradeBaseline.output_type == "signal"`, etc. (2) `execution_mode` par défaut `"standard"` sauf `BuyHoldBaseline` (`"single_trade"`). (3) `set(VALID_STRATEGIES) == set(MODEL_REGISTRY)` (cohérence registres). (4) Docstrings conformes au contrat `BaseModel` sur `base.py`, `dummy.py` et les 3 baselines. (5) Bypass θ fonctionnel pour `output_type == "signal"` vérifié sur données synthétiques. (6) Anti-fuite calibration (G-Leak/Calibration) : θ indépendant de `y_hat_test` (test de perturbation) |
+| **Automatisation** | `make gate-doc` → `pytest tests/test_baselines.py tests/test_threshold.py tests/test_trainer.py -v` + inspection registres + génération `reports/gate_report_G_Doc.json` |
+| **Décision** | `GO` si les 6 critères sont atteints. Le gate M3 ne peut être `GO` que si G-Doc est `GO`. |
+
+
 ---
 
 
@@ -575,6 +699,17 @@ Avec `train_days=180`, `test_days=30`, `step_days=30`, `embargo_bars=4`, `H=4`, 
 | **Réf. spec** | §12.6 |
 | **Critères d'acceptation** | CSV parseable. Somme des net_return cohérente avec l'équité finale. Colonnes conformes. |
 | **Dépendances** | WS-8.3 |
+
+
+### Gate intra-milestone : G-Backtest
+
+| Champ | Valeur |
+|---|---|
+| **Position** | Après WS-8.4, avant WS-9.1 |
+| **Objectif** | Vérifier que le moteur de backtest est déterministe, correct et conforme avant d'implémenter les baselines et métriques |
+| **Critères** | (1) Déterminisme : `2` runs identiques (même seed, DummyModel, données synthétiques) → `trades.csv` identiques (SHA-256), equity curves identiques (`atol=1e-10`). (2) Cohérence equity-trades : `E_final == E_0 * Π(1 + w * r_net_i)` à `atol=1e-8`. (3) Mode `one_at_a_time` : aucun trade chevauché (test sur séquence de signaux Go consécutifs). (4) Modèle de coûts : résultat identique au calcul à la main sur `>= 3` cas. (5) `trades.csv` parseable, colonnes conformes. (6) Anti-fuite backtest (G-Leak/Backtest) : signaux à t indépendants des prix `t' > t` (test de perturbation) |
+| **Automatisation** | `make gate-backtest` → `pytest tests/test_backtest.py -v --cov=ai_trading.backtest --cov-fail-under=90` + tests déterminisme/cohérence/coûts + génération `reports/gate_report_G_Backtest.json` |
+| **Décision** | `GO` si les 6 critères sont atteints. Bloquant pour WS-9 et WS-10. |
 
 
 ---
@@ -710,7 +845,7 @@ Avec `train_days=180`, `test_days=30`, `step_days=30`, `embargo_bars=4`, `H=4`, 
 |---|---|
 | **Description** | Module `utils/seed.py`. Fixer la seed globale pour : `random`, `numpy`, `torch` (si installé), `os.environ['PYTHONHASHSEED']`. **Note XGBoost** : la seed globale doit également être passée comme `random_state=seed` dans les hyperparamètres XGBoost (à la charge de l'implémentation du modèle XGBoost, cf. spec §16.1). Option `deterministic_torch` pour `torch.use_deterministic_algorithms(True)`. **Fallback** : si une opération CUDA/PyTorch non déterministe lève une erreur, retomber sur `torch.use_deterministic_algorithms(True, warn_only=True)` et logger un warning. Appelé une seule fois au début du run. |
 | **Réf. spec** | §16.1 |
-| **Critères d'acceptation** | Deux runs avec même seed → même résultat (test d'intégration). **Protocole de test concret** : exécuter deux runs complets avec `DummyModel` sur un dataset synthétique fixe, même config et même seed. Comparer les fichiers `metrics.json` des deux runs : toutes les valeurs numériques doivent être identiques à une tolérance `atol=1e-6` (alignée sur la précision float32 ~1e-7 utilisée par convention mémoire ; les tenseurs X_seq et y sont en float32, cf. section Conventions). Comparer également `equity_curve.csv` et `trades.csv` (identiques byte-à-byte via SHA-256). Si `deterministic_torch=True` et qu'une opération non déterministe est détectée, le fallback `warn_only=True` est activé et un warning est loggé au niveau WARNING. |
+| **Critères d'acceptation** | Deux runs avec même seed → même résultat (test d'intégration). **Protocole de test concret** : exécuter deux runs complets avec `DummyModel` sur un dataset synthétique fixe, même config et même seed. Comparer les fichiers `metrics.json` des deux runs : toutes les valeurs numériques doivent être identiques à une tolérance `atol=1e-7` (alignée sur la précision float32 ~1e-7 utilisée par convention mémoire et cohérente avec le seuil du gate M2 ; les tenseurs X_seq et y sont en float32, cf. section Conventions). Comparer également `equity_curve.csv` et `trades.csv` (identiques byte-à-byte via SHA-256). Si `deterministic_torch=True` et qu'une opération non déterministe est détectée, le fallback `warn_only=True` est activé et un warning est loggé au niveau WARNING. |
 | **Dépendances** | WS-1.2 |
 
 ### WS-12.2 — Orchestrateur de run
@@ -754,9 +889,9 @@ Avec `train_days=180`, `test_days=30`, `step_days=30`, `embargo_bars=4`, `H=4`, 
 
 | Champ | Valeur |
 |---|---|
-| **Description** | Créer un `Makefile` à la racine du projet servant d'interface utilisateur principale du pipeline (§17.3). Le Makefile expose les cibles suivantes : `install` (pip install des dépendances), `fetch-data` (téléchargement OHLCV via `python -m ai_trading fetch`), `qa` (contrôles qualité), `run` (pipeline complet), `run-all` (enchaîne `fetch-data → qa → run`), `test` (pytest), `lint` (ruff + mypy), `docker-build`, `docker-run`, `clean`, `help`. **Variables surchargeables** : `CONFIG` (défaut `configs/default.yaml`), `MODEL` (surcharge de `strategy.name`), `SEED` (surcharge de `reproducibility.global_seed`). Les surcharges `MODEL` et `SEED` sont passées en override CLI `--set` au script Python. La cible `help` liste toutes les cibles avec leur description (via grep sur les commentaires `##`). **Workflow typique** (§17.3) : `make install` (une fois) → `make fetch-data` (une fois ou après changement de symbole/période) → `make qa` → `make run`. La cible `run-all` est un raccourci enchaînant les trois dernières étapes. |
+| **Description** | Créer un `Makefile` à la racine du projet servant d'interface utilisateur principale du pipeline (§17.3). Le Makefile expose les cibles suivantes : `install` (pip install des dépendances), `fetch-data` (téléchargement OHLCV via `python -m ai_trading fetch`), `qa` (contrôles qualité), `run` (pipeline complet), `run-all` (enchaîne `fetch-data → qa → run`), `test` (pytest), `lint` (ruff + mypy), `docker-build`, `docker-run`, `clean`, `help`, **`gate-m1` à `gate-m5`** (vérification automatisée des critères de gate de milestone), **`gate-features`, `gate-split`, `gate-backtest`, `gate-doc`** (vérification automatisée des gates intra-milestone), **`gate-perf`** (benchmark de performance, post-MVP, non bloquant). **Variables surchargeables** : `CONFIG` (défaut `configs/default.yaml`), `MODEL` (surcharge de `strategy.name`), `SEED` (surcharge de `reproducibility.global_seed`). Les surcharges `MODEL` et `SEED` sont passées en override CLI `--set` au script Python. La cible `help` liste toutes les cibles avec leur description (via grep sur les commentaires `##`). **Cibles de gate milestone** : chaque `gate-m<N>` exécute les vérifications automatisables du gate M<N> (lint, tests ciblés avec couverture, validation JSON Schema, test de reproductibilité selon le milestone) et génère un fichier `reports/gate_report_M<N>.json` contenant le statut par critère et la décision GO/NO-GO. Exemple : `gate-m1` lance `pytest tests/test_config.py tests/test_ingestion.py tests/test_qa.py --cov=ai_trading.config --cov=ai_trading.data --cov-fail-under=95` + validation config + vérification SHA-256 données. **Cibles de gate intra-milestone** : `gate-features` lance `pytest tests/test_features.py -v --cov=ai_trading.features --cov-fail-under=90` + test de causalité ; `gate-split` lance `pytest tests/test_dataset.py tests/test_splitter.py -v --cov=ai_trading.data --cov-fail-under=90` + test E2E split/embargo ; `gate-backtest` lance `pytest tests/test_backtest.py -v --cov=ai_trading.backtest --cov-fail-under=90` + tests déterminisme/cohérence ; `gate-doc` lance `pytest tests/test_baselines.py tests/test_threshold.py tests/test_trainer.py -v` + inspection registres. Chaque cible intra-milestone génère un `reports/gate_report_G_<Name>.json`. **Cible `gate-perf`** (post-MVP) : lance les benchmarks de performance (temps d'exécution, mémoire) et génère `reports/gate_report_G_Perf.json` (non bloquant). **Dépendances inter-gates dans le Makefile** : `gate-m2` dépend de `gate-features` et `gate-split` ; `gate-m3` dépend de `gate-doc` ; `gate-m4` dépend de `gate-backtest`. Cette chaîne garantit que les gates intra-milestone passent avant les gates de milestone correspondants. **Workflow typique** (§17.3) : `make install` (une fois) → `make fetch-data` (une fois ou après changement de symbole/période) → `make qa` → `make run`. La cible `run-all` est un raccourci enchaînant les trois dernières étapes. |
 | **Réf. spec** | §17.3 (pilotage du pipeline — Makefile) |
-| **Critères d'acceptation** | `make help` affiche la liste des cibles disponibles. `make install` installe les dépendances de `requirements.txt`. `make test` lance `pytest tests/ -v`. `make lint` lance `ruff check` + `mypy`. `make run CONFIG=configs/default.yaml` lance le pipeline. `make fetch-data` déclenche l'ingestion. `make run-all` enchaîne fetch → qa → run. `make docker-build` + `make docker-run` fonctionnent. Les variables `CONFIG`, `MODEL`, `SEED` sont surchargeables (`make run MODEL=gru_reg SEED=123`). |
+| **Critères d'acceptation** | `make help` affiche la liste des cibles disponibles. `make install` installe les dépendances de `requirements.txt`. `make test` lance `pytest tests/ -v`. `make lint` lance `ruff check` + `mypy`. `make run CONFIG=configs/default.yaml` lance le pipeline. `make fetch-data` déclenche l'ingestion. `make run-all` enchaîne fetch → qa → run. `make docker-build` + `make docker-run` fonctionnent. Les variables `CONFIG`, `MODEL`, `SEED` sont surchargeables (`make run MODEL=gru_reg SEED=123`). `make gate-m1` à `make gate-m5` exécutent les vérifications et génèrent `reports/gate_report_M<N>.json` avec statut GO/NO-GO. `make gate-features`, `make gate-split`, `make gate-backtest`, `make gate-doc` exécutent les vérifications intra-milestone et génèrent `reports/gate_report_G_<Name>.json`. `make gate-perf` exécute les benchmarks et génère `reports/gate_report_G_Perf.json` (non bloquant). Les dépendances inter-gates sont respectées : `gate-m2` échoue si `gate-features` ou `gate-split` n'est pas `GO`. |
 | **Dépendances** | WS-12.3 (CLI entry point), WS-12.4 (Dockerfile pour cibles Docker) |
 
 
@@ -877,3 +1012,55 @@ ai_trading_agent/
 | **Artefacts** | JSON conformes aux schémas, validés par `jsonschema` en fin de run |
 | **Config** | Tout paramètre modifiable dans `configs/default.yaml`, jamais hardcodé dans le code |
 | **Mémoire** | Utiliser `float32` (et non `float64`) pour les tenseurs X_seq et y afin de réduire l'empreinte mémoire (~÷2). Avec L=128, F=9, N≈17000, un tenseur float32 occupe ~79 Mo vs ~157 Mo en float64. PyTorch utilise float32 par défaut ; aligner XGBoost et pandas sur cette convention. **Exception** (P-02) : les calculs de métriques (Sharpe, MDD, profit_factor, agrégation) doivent être effectués en `float64` pour éviter l'accumulation d'erreurs de précision (divisions et accumulations sur de nombreux trades/bougies). **Frontière float32/float64** : les paramètres du scaler (`μ_j`, `σ_j`) sont stockés et appliqués en `float64` (car ils sont calculés une fois par fold et réutilisés dans les calculs de métriques via l'equity). Les rendements du backtest, l'equity curve et tous les calculs intermédiaires de métriques sont en `float64`. Seuls les tenseurs d'entrée modèle (X_seq, y) et les poids du modèle restent en `float32`. |
+
+
+---
+
+
+## Annexe — Synthèse des gates
+
+Tableau récapitulatif de tous les gates du plan, dans l'ordre d'exécution.
+
+```mermaid
+flowchart LR
+  subgraph M1["M1 — Fondations"]
+    GM1((Gate M1))
+  end
+  subgraph M2["M2 — Feature & Data Pipeline"]
+    GF((G-Features)) --> GS((G-Split)) --> GM2((Gate M2))
+  end
+  subgraph M3["M3 — Training Framework"]
+    GD((G-Doc)) --> GM3((Gate M3))
+  end
+  subgraph M4["M4 — Evaluation Engine"]
+    GB((G-Backtest)) --> GM4((Gate M4))
+  end
+  subgraph M5["M5 — Production Readiness"]
+    GM5((Gate M5))
+  end
+  GM1 --> GF
+  GM2 --> GD
+  GM3 --> GB
+  GM4 --> GM5
+  GP((G-Perf\npost-MVP)) -.-> GM5
+
+  style GF fill:#f9f,stroke:#333
+  style GS fill:#f9f,stroke:#333
+  style GB fill:#f9f,stroke:#333
+  style GD fill:#f9f,stroke:#333
+  style GP fill:#eee,stroke:#999,stroke-dasharray: 5 5
+```
+
+| # | Gate | Type | Position | Bloquant | Cible Makefile | Rapport |
+|---|---|---|---|---|---|---|
+| 1 | **M1** | Milestone | Fin M1 (après WS-2) | Oui | `gate-m1` | `gate_report_M1.json` |
+| 2 | **G-Features** | Intra-milestone | Après WS-3.7 | Oui (WS-4) | `gate-features` | `gate_report_G_Features.json` |
+| 3 | **G-Split** | Intra-milestone | Après WS-4.6 | Oui (WS-5) | `gate-split` | `gate_report_G_Split.json` |
+| 4 | **M2** | Milestone | Fin M2 (après WS-5) | Oui | `gate-m2` | `gate_report_M2.json` |
+| 5 | **G-Doc** | Intra-milestone | Après WS-7.4 | Oui (gate M3) | `gate-doc` | `gate_report_G_Doc.json` |
+| 6 | **M3** | Milestone | Fin M3 (après WS-7) | Oui | `gate-m3` | `gate_report_M3.json` |
+| 7 | **G-Backtest** | Intra-milestone | Après WS-8.4 | Oui (WS-9, WS-10) | `gate-backtest` | `gate_report_G_Backtest.json` |
+| 8 | **M4** | Milestone | Fin M4 (après WS-10) | Oui | `gate-m4` | `gate_report_M4.json` |
+| 9 | **M5** | Milestone | Fin M5 (après WS-12) | Oui | `gate-m5` | `gate_report_M5.json` |
+| — | **G-Leak** | Transversal | Continu (toutes étapes) | Oui (implicite) | Intégré dans chaque gate | — |
+| — | **G-Perf** | Performance | Post-MVP | Non | `gate-perf` | `gate_report_G_Perf.json` |
