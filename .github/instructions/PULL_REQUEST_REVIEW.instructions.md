@@ -17,7 +17,7 @@ applyTo: "**"
 ## Grille d'audit
 
 ### Structure branche & commits
-- [ ] Branche `task/NNN-short-slug` depuis `main`.
+- [ ] Branche `task/NNN-short-slug` depuis `Max6000i1`.
 - [ ] Commit RED : `[WS-X] #NNN RED: <résumé>` (tests uniquement).
 - [ ] Commit GREEN : `[WS-X] #NNN GREEN: <résumé>` (implémentation + tâche).
 - [ ] Pas de commits parasites entre RED et GREEN.

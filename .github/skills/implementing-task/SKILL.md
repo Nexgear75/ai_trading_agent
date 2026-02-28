@@ -33,6 +33,7 @@ Exécuter des tâches décrites dans `docs/tasks/NNN__slug.md` selon un workflow
 - **Branche dédiée** : `task/NNN-short-slug` depuis `Max6000i1`. Jamais de commit direct sur `Max6000i1`.
 - **Pull Request obligatoire** vers `Max6000i1` après commit GREEN.
 - **Ambiguïté** : si specs ou tâche ambiguës → demander des clarifications avant d'implémenter.
+- **Zéro `# noqa` injustifié** : `# noqa` est interdit sauf pour les noms imposés par la spec (ex : `horizon_H_bars`, `L`). Tout diagnostic ruff fixable doit être corrigé à la source, jamais masqué par une suppression.
 
 ## Discipline de contexte
 
@@ -65,10 +66,12 @@ Charger uniquement les parties référencées de la spécification et du plan. N
 
 ### 3. Écrire les tests (RED)
 - Créer/modifier les fichiers de test dans `tests/` (convention plan : `test_config.py`, `test_features.py`, `test_splitter.py`, `test_backtest.py`, etc.). L'identifiant `#NNN` va dans les docstrings, pas dans les noms de fichiers.
+- **Imports corrects dès l'écriture** : respecter l'ordre ruff/isort (stdlib → third-party → local, séparés par une ligne vide). Ne jamais ajouter d'imports inutiles.
 - Couvrir chaque critère d'acceptation avec au moins un test.
 - Inclure des cas nominaux, erreurs, et bords.
 - Utiliser des données synthétiques (fixtures `conftest.py`), jamais de données réseau.
 - Si la tâche concerne l'anti-fuite : inclure un test de perturbation (modifier prix futurs → résultat identique pour t ≤ T).
+- **Lancer `ruff check` sur le fichier test après écriture**, avant le commit RED. Corriger tout diagnostic à la source (réordonner, supprimer l'import, renommer) — jamais de `# noqa` comme contournement.
 
 ### 4. Prouver que les tests échouent
 `pytest tests/test_xxx.py -v` → RED.
@@ -87,18 +90,42 @@ Le commit RED ne contient **que** des fichiers de tests.
 - **Anti-fuite** : aucun `.shift(-n)` sans justification temporelle correcte.
 - **Float32** pour tenseurs X_seq et y. **Float64** pour calculs de métriques.
 - **Nommage** : snake_case, anglais pour le code.
-- **Imports** : pas d'import `*`, pas d'imports inutilisés.
-- **Pas de print()** : utiliser `logging` si nécessaire.
+- **Imports** : pas d'import `*`, pas d'imports inutilisés, pas de variables assignées mais jamais référencées (dead code). Ordre isort strict (stdlib → third-party → local).
+- **Pas de print()** : utiliser `logging` uniquement si le module en a besoin. Ne pas importer `logging` ni créer `logger` « au cas où ».
+- **Corrections à la source** : si ruff signale un problème, corriger la cause (renommer, réordonner, supprimer). Ne jamais appliquer deux corrections contradictoires en même temps (ex : renommer un symbol ET ajouter un `# noqa` sur le même diagnostic).
 
-### 7. Valider la suite complète
-- `ruff check ai_trading/ tests/` → 0 erreur.
-- `pytest` → tous GREEN (nouveaux + existants), aucune régression.
+### 7. Valider la suite complète (commandes exactes, obligatoires)
+Exécuter **exactement** ces deux commandes, telles quelles (pas fichier par fichier) :
+```bash
+ruff check ai_trading/ tests/
+pytest
+```
+- `ruff check ai_trading/ tests/` → **0 erreur, 0 warning**. Si une erreur persiste, revenir à l'étape 6 et corriger à la source.
+- `pytest` → **tous GREEN** (nouveaux + existants), aucune régression, 0 échec, 0 erreur de collection.
 
-### 8. Audit strict
-- Vérifier : critères d'acceptation ↔ tests ↔ implémentation.
-- Ajouter des tests de bords/erreurs si nécessaire.
-- Vérifier l'absence de fuite de données (look-ahead).
-- Vérifier la cohérence avec la spec v1.0.
+**Ne jamais** passer à l'étape 8 si l'une de ces commandes échoue.
+
+### 8. Audit strict (obligatoire — ne pas escamoter)
+Relecture manuelle de **chaque fichier modifié**. Checklist minimale :
+
+#### 8a. Traçabilité critères ↔ tests ↔ code
+- [ ] Chaque critère d'acceptation a au moins un test correspondant.
+- [ ] Chaque test correspond à un comportement attendu.
+- [ ] Ajouter des tests de bords/erreurs si nécessaire.
+
+#### 8b. Anti-fuite
+- [ ] Aucun accès à des données futures (look-ahead).
+- [ ] Cohérence avec la spec v1.0.
+
+#### 8c. Qualité du code (post-implémentation)
+- [ ] **Aucun import inutilisé** : chaque `import` est référencé dans le code.
+- [ ] **Aucune variable morte** : chaque variable assignée est utilisée au moins une fois.
+- [ ] **Aucun `# noqa` injustifié** : seuls les `# noqa` pour des noms imposés par la spec sont tolérés (ex : `N815` sur `horizon_H_bars`). Si un `# noqa` existe, vérifier qu'il est encore nécessaire.
+- [ ] **Imports ordonnés** : stdlib → third-party → local, séparés par des lignes vides. Pas de `# noqa: I001`.
+- [ ] **Pas de code mort, commenté, ou TODO orphelin.**
+- [ ] **Pas de `print()`** restant.
+
+Si un point de cette checklist échoue, corriger **avant** de passer à l'étape 9.
 
 ### 9. Mettre à jour la tâche
 Dans `docs/tasks/NNN__slug.md` :
@@ -146,3 +173,5 @@ Aucun commit intermédiaire entre RED et GREEN sauf refactoring mineur (tests ve
 - **Seeds** et **hashes SHA-256** obligatoires pour la reproductibilité.
 - **Modules attendus** : config, data/ingestion, data/qa, data/dataset, data/splitter, data/scaler, features/registry, features/pipeline, models/base, models/dummy, training/trainer, calibration/threshold, backtest/engine, baselines/*, metrics/prediction, metrics/trading, metrics/aggregation, artifacts/run_dir, artifacts/manifest, artifacts/metrics_builder, artifacts/schema_validator, utils/seed, pipeline/runner.
 - **Nommage tests** : structurés par module (`test_config.py`, `test_features.py`, `test_splitter.py`, etc.). Identifiant tâche `#NNN` dans les docstrings uniquement.
+- **Ordre des imports** : toujours stdlib → third-party → local, séparés par une ligne vide. Ne jamais contourner I001 avec `# noqa`.
+- **Politique `# noqa`** : interdit sauf pour les noms imposés par la spec (ex : `N815` sur `horizon_H_bars`, `L`). Chaque `# noqa` restant doit être justifié par un commentaire.

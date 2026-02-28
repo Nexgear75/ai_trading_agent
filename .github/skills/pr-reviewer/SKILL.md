@@ -7,7 +7,7 @@ argument-hint: "[branche: task/NNN-short-slug] ou [PR number]"
 # Agent Skill — PR Reviewer (AI Trading Pipeline)
 
 ## Objectif
-Effectuer une revue systématique et exigeante d'une Pull Request (ou d'une branche `task/NNN-*`) avant merge vers `main`, en vérifiant la conformité avec les règles du projet AI Trading Pipeline.
+Effectuer une revue systématique et exigeante d'une Pull Request (ou d'une branche `task/NNN-*`) avant merge vers `Max6000i1`, en vérifiant la conformité avec les règles du projet AI Trading Pipeline.
 
 ## Contexte repo
 
@@ -23,7 +23,7 @@ Effectuer une revue systématique et exigeante d'une Pull Request (ou d'une bran
 ## Rôle de l'agent
 
 Tu dois :
-- auditer **tous les fichiers modifiés** de la PR/branche par rapport à `main` ;
+- auditer **tous les fichiers modifiés** de la PR/branche par rapport à `Max6000i1` ;
 - vérifier la conformité avec chaque règle du projet (voir grille ci-dessous) ;
 - produire un **rapport de revue structuré** avec verdict global ;
 - ne jamais approuver une PR qui viole une règle non négociable.
@@ -34,9 +34,9 @@ Tu dois :
 
 - Déterminer la branche source (`task/NNN-short-slug`).
 - Identifier la tâche associée dans `docs/tasks/NNN__slug.md`.
-- Lister les fichiers modifiés vs `main` :
+- Lister les fichiers modifiés vs `Max6000i1` :
   ```
-  git diff --name-only main...task/NNN-short-slug
+  git diff --name-only Max6000i1...task/NNN-short-slug
   ```
 
 ### 2. Vérifier la structure de branche et commits
