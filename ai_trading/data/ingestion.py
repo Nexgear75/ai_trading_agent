@@ -193,7 +193,10 @@ def _fetch_all_pages(
 
 def _build_dataframe(rows: list[list], symbol: str) -> pd.DataFrame:
     """Convert raw ccxt rows to a canonical DataFrame."""
-    df = pd.DataFrame(rows, columns=["timestamp_ms", "open", "high", "low", "close", "volume"])
+    df = pd.DataFrame(
+        rows,
+        columns=["timestamp_ms", "open", "high", "low", "close", "volume"],
+    )
 
     # Convert millisecond timestamps to datetime64[ns, UTC]
     df["timestamp_utc"] = pd.to_datetime(
@@ -234,7 +237,9 @@ def _parquet_path(config: PipelineConfig) -> Path:
     return Path(config.dataset.raw_dir) / f"{symbol}_{timeframe}_{start}_{end}.parquet"
 
 
-def _cache_covers_period(parquet: Path, start_ms: int, end_ms: int) -> bool:
+def _cache_covers_period(
+    parquet: Path, start_ms: int, end_ms: int, timeframe: str
+) -> bool:
     """Check if an existing Parquet file covers [start_ms, end_ms[."""
     if not parquet.exists():
         return False
@@ -246,18 +251,16 @@ def _cache_covers_period(parquet: Path, start_ms: int, end_ms: int) -> bool:
     file_start = int(df["timestamp_utc"].iloc[0].timestamp() * 1000)
     file_end = int(df["timestamp_utc"].iloc[-1].timestamp() * 1000)
 
+    tf_ms = _TIMEFRAME_MS.get(timeframe)
+    if tf_ms is None:
+        raise ValueError(
+            f"Timeframe '{timeframe}' is not recognised. "
+            f"Supported: {sorted(_TIMEFRAME_MS)}"
+        )
+
     # The file covers the period if its first candle <= start and
     # its last candle >= end - 1 timeframe interval
-    return file_start <= start_ms and file_end >= end_ms - _get_tf_ms(parquet)
-
-
-def _get_tf_ms(parquet: Path) -> int:
-    """Infer timeframe in ms from the first two rows of a Parquet file."""
-    df = pd.read_parquet(parquet, columns=["timestamp_utc"])
-    if len(df) < 2:
-        return 0
-    delta = df["timestamp_utc"].iloc[1] - df["timestamp_utc"].iloc[0]
-    return int(delta.total_seconds() * 1000)
+    return file_start <= start_ms and file_end >= end_ms - tf_ms
 
 
 def fetch_ohlcv(config: PipelineConfig) -> IngestionResult:
@@ -291,10 +294,10 @@ def fetch_ohlcv(config: PipelineConfig) -> IngestionResult:
     end_ms = int(pd.Timestamp(ds.end, tz="UTC").timestamp() * 1000)
 
     # Cache check
-    if _cache_covers_period(parquet, start_ms, end_ms):
+    if _cache_covers_period(parquet, start_ms, end_ms, ds.timeframe):
         logger.info("Cache hit: %s already covers period, skipping download.", parquet)
         sha = _sha256_file(parquet)
-        row_count = len(pd.read_parquet(parquet))
+        row_count = pq.ParquetFile(parquet).metadata.num_rows
         return IngestionResult(path=parquet, sha256=sha, row_count=row_count)
 
     # Create exchange

@@ -53,13 +53,14 @@ def _ts_ms(date_str: str) -> int:
 HOUR_MS = 3_600_000
 
 
-def _write_minimal_yaml(tmp_path: Path, overrides: dict | None = None) -> Path:
+def _write_minimal_yaml(
+    tmp_path: Path, default_config_path: Path, overrides: dict | None = None
+) -> Path:
     """Write a minimal valid YAML config pointing raw_dir to tmp_path."""
     import yaml
 
     # Load default config, dump, override dataset section
-    default_cfg_path = Path(__file__).resolve().parent.parent / "configs" / "default.yaml"
-    with open(default_cfg_path) as f:
+    with open(default_config_path, encoding="utf-8") as f:
         data = yaml.safe_load(f)
 
     data["dataset"]["raw_dir"] = str(tmp_path / "raw")
@@ -78,24 +79,26 @@ def _write_minimal_yaml(tmp_path: Path, overrides: dict | None = None) -> Path:
             d[keys[-1]] = val
 
     yaml_path = tmp_path / "config.yaml"
-    with open(yaml_path, "w") as f:
+    with open(yaml_path, "w", encoding="utf-8") as f:
         yaml.dump(data, f)
     return yaml_path
 
 
 @pytest.fixture
-def cfg(tmp_path):
+def cfg(tmp_path, default_config_path):
     """Return a PipelineConfig with raw_dir pointing to tmp_path/raw."""
-    yaml_path = _write_minimal_yaml(tmp_path)
+    yaml_path = _write_minimal_yaml(tmp_path, default_config_path)
     return load_config(yaml_path)
 
 
 @pytest.fixture
-def cfg_factory(tmp_path):
+def cfg_factory(tmp_path, default_config_path):
     """Factory returning PipelineConfig with arbitrary overrides."""
+
     def _make(**overrides):
-        yaml_path = _write_minimal_yaml(tmp_path, overrides)
+        yaml_path = _write_minimal_yaml(tmp_path, default_config_path, overrides)
         return load_config(yaml_path)
+
     return _make
 
 
@@ -407,6 +410,33 @@ class TestLocalCache:
         # No additional fetch_ohlcv calls on cache hit
         assert calls_after_second == calls_after_first
 
+    def test_single_row_cache_hit_no_fetch(self, cfg_factory, tmp_path):
+        """#004 — Single-candle files can still be valid cache hits."""
+        config = cfg_factory(
+            **{
+                "dataset.timeframe": "1d",
+                "dataset.start": "2024-01-01",
+                "dataset.end": "2024-01-02",
+            }
+        )
+
+        start_ms = _ts_ms("2024-01-01")
+        rows = _make_ohlcv_rows(start_ms, 1, 86_400_000)
+        mock_ex = _mock_exchange(rows)
+
+        with patch(
+            "ai_trading.data.ingestion._create_exchange", return_value=mock_ex
+        ):
+            from ai_trading.data.ingestion import fetch_ohlcv
+
+            fetch_ohlcv(config)
+            calls_after_first = mock_ex.fetch_ohlcv.call_count
+
+            fetch_ohlcv(config)
+            calls_after_second = mock_ex.fetch_ohlcv.call_count
+
+        assert calls_after_second == calls_after_first
+
 
 # ===========================================================================
 # Error handling — bad symbol / exchange
@@ -416,10 +446,12 @@ class TestLocalCache:
 class TestErrorHandling:
     """#004 — Explicit errors on invalid symbol or exchange."""
 
-    def test_invalid_exchange_raises(self, tmp_path):
+    def test_invalid_exchange_raises(self, tmp_path, default_config_path):
         """#004 — Unknown exchange raises explicit error."""
         yaml_path = _write_minimal_yaml(
-            tmp_path, {"dataset.exchange": "nonexistent_exchange"}
+            tmp_path,
+            default_config_path,
+            {"dataset.exchange": "nonexistent_exchange"},
         )
         config = load_config(yaml_path)
 
@@ -546,9 +578,9 @@ class TestOutputPath:
 class TestEdgeCases:
     """#004 — Edge case scenarios."""
 
-    def test_empty_period_raises(self, tmp_path):
+    def test_empty_period_raises(self, tmp_path, default_config_path):
         """#004 — If exchange returns no data, raise explicitly."""
-        yaml_path = _write_minimal_yaml(tmp_path)
+        yaml_path = _write_minimal_yaml(tmp_path, default_config_path)
         config = load_config(yaml_path)
 
         mock_ex = MagicMock()
