@@ -330,6 +330,10 @@
     "environment": {
       "type": "object",
       "additionalProperties": false,
+      "required": [
+        "python_version",
+        "platform"
+      ],
       "properties": {
         "python_version": {
           "type": "string"
