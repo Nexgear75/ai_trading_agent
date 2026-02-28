@@ -1,6 +1,6 @@
 # Tâche — Validation stricte de la configuration
 
-Statut : TODO
+Statut : DONE
 Ordre : 003
 Workstream : WS-1
 Milestone : M1
@@ -87,41 +87,41 @@ VALID_STRATEGIES = {
 ```
 
 ## Critères d'acceptation
-- [ ] Config valide (`configs/default.yaml`) passe la validation sans erreur
-- [ ] `backtest.mode != "one_at_a_time"` → erreur explicite
-- [ ] `backtest.direction != "long_only"` → erreur explicite
-- [ ] `min_warmup < max(rsi_period, ema_slow, max(vol_windows))` → erreur
-- [ ] `min_warmup < window.L` → erreur
-- [ ] `embargo_bars < label.horizon_H_bars` → erreur (ex: `embargo_bars=2, H=4` → rejet)
-- [ ] `strategy_type = "baseline"` avec `strategy.name = "xgboost_reg"` → erreur
-- [ ] `strategy_type = "model"` avec `strategy.name = "no_trade"` → erreur
-- [ ] `strategy.name` absent de `VALID_STRATEGIES` → erreur
-- [ ] `step_days < test_days` → erreur
-- [ ] `horizon_H_bars=0` → erreur, `window.L=1` → erreur, `position_fraction=0` → erreur
-- [ ] `dropout=1.0` → erreur, `q_grid` non triée → erreur, `mdd_cap=0` → erreur
-- [ ] `min_trades=-1` → erreur, `num_layers=0` → erreur
-- [ ] `n_heads` ne divise pas `d_model` → erreur, `stride > patch_size` → erreur
-- [ ] `sma.fast=1` → erreur, `batch_size=0` → erreur
-- [ ] `global_seed=-1` → erreur, `sharpe_epsilon=0` → erreur, `output_dir=""` → erreur
-- [ ] Clé YAML inconnue (ex: `dataset.foo: bar`) → erreur Pydantic `extra fields not permitted`
-- [ ] `scaling.method = "rolling_zscore"` → erreur (non implémenté MVP)
-- [ ] `len(symbols) > 1` → erreur (MVP mono-symbole)
-- [ ] Warning émis si `val_days < 7`
-- [ ] Tests couvrent les scénarios nominaux + erreurs + bords
-- [ ] Suite de tests verte après implémentation
-- [ ] `ruff check` passe sans erreur
+- [x] Config valide (`configs/default.yaml`) passe la validation sans erreur
+- [x] `backtest.mode != "one_at_a_time"` → erreur explicite
+- [x] `backtest.direction != "long_only"` → erreur explicite
+- [x] `min_warmup < max(rsi_period, ema_slow, max(vol_windows))` → erreur
+- [x] `min_warmup < window.L` → erreur
+- [x] `embargo_bars < label.horizon_H_bars` → erreur (ex: `embargo_bars=2, H=4` → rejet)
+- [x] `strategy_type = "baseline"` avec `strategy.name = "xgboost_reg"` → erreur
+- [x] `strategy_type = "model"` avec `strategy.name = "no_trade"` → erreur
+- [x] `strategy.name` absent de `VALID_STRATEGIES` → erreur
+- [x] `step_days < test_days` → erreur
+- [x] `horizon_H_bars=0` → erreur, `window.L=1` → erreur, `position_fraction=0` → erreur
+- [x] `dropout=1.0` → erreur, `q_grid` non triée → erreur, `mdd_cap=0` → erreur
+- [x] `min_trades=-1` → erreur, `num_layers=0` → erreur
+- [x] `n_heads` ne divise pas `d_model` → erreur, `stride > patch_size` → erreur
+- [x] `sma.fast=1` → erreur, `batch_size=0` → erreur
+- [x] `global_seed=-1` → erreur, `sharpe_epsilon=0` → erreur, `output_dir=""` → erreur
+- [x] Clé YAML inconnue (ex: `dataset.foo: bar`) → erreur Pydantic `extra fields not permitted`
+- [x] `scaling.method = "rolling_zscore"` → erreur (non implémenté MVP)
+- [x] `len(symbols) > 1` → erreur (MVP mono-symbole)
+- [x] Warning émis si `val_days < 7`
+- [x] Tests couvrent les scénarios nominaux + erreurs + bords
+- [x] Suite de tests verte après implémentation
+- [x] `ruff check` passe sans erreur
 
 ## Pré-condition de démarrage
 - **Tous les tests existants sont GREEN** avant de commencer.
 - **Créer une branche dédiée** `task/003-config-validation` depuis `Max6000i1`.
 
 ## Checklist de fin de tâche
-- [ ] Branche `task/003-config-validation` créée depuis `Max6000i1`.
-- [ ] Tests RED écrits avant implémentation.
-- [ ] **Commit RED** : `[WS-1] #003 RED: tests validation stricte configuration`.
-- [ ] Tests GREEN passants et reproductibles.
-- [ ] Critères d'acceptation tous satisfaits.
-- [ ] `ruff check ai_trading/ tests/` passe sans erreur.
-- [ ] Fichier de tâche mis à jour (statut DONE, critères cochés).
-- [ ] **Commit GREEN** : `[WS-1] #003 GREEN: validation stricte configuration`.
-- [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-1] #003 — Validation stricte de la configuration`.
+- [x] Branche `task/003-config-validation` créée depuis `Max6000i1`.
+- [x] Tests RED écrits avant implémentation.
+- [x] **Commit RED** : `[WS-1] #003 RED: tests validation stricte configuration`.
+- [x] Tests GREEN passants et reproductibles.
+- [x] Critères d'acceptation tous satisfaits.
+- [x] `ruff check ai_trading/ tests/` passe sans erreur.
+- [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
+- [x] **Commit GREEN** : `[WS-1] #003 GREEN: validation stricte configuration`.
+- [x] **Pull Request ouverte** vers `Max6000i1` : `[WS-1] #003 — Validation stricte de la configuration`.
