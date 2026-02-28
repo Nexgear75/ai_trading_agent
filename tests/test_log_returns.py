@@ -350,3 +350,71 @@ class TestEdgeCases:
         val_rev = result_rev.iloc[1]
 
         np.testing.assert_allclose(val, -val_rev, atol=1e-15)
+
+    @pytest.mark.parametrize("name", ["logret_1", "logret_2", "logret_4"])
+    def test_empty_dataframe(self, name: str) -> None:
+        """#008: Empty DataFrame (0 bars) → empty Series, no error."""
+        ohlcv = pd.DataFrame({
+            "open": pd.Series([], dtype=float),
+            "high": pd.Series([], dtype=float),
+            "low": pd.Series([], dtype=float),
+            "close": pd.Series([], dtype=float),
+            "volume": pd.Series([], dtype=float),
+        }, index=pd.DatetimeIndex([]))
+
+        feature = FEATURE_REGISTRY[name]()
+        result = feature.compute(ohlcv, {})
+        assert isinstance(result, pd.Series)
+        assert len(result) == 0
+
+    def test_logret_4_with_3_bars_all_nan(self) -> None:
+        """#008: logret_4 with 3 bars (< k=4) → all NaN."""
+        close = np.array([100.0, 110.0, 105.0])
+        ohlcv = pd.DataFrame({
+            "open": close,
+            "high": close,
+            "low": close,
+            "close": close,
+            "volume": np.ones(3),
+        }, index=pd.date_range("2024-01-01", periods=3, freq="h"))
+
+        feature = FEATURE_REGISTRY["logret_4"]()
+        result = feature.compute(ohlcv, {})
+        assert len(result) == 3
+        assert result.isna().all()
+
+    def test_logret_4_with_exactly_4_bars_all_nan(self) -> None:
+        """#008: logret_4 with exactly 4 bars → all NaN (shift(4) needs at least 5 rows for first non-NaN)."""
+        close = np.array([100.0, 110.0, 105.0, 120.0])
+        ohlcv = pd.DataFrame({
+            "open": close,
+            "high": close,
+            "low": close,
+            "close": close,
+            "volume": np.ones(4),
+        }, index=pd.date_range("2024-01-01", periods=4, freq="h"))
+
+        feature = FEATURE_REGISTRY["logret_4"]()
+        result = feature.compute(ohlcv, {})
+        assert len(result) == 4
+        assert result.isna().all()
+
+    def test_logret_4_with_5_bars_first_valid(self) -> None:
+        """#008: logret_4 with 5 bars → 4 NaN + 1 valid at index 4."""
+        close = np.array([100.0, 110.0, 105.0, 120.0, 130.0])
+        ohlcv = pd.DataFrame({
+            "open": close,
+            "high": close,
+            "low": close,
+            "close": close,
+            "volume": np.ones(5),
+        }, index=pd.date_range("2024-01-01", periods=5, freq="h"))
+
+        feature = FEATURE_REGISTRY["logret_4"]()
+        result = feature.compute(ohlcv, {})
+        assert len(result) == 5
+        assert result.iloc[:4].isna().all()
+        # index 4: log(130/100)
+        np.testing.assert_allclose(
+            result.iloc[4], np.log(130.0 / 100.0), atol=1e-12
+        )

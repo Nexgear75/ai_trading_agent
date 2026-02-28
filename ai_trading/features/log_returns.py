@@ -11,6 +11,9 @@ Formulas (spec §6.2):
 Each feature produces NaN at positions ``t < k`` (no forward-fill or zero-fill).
 All computations are strictly causal: value at *t* depends only on data at
 indices ``<= t``.
+
+The three classes are generated via ``_make_log_return_class(k)`` to avoid
+duplication of identical logic.
 """
 
 import numpy as np
@@ -19,49 +22,58 @@ import pandas as pd
 from ai_trading.features.registry import BaseFeature, register_feature
 
 
-@register_feature("logret_1")
-class LogReturn1(BaseFeature):
-    """Log-return over 1 bar: ``log(C_t / C_{t-1})``."""
+def _make_log_return_class(k: int) -> type[BaseFeature]:
+    """Factory: create a log-return feature class for lag *k*.
 
-    required_params: list[str] = []
+    Parameters
+    ----------
+    k : int
+        Number of bars for the log-return lag (1, 2, or 4).
 
-    @property
-    def min_periods(self) -> int:
-        return 1
+    Returns
+    -------
+    type[BaseFeature]
+        A concrete ``BaseFeature`` subclass computing
+        ``log(C_t / C_{t-k})``.
+    """
 
-    def compute(self, ohlcv: pd.DataFrame, params: dict) -> pd.Series:
-        """Compute 1-bar log-return from close prices."""
-        close = ohlcv["close"]
-        return np.log(close / close.shift(1))
+    class _LogReturn(BaseFeature):
+        __doc__ = f"""Log-return over {k} bar(s): ``log(C_t / C_{{t-{k}}})``."""
+
+        required_params: list[str] = []
+
+        @property
+        def min_periods(self) -> int:
+            return k
+
+        def compute(self, ohlcv: pd.DataFrame, params: dict) -> pd.Series:
+            """Compute k-bar log-return from close prices."""
+            close = ohlcv["close"]
+            result = np.log(close / close.shift(k))
+            # Preserve current behavior: return a Series without a name,
+            # while avoiding an unnecessary Series construction.
+            if isinstance(result, pd.Series):
+                result = result.rename(None)
+            return result
+
+    _LogReturn.__name__ = f"LogReturn{k}"
+    _LogReturn.__qualname__ = f"LogReturn{k}"
+    return _LogReturn
 
 
-@register_feature("logret_2")
-class LogReturn2(BaseFeature):
-    """Log-return over 2 bars: ``log(C_t / C_{t-2})``."""
-
-    required_params: list[str] = []
-
-    @property
-    def min_periods(self) -> int:
-        return 2
-
-    def compute(self, ohlcv: pd.DataFrame, params: dict) -> pd.Series:
-        """Compute 2-bar log-return from close prices."""
-        close = ohlcv["close"]
-        return np.log(close / close.shift(2))
+LogReturn1 = register_feature("logret_1")(_make_log_return_class(1))
+LogReturn2 = register_feature("logret_2")(_make_log_return_class(2))
+LogReturn4 = register_feature("logret_4")(_make_log_return_class(4))
 
 
-@register_feature("logret_4")
-class LogReturn4(BaseFeature):
-    """Log-return over 4 bars: ``log(C_t / C_{t-4})``."""
+def load_builtin_features() -> None:
+    """Ensure log-return features are registered in FEATURE_REGISTRY.
 
-    required_params: list[str] = []
-
-    @property
-    def min_periods(self) -> int:
-        return 4
-
-    def compute(self, ohlcv: pd.DataFrame, params: dict) -> pd.Series:
-        """Compute 4-bar log-return from close prices."""
-        close = ohlcv["close"]
-        return np.log(close / close.shift(4))
+    This function is intended to be called at pipeline startup so that the
+    built-in log-return features are registered even if this module has not
+    been imported elsewhere in the codebase.
+    """
+    # Access the feature classes to make the registration relationship explicit
+    # for static analysis tools and human readers. Registration itself happens
+    # at module import time via the decorators above.
+    _ = (LogReturn1, LogReturn2, LogReturn4)
