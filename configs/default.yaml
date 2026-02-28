@@ -45,10 +45,9 @@ features:
     - rsi_14
     - ema_ratio_12_26
   # Paramètres des features individuelles
-  # NOTE : Ces paramètres sont des extensions implementation-defined non listées
-  # dans l'Annexe E.1 de la spec (qui les définit comme constantes dans les
-  # formules §6.3–§6.5). Ils sont exposés ici en config pour éviter tout
-  # hardcoding et garantir l'explicitation des choix (cf. convention du plan).
+  # NOTE : Ces paramètres correspondent aux constantes définies dans l'Annexe E.1
+  # de la spec (formules §6.3–§6.5). Ils sont exposés ici en config pour éviter
+  # tout hardcoding et garantir l'explicitation des choix (cf. convention du plan).
   params:
     rsi_period: 14
     rsi_epsilon: 1.0e-12
@@ -68,6 +67,8 @@ splits:
   step_days: 30                   # Glissement entre folds
   val_frac_in_train: 0.2          # Fraction temporelle finale du train → validation
   embargo_bars: 4                 # = H par défaut. Gap entre train/val et test.
+  min_samples_train: 100          # Minimum de samples train pour qu'un fold soit valide
+  min_samples_test: 1             # Minimum de samples test pour qu'un fold soit valide
 
 # --- Scaling / normalisation -------------------------------------------------
 scaling:
@@ -84,7 +85,11 @@ scaling:
 strategy:
   strategy_type: model            # model | baseline
   name: xgboost_reg              # xgboost_reg | cnn1d_reg | gru_reg | lstm_reg | patchtst_reg | rl_ppo | no_trade | buy_hold | sma_rule
-  framework: xgboost              # Informatif uniquement (manifest). Le modèle est résolu par strategy.name via MODEL_REGISTRY.
+  # NOTE : framework est AUTO-DÉRIVÉ de strategy.name par l'orchestrateur (WS-12.2).
+  # La valeur ci-dessous est purement informative et sera écrasée dans le manifest.
+  # Mapping : xgboost_reg→xgboost, cnn1d/gru/lstm/patchtst/rl_ppo→pytorch, baselines→rule_based.
+  # Un warning est émis si cette valeur diffère de la dérivation automatique.
+  framework: xgboost
 
 # --- Thresholding (calibration θ) -------------------------------------------
 thresholding:
@@ -128,7 +133,7 @@ baselines:
 training:
   loss: mse                       # mse | mae | huber  (extension impl-defined)
   optimizer: adam                  # adam | sgd | adamw  (extension impl-defined)
-  learning_rate: 1.0e-3
+  learning_rate: 1.0e-3           # DL uniquement (CNN1D, GRU, LSTM, PatchTST). Ignoré par XGBoost et RL PPO qui ont leur propre LR ci-dessous.
   batch_size: 64
   max_epochs: 100
   early_stopping_patience: 10     # Epochs (DL) ou rounds (XGBoost)
@@ -186,7 +191,7 @@ models:
     gae_lambda: 0.95              # GAE lambda
     n_epochs_ppo: 4               # PPO inner epochs per rollout
     max_episodes: 200             # Max training episodes (rollouts)
-    rollout_steps: 512            # Steps per rollout
+    rollout_steps: 512            # Pas de décision par rollout (≠ bougies : en mode skip, un Go saute H+1 bougies)
     value_loss_coeff: 0.5
     entropy_coeff: 0.01           # Exploration encouragement
     learning_rate: 3.0e-4         # PPO-specific LR
@@ -197,14 +202,14 @@ metrics:
   sharpe_annualized: false        # Non annualisé dans le MVP
   sharpe_epsilon: 1.0e-12
 
-# --- Reproductibilité -------------------------------------------------------
+# --- Reproducibility ---------------------------------------------------------
 reproducibility:
-  global_seed: 42
+  global_seed: 42                 # Seed globale (numpy, random, torch, XGBoost random_state)
   deterministic_torch: true       # torch.use_deterministic_algorithms(True)
 
-# --- Artefacts ---------------------------------------------------------------
+# --- Artifacts ---------------------------------------------------------------
 artifacts:
-  output_dir: runs                # Racine des runs
+  output_dir: runs                # Répertoire racine des runs (chaîne non vide)
   save_model: true                # Sauvegarder les artefacts modèle par fold
-  save_equity_curve: true
-  save_predictions: true          # preds_val.csv + preds_test.csv
+  save_equity_curve: true         # Générer equity_curve.csv par fold + stitché
+  save_predictions: true          # Générer preds_val.csv et preds_test.csv par fold

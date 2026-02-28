@@ -22,6 +22,9 @@
         "directional_accuracy": 0.53,
         "spearman_ic": 0.06
       },
+      "n_samples_train": 3648,
+      "n_samples_val": 912,
+      "n_samples_test": 720,
       "trading": {
         "net_pnl": 0.021,
         "net_return": 0.021,
@@ -32,7 +35,8 @@
         "n_trades": 38,
         "avg_trade_return": 0.0006,
         "median_trade_return": 0.0003,
-        "exposure_time_frac": 0.52
+        "exposure_time_frac": 0.52,
+        "sharpe_per_trade": 0.12
       }
     }
   ],

@@ -813,7 +813,7 @@ $$
 \text{Directional accuracy} = \text{mean}( \mathbb{1}[ \text{sign}(y) = \text{sign}(\hat{y}) ] )
 $$
 
-**Convention** : les samples dont $y_t = 0$ exactement sont **exclus** du calcul de Directional Accuracy (direction indéterminée). Si tous les samples ont $y_t = 0$, DA = `null`.
+**Convention** : les samples dont $y_t = 0$ exactement sont **exclus** du calcul de Directional Accuracy (direction indéterminée). De même, les samples dont $\hat{y} = 0$ exactement sont **exclus** ($\text{sign}(0) = 0$, ni hausse ni baisse prédite). Si tous les samples éligibles sont exclus, DA = `null`.
 $$
 \text{IC (Spearman)} = \text{corr}_{\text{spearman}}(y, \hat{y}) \quad \text{(optionnel)}
 $$
@@ -918,7 +918,7 @@ flowchart LR
         PT[preds_test.csv]
         TR[trades.csv]
         EQ[equity_curve.csv]
-        M0[metrics.json]
+        M0[metrics_fold.json]
         MA[model_artifacts/]
       end
     end
@@ -1459,7 +1459,7 @@ Le schéma suivant définit formellement le contenu attendu de manifest.json. Il
         },
         "val_frac_in_train": {
           "type": "number",
-          "minimum": 0.0,
+          "exclusiveMinimum": 0.0,
           "maximum": 0.5
         },
         "embargo_bars": {
@@ -1502,7 +1502,8 @@ Le schéma suivant définit formellement le contenu attendu de manifest.json. Il
       "additionalProperties": false,
       "required": [
         "strategy_type",
-        "name"
+        "name",
+        "framework"
       ],
       "properties": {
         "strategy_type": {
@@ -1517,7 +1518,8 @@ Le schéma suivant définit formellement le contenu attendu de manifest.json. Il
           "description": "Ex: xgboost_reg, cnn1d_reg, gru_reg, lstm_reg, patchtst_reg, rl_ppo, no_trade, buy_hold, sma_rule."
         },
         "framework": {
-          "type": "string"
+          "type": "string",
+          "description": "Auto-dérivé de strategy.name (xgboost_reg→xgboost, cnn1d/gru/lstm/patchtst/rl_ppo→pytorch, baselines→rule_based)."
         },
         "hyperparams": {
           "type": "object"
@@ -1585,6 +1587,7 @@ Le schéma suivant définit formellement le contenu attendu de manifest.json. Il
     "environment": {
       "type": "object",
       "additionalProperties": false,
+      "required": ["python_version", "platform"],
       "properties": {
         "python_version": {
           "type": "string"
@@ -1605,7 +1608,8 @@ Le schéma suivant définit formellement le contenu attendu de manifest.json. Il
       "additionalProperties": false,
       "required": [
         "run_dir",
-        "files"
+        "files",
+        "per_fold"
       ],
       "properties": {
         "run_dir": {
@@ -1636,6 +1640,10 @@ Le schéma suivant définit formellement le contenu attendu de manifest.json. Il
             },
             "report_pdf": {
               "type": "string"
+            },
+            "pipeline_log": {
+              "type": "string",
+              "description": "Chemin vers le fichier de log du pipeline (pipeline.log)."
             }
           }
         },
@@ -1656,6 +1664,7 @@ Le schéma suivant définit formellement le contenu attendu de manifest.json. Il
               "files": {
                 "type": "object",
                 "additionalProperties": false,
+                "required": ["metrics_fold_json"],
                 "properties": {
                   "preds_val_csv": {
                     "type": "string"
@@ -1759,6 +1768,9 @@ Le schéma suivant définit formellement le contenu attendu de metrics.json. Il 
           "period_test",
           "threshold",
           "prediction",
+          "n_samples_train",
+          "n_samples_val",
+          "n_samples_test",
           "trading"
         ],
         "properties": {
@@ -1841,6 +1853,18 @@ Le schéma suivant définit formellement le contenu attendu de metrics.json. Il 
               }
             }
           },
+          "n_samples_train": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "n_samples_val": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "n_samples_test": {
+            "type": "integer",
+            "minimum": 0
+          },
           "trading": {
             "type": "object",
             "additionalProperties": false,
@@ -1907,6 +1931,13 @@ Le schéma suivant définit formellement le contenu attendu de metrics.json. Il 
                 ],
                 "minimum": 0.0,
                 "maximum": 1.0
+              },
+              "sharpe_per_trade": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "description": "Sharpe ratio calculé sur les rendements nets des trades uniquement. Null si n_trades == 0."
               }
             }
           }
@@ -2177,6 +2208,9 @@ Exemples minimaux (valeurs fictives) pour illustrer la structure. Ces fichiers s
         "directional_accuracy": 0.53,
         "spearman_ic": 0.06
       },
+      "n_samples_train": 3648,
+      "n_samples_val": 912,
+      "n_samples_test": 720,
       "trading": {
         "net_pnl": 0.021,
         "net_return": 0.021,
@@ -2187,7 +2221,8 @@ Exemples minimaux (valeurs fictives) pour illustrer la structure. Ces fichiers s
         "n_trades": 38,
         "avg_trade_return": 0.0006,
         "median_trade_return": 0.0003,
-        "exposure_time_frac": 0.52
+        "exposure_time_frac": 0.52,
+        "sharpe_per_trade": 0.12
       }
     }
   ],
