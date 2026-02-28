@@ -78,7 +78,7 @@ class FeaturesParamsConfig(_StrictBase):
     rsi_epsilon: float
     ema_fast: int
     ema_slow: int
-    vol_windows: list[int]
+    vol_windows: list[int] = Field(min_length=1)
     logvol_epsilon: float
     volatility_ddof: int
 

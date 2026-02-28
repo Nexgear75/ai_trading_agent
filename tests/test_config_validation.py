@@ -432,6 +432,11 @@ class TestAdditionalNumericBounds:
         with pytest.raises(ValidationError, match="rolling_window"):
             load_config(tmp_yaml(data))
 
+    def test_vol_windows_empty_raises(self, default_yaml_data, tmp_yaml):
+        data = _mutate(default_yaml_data, "features.params.vol_windows", [])
+        with pytest.raises(ValidationError, match="vol_windows"):
+            load_config(tmp_yaml(data))
+
 
 # ===========================================================================
 # Dropout bounds for all model types with dropout
