@@ -467,3 +467,44 @@ class TestEdgeCases:
         assert np.isnan(result.iloc[50])
         assert np.isnan(result.iloc[71])
         assert not np.isnan(result.iloc[72])
+
+    def test_empty_dataframe_returns_empty_series(self):
+        """#009 Empty OHLCV → empty Series (no crash)."""
+        _import_volatility()
+        timestamps = pd.DatetimeIndex([], dtype="datetime64[ns]", freq="h")
+        ohlcv = pd.DataFrame(
+            {"open": [], "high": [], "low": [], "close": [], "volume": []},
+            index=timestamps,
+        )
+        params = _default_params()
+        for name in ("vol_24", "vol_72"):
+            instance = FEATURE_REGISTRY[name]()
+            result = instance.compute(ohlcv, params)
+            assert isinstance(result, pd.Series)
+            assert len(result) == 0
+
+    def test_single_bar_all_nan(self):
+        """#009 With only 1 bar, all values must be NaN."""
+        _import_volatility()
+        ohlcv = _make_ohlcv(1)
+        params = _default_params()
+        for name in ("vol_24", "vol_72"):
+            instance = FEATURE_REGISTRY[name]()
+            result = instance.compute(ohlcv, params)
+            assert len(result) == 1
+            assert result.isna().all()
+
+    def test_exact_window_bars_all_nan_vol_24(self):
+        """#009 With exactly 24 bars, vol_24 must be all NaN.
+
+        24 bars produce only 23 log-returns, which is less than the
+        required window of 24.
+        """
+        _import_volatility()
+        ohlcv = _make_ohlcv(24)
+        params = _default_params()
+        instance = FEATURE_REGISTRY["vol_24"]()
+        result = instance.compute(ohlcv, params)
+        assert result.isna().all(), (
+            "24 bars yield 23 logreturns < window 24 → all NaN expected"
+        )

@@ -42,7 +42,7 @@ Implémenter les deux features de volatilité :
 - [x] Résultat numérique identique à `np.std(..., ddof=0)` sur la fenêtre correspondante.
 - [x] Convention `ddof=0` (écart-type population) lue depuis la config.
 - [x] NaN aux positions t < n.
-- [x] Les fenêtres sont lues depuis `config.features.params.vol_windows` (pas hardcodées).
+- [x] Les fenêtres sont fixes (24, 72) conformément à la spec §6.5 ; seul `volatility_ddof` est lu depuis la config.
 - [x] Causalité vérifiée : modifier `close[t > T]` ne modifie pas `vol_n[t <= T]`.
 - [x] Tests couvrent les scénarios nominaux + erreurs + bords.
 - [x] Suite de tests verte après implémentation.
