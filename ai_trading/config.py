@@ -63,6 +63,10 @@ class DatasetConfig(_StrictBase):
     raw_dir: str
 
 
+class QAConfig(_StrictBase):
+    zero_volume_min_streak: int = Field(ge=1)
+
+
 class LabelConfig(_StrictBase):
     horizon_H_bars: int = Field(ge=1)  # noqa: N815
     target_type: str
@@ -294,6 +298,7 @@ class ArtifactsConfig(_StrictBase):
 class PipelineConfig(_StrictBase):
     logging: LoggingConfig
     dataset: DatasetConfig
+    qa: QAConfig
     label: LabelConfig
     window: WindowConfig
     features: FeaturesConfig

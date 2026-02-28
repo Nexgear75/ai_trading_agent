@@ -1,6 +1,6 @@
 # Tâche — Contrôles qualité (QA) obligatoires
 
-Statut : TODO
+Statut : DONE
 Ordre : 005
 Workstream : WS-2
 Milestone : M1
@@ -36,30 +36,30 @@ Implémenter un module `ai_trading/data/qa.py` qui effectue les contrôles quali
 - `QAReport` : dataclass structurée contenant le statut de chaque contrôle, les détails des anomalies détectées et un statut global pass/fail.
 
 ## Critères d'acceptation
-- [ ] Données propres → QA passe (statut global = pass)
-- [ ] Doublons de timestamp détectés et signalés
-- [ ] Trous (missing candles) détectés avec la liste des timestamps manquants
-- [ ] Prix négatif → erreur explicite
-- [ ] OHLC incohérent (`high < open` ou `low > close`) → détecté et signalé
-- [ ] Volume nul prolongé → détecté et reporté
-- [ ] Pas Δ irrégulier (hors trous attendus) → détecté
-- [ ] `QAReport` retourné avec les détails structurés de chaque contrôle
-- [ ] Tests avec données synthétiques : tous les cas d'anomalie couverts
-- [ ] Tests couvrent les scénarios nominaux + erreurs + bords
-- [ ] Suite de tests verte après implémentation
-- [ ] `ruff check` passe sans erreur
+- [x] Données propres → QA passe (statut global = pass)
+- [x] Doublons de timestamp détectés et signalés
+- [x] Trous (missing candles) détectés avec la liste des timestamps manquants
+- [x] Prix négatif → erreur explicite
+- [x] OHLC incohérent (`high < open` ou `low > close`) → détecté et signalé
+- [x] Volume nul prolongé → détecté et reporté
+- [x] Pas Δ irrégulier (hors trous attendus) → détecté
+- [x] `QAReport` retourné avec les détails structurés de chaque contrôle
+- [x] Tests avec données synthétiques : tous les cas d'anomalie couverts
+- [x] Tests couvrent les scénarios nominaux + erreurs + bords
+- [x] Suite de tests verte après implémentation
+- [x] `ruff check` passe sans erreur
 
 ## Pré-condition de démarrage
 - **Tous les tests existants sont GREEN** avant de commencer.
 - **Créer une branche dédiée** `task/005-qa-checks` depuis `Max6000i1`.
 
 ## Checklist de fin de tâche
-- [ ] Branche `task/005-qa-checks` créée depuis `Max6000i1`.
-- [ ] Tests RED écrits avant implémentation.
-- [ ] **Commit RED** : `[WS-2] #005 RED: tests contrôles qualité QA`.
-- [ ] Tests GREEN passants et reproductibles.
-- [ ] Critères d'acceptation tous satisfaits.
-- [ ] `ruff check ai_trading/ tests/` passe sans erreur.
-- [ ] Fichier de tâche mis à jour (statut DONE, critères cochés).
-- [ ] **Commit GREEN** : `[WS-2] #005 GREEN: contrôles qualité QA`.
-- [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-2] #005 — Contrôles qualité QA`.
+- [x] Branche `task/005-qa-checks` créée depuis `Max6000i1`.
+- [x] Tests RED écrits avant implémentation.
+- [x] **Commit RED** : `[WS-2] #005 RED: tests contrôles qualité QA`.
+- [x] Tests GREEN passants et reproductibles.
+- [x] Critères d'acceptation tous satisfaits.
+- [x] `ruff check ai_trading/ tests/` passe sans erreur.
+- [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
+- [x] **Commit GREEN** : `[WS-2] #005 GREEN: contrôles qualité QA`.
+- [x] **Pull Request ouverte** vers `Max6000i1` : `[WS-2] #005 — Contrôles qualité QA`.

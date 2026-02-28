@@ -21,6 +21,11 @@ dataset:
   timezone: UTC
   raw_dir: data/raw               # Répertoire des fichiers bruts
 
+# --- QA (contrôles qualité) --------------------------------------------------
+qa:
+  zero_volume_min_streak: 2       # Nombre min de bougies consécutives à volume nul
+                                  # pour signaler un volume nul prolongé (§4.2)
+
 # --- Label (cible y_t) ------------------------------------------------------
 label:
   horizon_H_bars: 4               # Horizon de prédiction (bougies)
