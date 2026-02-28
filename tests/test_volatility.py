@@ -37,9 +37,8 @@ def _make_ohlcv(n_bars: int, seed: int = 42) -> pd.DataFrame:
 
 
 def _default_params() -> dict:
-    """Default params matching configs/default.yaml."""
+    """Default volatility params (only volatility_ddof is required by these features)."""
     return {
-        "vol_windows": [24, 72],
         "volatility_ddof": 0,
     }
 
@@ -104,21 +103,21 @@ class TestMinPeriods:
 # ---------------------------------------------------------------------------
 
 class TestRequiredParams:
-    """Verify required_params includes vol_windows and volatility_ddof."""
+    """Verify required_params includes volatility_ddof and does not require vol_windows."""
 
     def test_vol_24_required_params(self):
-        """#009 vol_24 must require vol_windows and volatility_ddof."""
+        """#009 vol_24 must require volatility_ddof."""
         _import_volatility()
         cls = FEATURE_REGISTRY["vol_24"]
-        assert "vol_windows" in cls.required_params
         assert "volatility_ddof" in cls.required_params
+        assert "vol_windows" not in cls.required_params
 
     def test_vol_72_required_params(self):
-        """#009 vol_72 must require vol_windows and volatility_ddof."""
+        """#009 vol_72 must require volatility_ddof."""
         _import_volatility()
         cls = FEATURE_REGISTRY["vol_72"]
-        assert "vol_windows" in cls.required_params
         assert "volatility_ddof" in cls.required_params
+        assert "vol_windows" not in cls.required_params
 
 
 # ---------------------------------------------------------------------------
@@ -196,8 +195,8 @@ class TestDdofConfig:
         """#009 Using ddof=1 must yield different values from ddof=0."""
         _import_volatility()
         ohlcv = _make_ohlcv(100)
-        params_0 = {"vol_windows": [24, 72], "volatility_ddof": 0}
-        params_1 = {"vol_windows": [24, 72], "volatility_ddof": 1}
+        params_0 = {"volatility_ddof": 0}
+        params_1 = {"volatility_ddof": 1}
 
         instance = FEATURE_REGISTRY["vol_24"]()
         result_0 = instance.compute(ohlcv, params_0)
@@ -214,7 +213,7 @@ class TestDdofConfig:
         """#009 ddof=1 must match np.std(logret, ddof=1) on the window."""
         _import_volatility()
         ohlcv = _make_ohlcv(100)
-        params = {"vol_windows": [24, 72], "volatility_ddof": 1}
+        params = {"volatility_ddof": 1}
         instance = FEATURE_REGISTRY["vol_24"]()
         result = instance.compute(ohlcv, params)
 
@@ -434,9 +433,11 @@ class TestEdgeCases:
             instance.compute(ohlcv, {})
 
     def test_vol_windows_from_config(self):
-        """#009 Windows are read from config, not hardcoded.
+        """#009 vol_24 window is fixed at 24 per spec §6.5, regardless of vol_windows.
 
-        Using custom windows [10, 50] should change the result window size.
+        Passing a custom vol_windows=[10, 50] must NOT change the actual rolling
+        window; vol_24 always uses a 24-bar window to stay consistent with
+        ``min_periods`` and the feature name contract.
         """
         _import_volatility()
         ohlcv = _make_ohlcv(100)
@@ -444,7 +445,25 @@ class TestEdgeCases:
         instance = FEATURE_REGISTRY["vol_24"]()
         result = instance.compute(ohlcv, params)
 
-        # With a window of 10 (first element in vol_windows for vol_24),
-        # first valid position should be at index 10, not 24
-        assert np.isnan(result.iloc[9])
-        assert not np.isnan(result.iloc[10])
+        # Window is fixed at 24; positions 0..23 must be NaN, position 24 valid.
+        assert np.isnan(result.iloc[10])
+        assert np.isnan(result.iloc[23])
+        assert not np.isnan(result.iloc[24])
+
+    def test_vol_72_window_fixed_regardless_of_vol_windows(self):
+        """#009 vol_72 window is fixed at 72 per spec §6.5, regardless of vol_windows.
+
+        Passing a custom vol_windows=[10, 50] must NOT change the actual rolling
+        window; vol_72 always uses a 72-bar window to stay consistent with
+        ``min_periods`` and the feature name contract.
+        """
+        _import_volatility()
+        ohlcv = _make_ohlcv(200)
+        params = {"vol_windows": [10, 50], "volatility_ddof": 0}
+        instance = FEATURE_REGISTRY["vol_72"]()
+        result = instance.compute(ohlcv, params)
+
+        # Window is fixed at 72; positions 0..71 must be NaN, position 72 valid.
+        assert np.isnan(result.iloc[50])
+        assert np.isnan(result.iloc[71])
+        assert not np.isnan(result.iloc[72])

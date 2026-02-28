@@ -48,24 +48,31 @@ def _compute_rolling_volatility(
 
 @register_feature("vol_24")
 class Volatility24(BaseFeature):
-    """Rolling volatility over the first window in ``vol_windows`` (default 24)."""
+    """Rolling volatility over a fixed 24-bar window (spec §6.5).
 
-    required_params: list[str] = ["vol_windows", "volatility_ddof"]
+    The window is always 24, matching the feature name and the spec formula::
+
+        vol_24(t) = std(logret_1(t-i), i=0..23, ddof=config)
+    """
+
+    _WINDOW: int = 24
+
+    required_params: list[str] = ["volatility_ddof"]
 
     @property
     def min_periods(self) -> int:
-        """Minimum bars before first valid value (default window = 24)."""
-        return 24
+        """Minimum bars before first valid value: 24."""
+        return self._WINDOW
 
     def compute(self, ohlcv: pd.DataFrame, params: dict) -> pd.Series:
-        """Compute vol using the first element of ``vol_windows``.
+        """Compute vol_24 using a fixed 24-bar rolling window.
 
         Parameters
         ----------
         ohlcv : pd.DataFrame
             OHLCV data with a ``close`` column.
         params : dict
-            Must contain ``vol_windows`` (list[int]) and ``volatility_ddof`` (int).
+            Must contain ``volatility_ddof`` (int).
 
         Returns
         -------
@@ -77,32 +84,37 @@ class Volatility24(BaseFeature):
         KeyError
             If required params are missing.
         """
-        vol_windows = params["vol_windows"]
         ddof = params["volatility_ddof"]
-        window = vol_windows[0]
-        return _compute_rolling_volatility(ohlcv["close"], window, ddof)
+        return _compute_rolling_volatility(ohlcv["close"], self._WINDOW, ddof)
 
 
 @register_feature("vol_72")
 class Volatility72(BaseFeature):
-    """Rolling volatility over the second window in ``vol_windows`` (default 72)."""
+    """Rolling volatility over a fixed 72-bar window (spec §6.5).
 
-    required_params: list[str] = ["vol_windows", "volatility_ddof"]
+    The window is always 72, matching the feature name and the spec formula::
+
+        vol_72(t) = std(logret_1(t-i), i=0..71, ddof=config)
+    """
+
+    _WINDOW: int = 72
+
+    required_params: list[str] = ["volatility_ddof"]
 
     @property
     def min_periods(self) -> int:
-        """Minimum bars before first valid value (default window = 72)."""
-        return 72
+        """Minimum bars before first valid value: 72."""
+        return self._WINDOW
 
     def compute(self, ohlcv: pd.DataFrame, params: dict) -> pd.Series:
-        """Compute vol using the second element of ``vol_windows``.
+        """Compute vol_72 using a fixed 72-bar rolling window.
 
         Parameters
         ----------
         ohlcv : pd.DataFrame
             OHLCV data with a ``close`` column.
         params : dict
-            Must contain ``vol_windows`` (list[int]) and ``volatility_ddof`` (int).
+            Must contain ``volatility_ddof`` (int).
 
         Returns
         -------
@@ -114,7 +126,5 @@ class Volatility72(BaseFeature):
         KeyError
             If required params are missing.
         """
-        vol_windows = params["vol_windows"]
         ddof = params["volatility_ddof"]
-        window = vol_windows[1]
-        return _compute_rolling_volatility(ohlcv["close"], window, ddof)
+        return _compute_rolling_volatility(ohlcv["close"], self._WINDOW, ddof)
