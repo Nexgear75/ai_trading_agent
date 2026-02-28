@@ -1,7 +1,7 @@
 # Plan d'implémentation — Pipeline commun AI Trading
 
-**Référence** : `docs/specifications/Specification_Pipeline_Commun_AI_Trading_v1.0.md` (v1.0 + addendum v1.1 + v1.2)
-**Date** : 2026-02-27
+**Référence** : `docs/specifications/Specification_Pipeline_Commun_AI_Trading_v1.0.md` (v1.0 + addendum v1.1 + v1.2 + §17 spécification technique MVP)
+**Date** : 2026-02-28
 **Portée** : pipeline complet (hors implémentation interne des modèles ML/DL)
 
 > Ce plan découpe l'implémentation en **Work Streams (WS)** parallélisables et en **Milestones (M)** séquentiels.
@@ -63,7 +63,7 @@ flowchart LR
 | **M2** | WS-3, WS-4, WS-5 | Pipeline de features → datasets (N,L,F) → splits walk-forward → scaler | Tenseur X_seq reproductible, splits disjoints vérifiés |
 | **M3** | WS-6, WS-7 | Interface plug-in modèle, boucle d'entraînement, calibration θ | Modèle dummy réussit fit/predict/calibration sur données synthétiques |
 | **M4** | WS-8, WS-9, WS-10 | Backtest commun, 3 baselines, métriques de prédiction et trading | Métriques cohérentes sur données synthétiques et baselines |
-| **M5** | WS-11, WS-12 | Artefacts conformes aux schémas JSON, orchestrateur bout-en-bout, Docker | Run complet reproductible avec manifest.json + metrics.json valides |
+| **M5** | WS-11, WS-12 | Artefacts conformes aux schémas JSON, orchestrateur bout-en-bout, Makefile, Docker | Run complet reproductible avec manifest.json + metrics.json valides, `make run-all` fonctionnel |
 
 
 ## Milestones et dépendances
@@ -129,6 +129,7 @@ graph TD
   T121 --> T122[WS-12.2 Orchestrateur run]
   T122 --> T123[WS-12.3 CLI entry point]
   T123 --> T124[WS-12.4 Dockerfile + CI]
+  T124 --> T126[WS-12.6 Makefile]
   T113 --> T125[WS-12.5 Compare runs\npost-MVP]
 ```
 
@@ -145,8 +146,8 @@ graph TD
 
 | Champ | Valeur |
 |---|---|
-| **Description** | Créer l'arborescence Python `ai_trading/` (nom du package Python interne — distinct du répertoire racine du repo `ai_trading_agent/`), le `__init__.py` (avec `__version__ = "1.0.0"` — single source of truth, lu dynamiquement par `pyproject.toml` via `[tool.setuptools.dynamic] version = {attr = "ai_trading.__version__"}`), le `pyproject.toml` (PEP 621 / PEP 517, build backend `setuptools.build_meta`), et mettre à jour `requirements.txt` avec toutes les dépendances (pandas, numpy, PyYAML, pydantic>=2.0, jsonschema, xgboost, torch, scikit-learn, scipy, ccxt, pyarrow). Un fichier `requirements-dev.txt` sépare les dépendances de développement (pytest, ruff). Configurer le logging avec `logging` standard, piloté par `config.logging` (level, format text/JSON, fichier optionnel). **Logging en deux phases** : (1) au démarrage du pipeline, configurer le logging vers **stdout uniquement** (le `run_dir` n'existe pas encore) ; (2) après création du `run_dir` (WS-11.1), ajouter dynamiquement un `FileHandler` vers `run_dir/pipeline.log` si `config.logging.file` est spécifié (`"pipeline.log"` par défaut, `null` = stdout only). |
-| **Réf. spec** | §1 (périmètre), §16 (reproductibilité) |
+| **Description** | Créer l'arborescence Python `ai_trading/` (nom du package Python interne — distinct du répertoire racine du repo `ai_trading_agent/`), le `__init__.py` (avec `__version__ = "1.0.0"` — single source of truth, lu dynamiquement par `pyproject.toml` via `[tool.setuptools.dynamic] version = {attr = "ai_trading.__version__"}`), le `pyproject.toml` (PEP 621 / PEP 517, build backend `setuptools.build_meta`), et mettre à jour `requirements.txt` avec toutes les dépendances (pandas, numpy, PyYAML, pydantic>=2.0, jsonschema, xgboost, torch, scikit-learn, scipy, ccxt, pyarrow). Un fichier `requirements-dev.txt` sépare les dépendances de développement (pytest, ruff). Configurer le logging avec `logging` standard, piloté par `config.logging` (level, format text/JSON, fichier optionnel). **Logging en deux phases** : (1) au démarrage du pipeline, configurer le logging vers **stdout uniquement** (le `run_dir` n'existe pas encore) ; (2) après création du `run_dir` (WS-11.1), ajouter dynamiquement un `FileHandler` vers `run_dir/pipeline.log` si `config.logging.file` est spécifié (`"pipeline.log"` par défaut, `null` = stdout only). **Messages clés à logger en INFO** (§17.7) : début/fin de chaque étape, nombre de samples par split par fold, seuil θ retenu, chemin du `run_dir`. Le niveau DEBUG ajoute shapes des tenseurs, durée de chaque étape, loss par epoch. |
+| **Réf. spec** | §1 (périmètre), §16 (reproductibilité), §17.1 (stack et dépendances), §17.7 (logging et verbosité) |
 | **Critères d'acceptation** | `pip install -e .` réussit. `import ai_trading` fonctionne. `ai_trading.__version__` retourne `"1.0.0"`. Linter (ruff) passe sans erreur. `requirements.txt` contient toutes les dépendances runtime. `requirements-dev.txt` existe et inclut pytest+ruff. |
 | **Dépendances** | Aucune |
 
@@ -154,8 +155,8 @@ graph TD
 
 | Champ | Valeur |
 |---|---|
-| **Description** | Implémenter un module `config.py` qui charge `configs/default.yaml` (ou un YAML passé en argument), le fusionne avec les overrides CLI éventuels, et retourne un objet config typé **Pydantic v2** (`BaseModel`). Le choix de Pydantic v2 (et non de simples dataclasses) est motivé par la validation intégrée (types, bornes, contraintes croisées via `@model_validator`), la sérialisation YAML/JSON native, et la génération automatique de schémas. **Override CLI** : supporter la dot notation via `argparse` : `--set splits.train_days=240 --set costs.slippage_rate_per_side=0.0005`. Le mécanisme parcourt la config imbriquée et remplace la valeur au chemin spécifié. Erreur explicite si le chemin n'existe pas dans le schéma. |
-| **Réf. spec** | Annexe E.1 (tous les paramètres MVP) |
+| **Description** | Implémenter un module `config.py` qui charge `configs/default.yaml` (ou un YAML passé en argument), le fusionne avec les overrides CLI éventuels, et retourne un objet config typé **Pydantic v2** (`BaseModel`). Le choix de Pydantic v2 (et non de simples dataclasses) est motivé par la validation intégrée (types, bornes, contraintes croisées via `@model_validator`), la sérialisation YAML/JSON native, et la génération automatique de schémas. **Override CLI** : supporter la dot notation via `argparse` : `--set splits.train_days=240 --set costs.slippage_rate_per_side=0.0005`. Le mécanisme parcourt la config imbriquée et remplace la valeur au chemin spécifié. Erreur explicite si le chemin n'existe pas dans le schéma. La configuration complète (après surcharges) est sauvegardée dans `config_snapshot.yaml` du run (§17.5). |
+| **Réf. spec** | Annexe E.1 (tous les paramètres MVP), §17.5 (gestion de la configuration) |
 | **Critères d'acceptation** | Le config loader supporte : (1) chargement du default, (2) override par fichier custom, (3) override par CLI args en dot notation (`--set key.subkey=value`). Tous les champs de `configs/default.yaml` sont accessibles par attribut. La config est une instance Pydantic v2 avec validation automatique. |
 | **Dépendances** | WS-1.1 |
 
@@ -163,8 +164,8 @@ graph TD
 
 | Champ | Valeur |
 |---|---|
-| **Description** | Ajouter une validation stricte de la configuration : types, bornes (ex: `embargo_bars >= 0`, `val_frac_in_train ∈ (0, 0.5]` — strictement positif pour garantir l'existence du validation set, nécessaire à l'early stopping et à la calibration θ), contraintes croisées (ex: `sma.fast < sma.slow <= min_warmup`), règle MVP `len(symbols) == 1`, **contrainte warmup-features** : `min_warmup >= max(features.params.rsi_period, features.params.ema_slow, max(features.params.vol_windows))` (garantit que toutes les features sont calculables après la zone warmup), et **règles non négociables du backtest** : `backtest.mode == "one_at_a_time"` et `backtest.direction == "long_only"` (§12.1, Annexe E.2.3). Erreur explicite (`raise`) si invalide. **Bornes numériques complètes (via Pydantic `Field`)** : `label.horizon_H_bars >= 1`, `window.L >= 2`, `splits.train_days >= 1`, `splits.test_days >= 1`, `splits.step_days >= 1`, `costs.fee_rate_per_side >= 0`, `costs.slippage_rate_per_side >= 0`, `thresholding.q_grid` chaque valeur ∈ `[0, 1]` et triée croissante, `thresholding.mdd_cap ∈ (0, 1]`, `thresholding.min_trades >= 0`, `backtest.initial_equity > 0`, `backtest.position_fraction ∈ (0, 1]`, `models.*.dropout ∈ [0, 1)`, `models.*.num_layers >= 1` (GRU, LSTM, PatchTST), `models.patchtst.n_heads` divise `models.patchtst.d_model`, `models.patchtst.stride <= models.patchtst.patch_size`, `baselines.sma.fast >= 2`, `training.batch_size >= 1`, `scaling.rolling_window >= 2` (si `scaling.method == rolling_zscore`). |
-| **Réf. spec** | Annexe E.2.6 (un seul symbole), §8.1, §12.1, §13.3, Annexe E.2.3 |
+| **Description** | Ajouter une validation stricte de la configuration : types, bornes (ex: `embargo_bars >= 0`, `val_frac_in_train ∈ (0, 0.5]` — strictement positif pour garantir l'existence du validation set, nécessaire à l'early stopping et à la calibration θ), contraintes croisées (ex: `sma.fast < sma.slow <= min_warmup`), règle MVP `len(symbols) == 1`, **contrainte warmup-features** : `min_warmup >= max(features.params.rsi_period, features.params.ema_slow, max(features.params.vol_windows))` (garantit que toutes les features sont calculables après la zone warmup), et **règles non négociables du backtest** : `backtest.mode == "one_at_a_time"` et `backtest.direction == "long_only"` (§12.1, Annexe E.2.3). Erreur explicite (`raise`) si invalide (§17.5 : rejet explicite des configurations incohérentes). **Bornes numériques complètes (via Pydantic `Field`)** : `label.horizon_H_bars >= 1`, `window.L >= 2`, `splits.train_days >= 1`, `splits.test_days >= 1`, `splits.step_days >= 1`, `costs.fee_rate_per_side >= 0`, `costs.slippage_rate_per_side >= 0`, `thresholding.q_grid` chaque valeur ∈ `[0, 1]` et triée croissante, `thresholding.mdd_cap ∈ (0, 1]`, `thresholding.min_trades >= 0`, `backtest.initial_equity > 0`, `backtest.position_fraction ∈ (0, 1]`, `models.*.dropout ∈ [0, 1)`, `models.*.num_layers >= 1` (GRU, LSTM, PatchTST), `models.patchtst.n_heads` divise `models.patchtst.d_model`, `models.patchtst.stride <= models.patchtst.patch_size`, `baselines.sma.fast >= 2`, `training.batch_size >= 1`, `scaling.rolling_window >= 2` (si `scaling.method == rolling_zscore`). Validation supplémentaire (§17.5) : `strategy.name` absent du registre des modèles/baselines → erreur, `scaling.method = rolling_zscore` (non implémenté MVP) → erreur. |
+| **Réf. spec** | Annexe E.2.6 (un seul symbole), §8.1, §12.1, §13.3, Annexe E.2.3, §17.5 (validation configuration) |
 | **Critères d'acceptation** | Tests unitaires couvrant : config valide OK, chaque violation levée avec message clair. En particulier : `backtest.mode != "one_at_a_time"` → erreur, `backtest.direction != "long_only"` → erreur, `min_warmup < max(rsi_period, ema_slow, max(vol_windows))` → erreur. Tests de bornes numériques : `horizon_H_bars=0` → erreur, `window.L=1` → erreur, `position_fraction=0` → erreur, `dropout=1.0` → erreur, `q_grid` non triée → erreur, `mdd_cap=0` → erreur, `min_trades=-1` → erreur, `num_layers=0` → erreur, `n_heads` ne divise pas `d_model` → erreur, `stride > patch_size` → erreur, `sma.fast=1` → erreur, `batch_size=0` → erreur. |
 | **Dépendances** | WS-1.2 |
 
@@ -181,8 +182,8 @@ graph TD
 
 | Champ | Valeur |
 |---|---|
-| **Description** | Implémenter un module `data/ingestion.py` qui télécharge les données OHLCV via l'API Binance (ccxt) pour le symbole, timeframe et période configurés. **Convention de bornes** : `dataset.start` est inclus, `dataset.end` est **exclusif** (convention Python `[start, end[`). La dernière bougie téléchargée a donc `timestamp_utc < end`. **Pagination** : ccxt retourne un maximum de bougies par appel (~1000) ; le module doit boucler sur `fetch_ohlcv()` avec le paramètre `since` incrémenté jusqu'à couvrir toute la période demandée. **Retry** : en cas d'erreur réseau ou rate-limit (429), retenter avec backoff exponentiel (max 3 retries). **Cache locale** : si le fichier Parquet existe déjà et couvre la période, ne pas re-télécharger (vérification par bornes temporelles). Stockage en Parquet avec colonnes canoniques : `timestamp_utc, open, high, low, close, volume, symbol`. Tri croissant par `timestamp_utc`. Calcul du SHA-256 du fichier pour traçabilité. |
-| **Réf. spec** | §4.1 (format canonique) |
+| **Description** | Implémenter un module `data/ingestion.py` qui télécharge les données OHLCV via l'API Binance (ccxt) pour le symbole, timeframe et période configurés. **L'ingestion est une étape séparée et préalable** (§17.4) au pipeline de modélisation : les données sont téléchargées une seule fois (`make fetch-data` / `python -m ai_trading fetch`) puis réutilisées offline pour tous les runs. **Convention de bornes** : `dataset.start` est inclus, `dataset.end` est **exclusif** (convention Python `[start, end[`). La dernière bougie téléchargée a donc `timestamp_utc < end`. **Pagination** : ccxt retourne un maximum de bougies par appel (~1000) ; le module doit boucler sur `fetch_ohlcv()` avec le paramètre `since` incrémenté jusqu'à couvrir toute la période demandée. **Retry** : en cas d'erreur réseau ou rate-limit (429), retenter avec backoff exponentiel (max 3 retries). **Cache locale / mode idempotent** : si le fichier Parquet existe déjà et couvre la période, ne pas re-télécharger (vérification par bornes temporelles) ; sinon, seules les bougies manquantes sont récupérées (téléchargement incrémental, §17.4). Stockage en Parquet avec colonnes canoniques : `timestamp_utc, open, high, low, close, volume, symbol`. Tri croissant par `timestamp_utc`. Calcul du SHA-256 du fichier pour traçabilité. |
+| **Réf. spec** | §4.1 (format canonique), §17.4 (ingestion étape préalable) |
 | **Critères d'acceptation** | Fichier Parquet généré avec les colonnes attendues. SHA-256 stable sur relance. Tri vérifié par test. |
 | **Dépendances** | WS-1.2 (config pour symbole, timeframe, période) |
 
@@ -737,6 +738,15 @@ Avec `train_days=180`, `test_days=30`, `step_days=30`, `embargo_bars=4`, `H=4`, 
 | **Dépendances** | WS-11.3 (metrics.json produits) |
 | **Priorité** | **Post-MVP** — exécuté manuellement après tous les runs. |
 
+### WS-12.6 — Makefile (pilotage du pipeline)
+
+| Champ | Valeur |
+|---|---|
+| **Description** | Créer un `Makefile` à la racine du projet servant d'interface utilisateur principale du pipeline (§17.3). Le Makefile expose les cibles suivantes : `install` (pip install des dépendances), `fetch-data` (téléchargement OHLCV via `python -m ai_trading fetch`), `qa` (contrôles qualité), `run` (pipeline complet), `run-all` (enchaîne `fetch-data → qa → run`), `test` (pytest), `lint` (ruff + mypy), `docker-build`, `docker-run`, `clean`, `help`. **Variables surchargeables** : `CONFIG` (défaut `configs/default.yaml`), `MODEL` (surcharge de `strategy.name`), `SEED` (surcharge de `reproducibility.global_seed`). Les surcharges `MODEL` et `SEED` sont passées en override CLI `--set` au script Python. La cible `help` liste toutes les cibles avec leur description (via grep sur les commentaires `##`). **Workflow typique** (§17.3) : `make install` (une fois) → `make fetch-data` (une fois ou après changement de symbole/période) → `make qa` → `make run`. La cible `run-all` est un raccourci enchaînant les trois dernières étapes. |
+| **Réf. spec** | §17.3 (pilotage du pipeline — Makefile) |
+| **Critères d'acceptation** | `make help` affiche la liste des cibles disponibles. `make install` installe les dépendances de `requirements.txt`. `make test` lance `pytest tests/ -v`. `make lint` lance `ruff check` + `mypy`. `make run CONFIG=configs/default.yaml` lance le pipeline. `make fetch-data` déclenche l'ingestion. `make run-all` enchaîne fetch → qa → run. `make docker-build` + `make docker-run` fonctionnent. Les variables `CONFIG`, `MODEL`, `SEED` sont surchargeables (`make run MODEL=gru_reg SEED=123`). |
+| **Dépendances** | WS-12.3 (CLI entry point), WS-12.4 (Dockerfile pour cibles Docker) |
+
 
 ---
 
@@ -745,6 +755,7 @@ Avec `train_days=180`, `test_days=30`, `step_days=30`, `embargo_bars=4`, `H=4`, 
 
 ```
 ai_trading_agent/
+├── Makefile                                # WS-12.6 — Point d'entrée utilisateur (§17.3)
 ├── configs/
 │   └── default.yaml
 ├── docs/
@@ -846,7 +857,7 @@ ai_trading_agent/
 | **Langue code** | Anglais (noms de variables, fonctions, classes, docstrings) |
 | **Langue docs** | Français (docs/, tâches, plan) |
 | **Style** | snake_case, PEP 8, imports explicites (pas de `*`) |
-| **Tests** | pytest, un fichier par module (`test_config.py`, `test_features.py`, etc.), TDD encouragé (RED → GREEN → REFACTOR). Les identifiants de tâche (`#NNN`) sont référencés dans les docstrings des classes/fonctions de test, pas dans le nom des fichiers. |
+| **Tests** | pytest, un fichier par module (`test_config.py`, `test_features.py`, etc.), TDD encouragé (RED → GREEN → REFACTOR). Les identifiants de tâche (`#NNN`) sont référencés dans les docstrings des classes/fonctions de test, pas dans le nom des fichiers. Tests unitaires par module + test d'intégration minimal sur données synthétiques vérifiant l'arborescence de sortie, la conformité des JSON et la cohérence des métriques (§17.6). Objectif MVP : couverture > 80% des modules critiques (features, splits, backtest, metrics). |
 | **Strict code** | Aucun fallback silencieux, `raise` explicite en cas d'erreur, pas d'`except` trop large |
 | **Anti-fuite** | Toute donnée future inaccessible à t. Scaler fit sur train uniquement. Embargo respecté. |
 | **Reproductibilité** | Seed fixée, SHA-256 des données, config versionée, environnement tracé |
