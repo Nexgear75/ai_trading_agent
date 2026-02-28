@@ -358,10 +358,15 @@ class TestValDaysWarning:
         data = _mutate(data, "window.min_warmup", 72)
         # Fix embargo >= H
         data = _mutate(data, "splits.embargo_bars", 4)
-        with caplog.at_level(logging.WARNING):
+        with caplog.at_level(logging.WARNING, logger="ai_trading.config"):
             cfg = load_config(tmp_yaml(data))
         assert isinstance(cfg, PipelineConfig)
-        assert any("val" in record.message.lower() for record in caplog.records)
+        val_warnings = [
+            r for r in caplog.records
+            if r.name == "ai_trading.config" and "val_days" in r.message
+        ]
+        assert len(val_warnings) == 1
+        assert "val_days=4" in val_warnings[0].message
 
 
 # ===========================================================================
