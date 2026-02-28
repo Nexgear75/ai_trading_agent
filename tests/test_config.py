@@ -6,6 +6,8 @@ CLI dot-notation override, error paths (FileNotFoundError, extra forbid, type
 validation, invalid dot path), and edge cases.
 """
 
+import copy
+
 import pytest
 import yaml
 from pydantic import ValidationError
@@ -317,3 +319,192 @@ class TestEdgeCases:
         ]
         for section in expected_sections:
             assert hasattr(cfg, section), f"Missing section: {section}"
+
+
+# ===========================================================================
+# Task #003 — Strict validation rules
+# ===========================================================================
+
+
+class TestStrictValidationTask003:
+    """#003 — Strict config validation (bounds, cross-checks, MVP constraints)."""
+
+    @staticmethod
+    def _write_mutated(default_yaml_data, tmp_yaml, mutate, name: str = "invalid.yaml"):
+        data = copy.deepcopy(default_yaml_data)
+        mutate(data)
+        return tmp_yaml(data, name)
+
+    def test_backtest_mode_must_be_one_at_a_time(self, default_yaml_data, tmp_yaml):
+        path = self._write_mutated(
+            default_yaml_data,
+            tmp_yaml,
+            lambda d: d["backtest"].update({"mode": "multi_positions"}),
+            "invalid_backtest_mode.yaml",
+        )
+        with pytest.raises(ValidationError, match="one_at_a_time"):
+            load_config(path)
+
+    def test_backtest_direction_must_be_long_only(self, default_yaml_data, tmp_yaml):
+        path = self._write_mutated(
+            default_yaml_data,
+            tmp_yaml,
+            lambda d: d["backtest"].update({"direction": "short_only"}),
+            "invalid_backtest_direction.yaml",
+        )
+        with pytest.raises(ValidationError, match="long_only"):
+            load_config(path)
+
+    def test_min_warmup_must_cover_feature_requirements(self, default_yaml_data, tmp_yaml):
+        def mutate(data):
+            data["window"]["min_warmup"] = 20
+
+        path = self._write_mutated(
+            default_yaml_data,
+            tmp_yaml,
+            mutate,
+            "invalid_warmup_feature.yaml",
+        )
+        with pytest.raises(ValidationError, match="min_warmup"):
+            load_config(path)
+
+    def test_min_warmup_must_be_greater_or_equal_window_length(self, default_yaml_data, tmp_yaml):
+        def mutate(data):
+            data["window"]["L"] = 128
+            data["window"]["min_warmup"] = 127
+
+        path = self._write_mutated(
+            default_yaml_data,
+            tmp_yaml,
+            mutate,
+            "invalid_warmup_window.yaml",
+        )
+        with pytest.raises(ValidationError, match=r"window\.L"):
+            load_config(path)
+
+    def test_embargo_bars_must_be_greater_or_equal_horizon(self, default_yaml_data, tmp_yaml):
+        def mutate(data):
+            data["label"]["horizon_H_bars"] = 4
+            data["splits"]["embargo_bars"] = 2
+
+        path = self._write_mutated(default_yaml_data, tmp_yaml, mutate, "invalid_embargo.yaml")
+        with pytest.raises(ValidationError, match="embargo_bars"):
+            load_config(path)
+
+    def test_strategy_type_baseline_cannot_use_model_name(self, default_yaml_data, tmp_yaml):
+        def mutate(data):
+            data["strategy"]["strategy_type"] = "baseline"
+            data["strategy"]["name"] = "xgboost_reg"
+
+        path = self._write_mutated(
+            default_yaml_data,
+            tmp_yaml,
+            mutate,
+            "invalid_strategy_mismatch_1.yaml",
+        )
+        with pytest.raises(ValidationError, match="strategy_type"):
+            load_config(path)
+
+    def test_strategy_type_model_cannot_use_baseline_name(self, default_yaml_data, tmp_yaml):
+        def mutate(data):
+            data["strategy"]["strategy_type"] = "model"
+            data["strategy"]["name"] = "no_trade"
+
+        path = self._write_mutated(
+            default_yaml_data,
+            tmp_yaml,
+            mutate,
+            "invalid_strategy_mismatch_2.yaml",
+        )
+        with pytest.raises(ValidationError, match="strategy_type"):
+            load_config(path)
+
+    def test_unknown_strategy_name_is_rejected(self, default_yaml_data, tmp_yaml):
+        path = self._write_mutated(
+            default_yaml_data,
+            tmp_yaml,
+            lambda d: d["strategy"].update({"name": "unknown_strategy"}),
+            "invalid_strategy_name.yaml",
+        )
+        with pytest.raises(ValidationError, match=r"strategy\.name"):
+            load_config(path)
+
+    def test_step_days_must_be_greater_or_equal_test_days(self, default_yaml_data, tmp_yaml):
+        def mutate(data):
+            data["splits"]["test_days"] = 30
+            data["splits"]["step_days"] = 29
+
+        path = self._write_mutated(default_yaml_data, tmp_yaml, mutate, "invalid_walk_forward.yaml")
+        with pytest.raises(ValidationError, match="step_days"):
+            load_config(path)
+
+    @pytest.mark.parametrize(
+        ("mutate", "match"),
+        [
+            (lambda d: d["label"].update({"horizon_H_bars": 0}), "horizon_H_bars"),
+            (lambda d: d["window"].update({"L": 1}), r"window\.L|L"),
+            (lambda d: d["backtest"].update({"position_fraction": 0.0}), "position_fraction"),
+            (lambda d: d["models"]["gru"].update({"dropout": 1.0}), "dropout"),
+            (lambda d: d["thresholding"].update({"q_grid": [0.8, 0.6, 0.9]}), "q_grid"),
+            (lambda d: d["thresholding"].update({"mdd_cap": 0.0}), "mdd_cap"),
+            (lambda d: d["thresholding"].update({"min_trades": -1}), "min_trades"),
+            (lambda d: d["models"]["gru"].update({"num_layers": 0}), "num_layers"),
+            (
+                lambda d: d["models"]["patchtst"].update({"d_model": 64, "n_heads": 3}),
+                "n_heads",
+            ),
+            (
+                lambda d: d["models"]["patchtst"].update({"patch_size": 16, "stride": 17}),
+                "stride",
+            ),
+            (lambda d: d["baselines"]["sma"].update({"fast": 1}), r"sma\.fast|fast"),
+            (lambda d: d["training"].update({"batch_size": 0}), "batch_size"),
+            (lambda d: d["reproducibility"].update({"global_seed": -1}), "global_seed"),
+            (lambda d: d["metrics"].update({"sharpe_epsilon": 0.0}), "sharpe_epsilon"),
+            (lambda d: d["artifacts"].update({"output_dir": ""}), "output_dir"),
+        ],
+    )
+    def test_numeric_and_structural_constraints(self, default_yaml_data, tmp_yaml, mutate, match):
+        path = self._write_mutated(default_yaml_data, tmp_yaml, mutate)
+        with pytest.raises(ValidationError, match=match):
+            load_config(path)
+
+    def test_unknown_yaml_nested_key_dataset_is_rejected(self, default_yaml_data, tmp_yaml):
+        def mutate(data):
+            data["dataset"]["foo"] = "bar"
+
+        path = self._write_mutated(
+            default_yaml_data,
+            tmp_yaml,
+            mutate,
+            "invalid_dataset_extra.yaml",
+        )
+        with pytest.raises(ValidationError, match="foo|extra"):
+            load_config(path)
+
+    def test_scaling_method_rolling_zscore_is_rejected_in_mvp(self, default_yaml_data, tmp_yaml):
+        path = self._write_mutated(
+            default_yaml_data,
+            tmp_yaml,
+            lambda d: d["scaling"].update({"method": "rolling_zscore"}),
+            "invalid_scaling_method.yaml",
+        )
+        with pytest.raises(ValidationError, match="rolling_zscore"):
+            load_config(path)
+
+    def test_dataset_must_be_single_symbol_in_mvp(self, default_yaml_data, tmp_yaml):
+        def mutate(data):
+            data["dataset"]["symbols"] = ["BTCUSDT", "ETHUSDT"]
+
+        path = self._write_mutated(default_yaml_data, tmp_yaml, mutate, "invalid_symbols_len.yaml")
+        with pytest.raises(ValidationError, match="symbols"):
+            load_config(path)
+
+    def test_warning_emitted_when_val_days_below_7(self, default_yaml_data, tmp_yaml):
+        def mutate(data):
+            data["splits"]["train_days"] = 20
+            data["splits"]["val_frac_in_train"] = 0.2
+
+        path = self._write_mutated(default_yaml_data, tmp_yaml, mutate, "warning_val_days.yaml")
+        with pytest.warns(UserWarning, match="val_days"):
+            load_config(path)
