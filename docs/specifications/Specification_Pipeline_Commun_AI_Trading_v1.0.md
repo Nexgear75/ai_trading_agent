@@ -592,7 +592,7 @@ On considère le faux positif (Go mais trade perdant) plus grave que le faux né
 
 Soit $\hat y_\text{val}$ l'ensemble des prédictions sur la validation. On définit une grille de quantiles $Q = \{q_1, q_2, \ldots\}$.
 Pour chaque $q \in Q$:
-- $\theta(q) = \text{quantile_q}(\hat y_\text{val})$
+- $\theta(q) = \text{quantile}_q(\hat y_{\text{val}})$
 - on génère des signaux Go/No-Go sur la validation
 - on backteste (règles + coûts identiques)
 - on calcule les métriques trading sur validation
