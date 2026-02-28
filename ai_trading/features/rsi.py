@@ -34,12 +34,19 @@ class RSI14(BaseFeature):
 
     @property
     def min_periods(self) -> int:
-        """Minimum bars needed for spec-default rsi_period=14: 14 + 1 = 15.
+        """Minimum bars needed for the spec-default rsi_period=14: 14 + 1 = 15.
 
-        This property returns the fixed warmup based on the spec default (§6.3)
+        This property returns a fixed warmup based on the spec default (§6.3)
         and does not change with runtime params.  ``compute()`` reads
         ``rsi_period`` directly from *params* so all configured periods work
-        correctly; ``min_periods`` is a static upper bound for pipeline warmup.
+        correctly.
+
+        .. note::
+            This value is a **lower bound** valid only for the spec default
+            ``rsi_period=14``.  If a larger ``rsi_period`` were configured,
+            the actual warmup required would be ``rsi_period + 1``, which
+            would exceed the value returned here.  The pipeline should use
+            ``params["rsi_period"] + 1`` for runtime warmup decisions.
         """
         return 15  # rsi_period (14) + 1, per spec §6.3
 

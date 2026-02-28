@@ -76,7 +76,14 @@ def _make_ohlcv(close_values):
 
 
 def _compute_rsi_reference(close_values, n=14, epsilon=1e-12):
-    """Cleaner reference implementation of Wilder RSI."""
+    """Pure-Python reference implementation of Wilder RSI.
+
+    .. note::
+        This mirrors the production algorithm to validate internal
+        consistency.  Independent validation of numerical correctness
+        is provided by ``TestRSINumerical.test_rsi_hand_computed_small``
+        which uses hand-calculated expected values.
+    """
     close = list(close_values)
     length = len(close)
     result = [float("nan")] * length
@@ -496,3 +503,38 @@ class TestRSIErrors:
 
         assert result.iloc[:14].isna().all()
         assert np.isfinite(result.iloc[14])
+
+    def test_empty_dataframe(self, rsi_instance, default_params):
+        """Empty OHLCV DataFrame → empty Series (no crash)."""
+        ohlcv = _make_ohlcv([])
+        result = rsi_instance.compute(ohlcv, default_params)
+        assert len(result) == 0
+        assert isinstance(result, pd.Series)
+
+    def test_rsi_period_1(self, rsi_instance):
+        """Boundary: rsi_period=1 — needs 2 bars, first valid at bar 1."""
+        params = {"rsi_period": 1, "rsi_epsilon": 1e-12}
+        # close = [100, 102, 101, 103]
+        # deltas: [+2, -1, +2]
+        # period=1 → SMA init over 1 value: AG_1 = gains[0]=2, AL_1 = losses[0]=0
+        # RSI_1 = 100 - 100/(1 + 2/(0+eps)) ≈ 100
+        # Wilder bar 2: AG = (0*2 + 0)/1 = 0 (wait — (n-1)*AG + gain)/n = (0*2+0)/1=0
+        #   actually gains[1]=0, losses[1]=1
+        #   AG = (0*2 + 0)/1 = 0, AL = (0*0 + 1)/1 = 1
+        #   RSI_2 = 100 - 100/(1 + 0/(1+eps)) ≈ 0
+        # Wilder bar 3: gains[2]=2, losses[2]=0
+        #   AG = (0*0 + 2)/1 = 2, AL = (0*1 + 0)/1 = 0
+        #   RSI_3 = 100 - 100/(1 + 2/(0+eps)) ≈ 100
+        close = [100.0, 102.0, 101.0, 103.0]
+        ohlcv = _make_ohlcv(close)
+        result = rsi_instance.compute(ohlcv, params)
+
+        # Bar 0: NaN
+        assert np.isnan(result.iloc[0])
+        # Bar 1: first valid
+        assert np.isfinite(result.iloc[1])
+        np.testing.assert_allclose(result.iloc[1], 100.0, atol=1e-6)
+        # Bar 2: pure loss → RSI ≈ 0
+        np.testing.assert_allclose(result.iloc[2], 0.0, atol=1e-6)
+        # Bar 3: pure gain → RSI ≈ 100
+        np.testing.assert_allclose(result.iloc[3], 100.0, atol=1e-6)
