@@ -84,6 +84,14 @@ But : imposer un pipeline unique (données, splits, coûts, backtest, métriques
   - 16.1 Seeds et déterminisme
   - 16.2 Journalisation minimale
   - 16.3 Convention de versionning des features
+- 17. Spécification technique (MVP)
+  - 17.1 Stack et dépendances
+  - 17.2 Structure du projet
+  - 17.3 Pilotage du pipeline (Makefile)
+  - 17.4 Ingestion des données (étape préalable)
+  - 17.5 Gestion de la configuration
+  - 17.6 Stratégie de tests
+  - 17.7 Logging et verbosité
 - Annexes
   - Annexe A - JSON Schema: manifest.schema.json
   - Annexe B - JSON Schema: metrics.schema.json
@@ -959,6 +967,242 @@ Le seed global est fixé en configuration. Il doit être appliqué à:
 ## 16.3 Convention de versionning des features
 
 Toute modification de la liste de features, de leur définition ou de leurs paramètres doit incrémenter `feature_version` et être décrite dans l'historique. Sans cela, des résultats issus de pipelines différents deviennent incomparables.
+
+
+# 17. Spécification technique (MVP)
+
+Cette section décrit les choix techniques d'implémentation pour le MVP: stack, structure du code, pilotage, tests et logging. Elle complète les sections fonctionnelles précédentes.
+
+
+## 17.1 Stack et dépendances
+
+| Composant | Choix MVP | Notes |
+|-----------|-----------|-------|
+| Langage | Python 3.11+ | Dockerfile basé sur `python:3.11-slim` |
+| ML tabulaire | XGBoost ≥ 2.0 | |
+| DL | PyTorch ≥ 2.0 | CNN-1D, GRU, LSTM, PatchTST, RL-PPO |
+| Données | pandas ≥ 2.0, numpy ≥ 1.24, pyarrow ≥ 12.0 | Parquet comme format de stockage |
+| Exchange API | ccxt ≥ 4.0 | Accès unifié à l'API Binance |
+| Config | PyYAML ≥ 6.0, pydantic ≥ 2.0 | Validation par modèle pydantic |
+| Schemas | jsonschema ≥ 4.17 | Validation manifest/metrics |
+| Stats | scipy ≥ 1.11, scikit-learn ≥ 1.3 | Scalers, métriques |
+| Tests | pytest | |
+| Lint | ruff, mypy | |
+
+Les dépendances exactes sont figées dans `requirements.txt`. Le `Dockerfile` fournit un environnement reproductible.
+
+
+## 17.2 Structure du projet
+
+```
+ai_trading_agent/
+├── Makefile                      # Point d'entrée utilisateur (§17.3)
+├── Dockerfile                    # Environnement reproductible
+├── requirements.txt              # Dépendances fixées
+├── configs/
+│   └── default.yaml              # Configuration par défaut (MVP)
+├── data/
+│   └── raw/                      # Données OHLCV brutes (Parquet) — non versionné dans git
+├── runs/                         # Artefacts de sortie (§15.1) — non versionné dans git
+├── src/
+│   └── ai_trading/
+│       ├── __init__.py
+│       ├── __main__.py           # Point d'entrée Python (argparse)
+│       ├── config.py             # Chargement et validation YAML (pydantic)
+│       ├── ingestion.py          # Téléchargement OHLCV via ccxt (§17.4)
+│       ├── qa.py                 # Contrôles qualité (§4.2)
+│       ├── features.py           # Feature engineering (§6)
+│       ├── dataset.py            # Construction samples (§7)
+│       ├── splits.py             # Walk-forward splitter (§8)
+│       ├── scaling.py            # Normalisation (§9)
+│       ├── models/               # Plug-ins modèles (§10)
+│       │   ├── __init__.py       # MODEL_REGISTRY
+│       │   ├── xgboost_reg.py
+│       │   ├── cnn1d_reg.py
+│       │   ├── gru_reg.py
+│       │   ├── lstm_reg.py
+│       │   ├── patchtst_reg.py
+│       │   └── rl_ppo.py
+│       ├── baselines/            # Baselines (§13)
+│       │   ├── __init__.py
+│       │   ├── no_trade.py
+│       │   ├── buy_hold.py
+│       │   └── sma_rule.py
+│       ├── threshold.py          # Calibration θ (§11)
+│       ├── backtest.py           # Moteur de backtest commun (§12)
+│       ├── metrics.py            # Calcul des métriques (§14)
+│       └── artifacts.py          # Sauvegarde manifest/metrics/artefacts (§15)
+├── tests/
+│   ├── conftest.py               # Fixtures partagées
+│   ├── test_ingestion.py
+│   ├── test_qa.py
+│   ├── test_features.py
+│   ├── test_dataset.py
+│   ├── test_splits.py
+│   ├── test_scaling.py
+│   ├── test_models/
+│   ├── test_baselines/
+│   ├── test_threshold.py
+│   ├── test_backtest.py
+│   ├── test_metrics.py
+│   └── test_artifacts.py
+├── docs/
+│   └── specifications/           # Cette spécification
+└── scripts/                      # Utilitaires ponctuels
+```
+
+Les répertoires `data/` et `runs/` sont exclus du contrôle de version (`.gitignore`).
+
+
+## 17.3 Pilotage du pipeline (Makefile)
+
+Le Makefile est l'interface utilisateur principale du pipeline. Il enchaîne les étapes via des cibles Make, avec des variables surchargeables.
+
+### Variables
+
+| Variable | Défaut | Description |
+|----------|--------|-------------|
+| `CONFIG` | `configs/default.yaml` | Fichier de configuration |
+| `MODEL` | (lu depuis config) | Surcharge de `strategy.name` |
+| `SEED` | (lu depuis config) | Surcharge de `reproducibility.global_seed` |
+
+### Cibles
+
+```makefile
+# === Configuration ===========================================================
+CONFIG  ?= configs/default.yaml
+
+# === Cibles principales ======================================================
+
+install:          ## Installer les dépendances Python
+	pip install -r requirements.txt
+
+fetch-data:       ## Télécharger les données OHLCV depuis Binance (une seule fois)
+	python -m ai_trading fetch --config $(CONFIG)
+
+qa:               ## Contrôles qualité sur les données brutes
+	python -m ai_trading qa --config $(CONFIG)
+
+run:              ## Lancer le pipeline complet (fetch-data doit avoir été exécuté)
+	python -m ai_trading run --config $(CONFIG)
+
+run-all: fetch-data qa run  ## Pipeline bout en bout: fetch → QA → run
+
+# === Utilitaires =============================================================
+
+test:             ## Lancer les tests unitaires
+	pytest tests/ -v
+
+lint:             ## Lint + type check
+	ruff check src/ && mypy src/
+
+docker-build:     ## Construire l'image Docker
+	docker build -t ai-trading-pipeline .
+
+docker-run:       ## Lancer le pipeline dans Docker
+	docker run --rm -v $$(pwd)/data:/app/data -v $$(pwd)/runs:/app/runs \
+	  ai-trading-pipeline
+
+clean:            ## Supprimer les artefacts temporaires (pas les données)
+	rm -rf runs/__pycache__ src/**/__pycache__ .pytest_cache
+
+help:             ## Afficher cette aide
+	@grep -E '^[a-zA-Z_-]+:.*##' Makefile | sort | \
+	  awk 'BEGIN {FS = ":.*##"}; {printf "  %-18s %s\n", $$1, $$2}'
+```
+
+### Workflow typique
+
+```bash
+make install          # Une fois
+make fetch-data       # Une fois (ou quand on change la période/symbole)
+make qa               # Vérifier les données
+make run              # Lancer le pipeline
+```
+
+La cible `run-all` enchaîne les trois étapes pour un lancement bout en bout.
+
+
+## 17.4 Ingestion des données (étape préalable)
+
+Le téléchargement des données OHLCV depuis Binance est une étape **séparée et préalable** au pipeline de modélisation. Les données sont téléchargées une seule fois puis réutilisées pour tous les runs.
+
+### Principe
+
+1. La commande `make fetch-data` (ou `python -m ai_trading fetch`) lit la section `dataset` de la config (symboles, timeframe, période).
+2. Elle télécharge les bougies OHLCV via l'API REST Binance (bibliothèque `ccxt`).
+3. Les données sont sauvegardées en fichier Parquet dans `data/raw/`, un fichier par symbole (ex: `BTCUSDT_1h.parquet`).
+4. Si le fichier existe déjà et couvre la période demandée, le téléchargement est ignoré (mode idempotent). Sinon, seules les bougies manquantes sont récupérées (téléchargement incrémental).
+
+### Séparation des responsabilités
+
+| Étape | Commande | Dépendance réseau | Résultat |
+|-------|----------|-------------------|----------|
+| Ingestion | `make fetch-data` | Oui (API Binance) | `data/raw/*.parquet` |
+| QA | `make qa` | Non | Validation des fichiers locaux |
+| Pipeline | `make run` | Non | `runs/<run_id>/` |
+
+Cette séparation garantit que le pipeline de modélisation fonctionne **offline** une fois les données téléchargées. Cela permet de relancer des expériences sans dépendre de la disponibilité de l'API.
+
+### Contraintes
+
+- Le format de sortie respecte le format canonique (§4.1): colonnes `timestamp_utc`, `open`, `high`, `low`, `close`, `volume`, `symbol`, triées par `timestamp_utc`.
+- Les timestamps sont en UTC.
+- L'API Binance impose des limites de débit; l'ingestion doit gérer la pagination (max 1000 bougies par requête) et respecter les rate limits.
+
+
+## 17.5 Gestion de la configuration
+
+### Chargement
+
+1. Le fichier YAML est chargé via PyYAML.
+2. Le contenu est validé par un modèle pydantic (types, valeurs autorisées, contraintes croisées).
+3. Les surcharges en ligne de commande (ex: `--model gru_reg`) écrasent les valeurs correspondantes.
+4. La configuration complète (après surcharges) est sauvegardée dans `config_snapshot.yaml` du run (§15.1).
+
+### Validation
+
+La validation pydantic doit rejeter explicitement les configurations incohérentes, par exemple:
+- `embargo_bars < label.horizon_H_bars`,
+- `strategy.name` absent du registre des modèles/baselines,
+- `scaling.method = rolling_zscore` (non implémenté dans le MVP).
+
+
+## 17.6 Stratégie de tests
+
+### Tests unitaires
+
+Chaque module (`qa.py`, `features.py`, `splits.py`, `scaling.py`, `backtest.py`, `metrics.py`) a un fichier de test dédié. Les tests vérifient les formules sur des cas simples avec des valeurs attendues calculées manuellement.
+
+### Tests d'intégration
+
+Un test d'intégration minimal exécute le pipeline complet sur un jeu de données synthétique (quelques centaines de bougies) et vérifie:
+- la création de l'arborescence de sortie (§15.1),
+- la conformité du manifest.json et metrics.json aux schémas JSON,
+- la cohérence des métriques (ex: no-trade → net_pnl = 0).
+
+### Couverture
+
+Objectif MVP: couverture > 80% des modules critiques (features, splits, backtest, metrics).
+
+
+## 17.7 Logging et verbosité
+
+Le logging utilise le module standard `logging` de Python, configuré via la section `logging` de la config:
+
+| Paramètre | Valeur par défaut | Description |
+|-----------|-------------------|-------------|
+| `level` | `INFO` | Niveau de verbosité (`DEBUG`, `INFO`, `WARNING`, `ERROR`) |
+| `format` | `text` | Format de sortie (`text` pour lisibilité humaine, `json` pour parsing) |
+| `file` | `null` | `null` = stdout uniquement; sinon chemin relatif au `run_dir` |
+
+Les messages clés à logger en `INFO`:
+- Début/fin de chaque étape du pipeline (ingestion, QA, features, splits, training, backtest).
+- Nombre de samples par split (train/val/test) par fold.
+- Seuil θ retenu et métriques de sélection.
+- Chemin du run_dir créé.
+
+Le niveau `DEBUG` ajoute les détails intermédiaires (shape des tenseurs, durée de chaque étape, loss par epoch).
 
 
 # Annexes
