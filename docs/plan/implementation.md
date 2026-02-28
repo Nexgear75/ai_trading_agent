@@ -99,6 +99,9 @@ graph TD
   T11 --> T61[WS-6.1 Interface BaseModel]
   T61 --> T62[WS-6.2 Dummy model]
   T51 --> T63[WS-6.3 Training loop]
+  T43 --> T63
+  T52 -.-> T63
+  T53 -.-> T63
   T62 --> T63
   T63 --> T71[WS-7.1 Quantile grid]
   T71 --> T72[WS-7.2 Objectif + contraintes]
@@ -142,27 +145,27 @@ graph TD
 
 | Champ | Valeur |
 |---|---|
-| **Description** | Créer l'arborescence Python `ai_trading/` (nom du package Python interne — distinct du répertoire racine du repo `ai_trading_agent/`), le `__init__.py`, le `pyproject.toml` ou `setup.py`, et mettre à jour `requirements.txt` avec toutes les dépendances (pandas, numpy, PyYAML, jsonschema, xgboost, torch, etc.). |
+| **Description** | Créer l'arborescence Python `ai_trading/` (nom du package Python interne — distinct du répertoire racine du repo `ai_trading_agent/`), le `__init__.py` (avec `__version__ = "1.0.0"` — single source of truth, lu dynamiquement par `pyproject.toml` via `[tool.setuptools.dynamic] version = {attr = "ai_trading.__version__"}`), le `pyproject.toml` (PEP 621 / PEP 517, build backend `setuptools.build_meta`), et mettre à jour `requirements.txt` avec toutes les dépendances (pandas, numpy, PyYAML, pydantic>=2.0, jsonschema, xgboost, torch, scikit-learn, scipy, ccxt, pyarrow). Un fichier `requirements-dev.txt` sépare les dépendances de développement (pytest, ruff). Configurer le logging avec `logging` standard, piloté par `config.logging` (level, format text/JSON, fichier optionnel). |
 | **Réf. spec** | §1 (périmètre), §16 (reproductibilité) |
-| **Critères d'acceptation** | `pip install -e .` réussit. `import ai_trading` fonctionne. Linter (ruff/flake8) passe sans erreur. |
+| **Critères d'acceptation** | `pip install -e .` réussit. `import ai_trading` fonctionne. `ai_trading.__version__` retourne `"1.0.0"`. Linter (ruff) passe sans erreur. `requirements.txt` contient toutes les dépendances runtime. `requirements-dev.txt` existe et inclut pytest+ruff. |
 | **Dépendances** | Aucune |
 
-### WS-1.2 — Config loader (YAML → dataclass/dict)
+### WS-1.2 — Config loader (YAML → Pydantic v2 model)
 
 | Champ | Valeur |
 |---|---|
-| **Description** | Implémenter un module `config.py` qui charge `configs/default.yaml` (ou un YAML passé en argument), le fusionne avec les overrides CLI éventuels, et retourne un objet config typé (dataclass ou Pydantic). |
+| **Description** | Implémenter un module `config.py` qui charge `configs/default.yaml` (ou un YAML passé en argument), le fusionne avec les overrides CLI éventuels, et retourne un objet config typé **Pydantic v2** (`BaseModel`). Le choix de Pydantic v2 (et non de simples dataclasses) est motivé par la validation intégrée (types, bornes, contraintes croisées via `@model_validator`), la sérialisation YAML/JSON native, et la génération automatique de schémas. **Override CLI** : supporter la dot notation via `argparse` : `--set splits.train_days=240 --set costs.slippage_rate_per_side=0.0005`. Le mécanisme parcourt la config imbriquée et remplace la valeur au chemin spécifié. Erreur explicite si le chemin n'existe pas dans le schéma. |
 | **Réf. spec** | Annexe E.1 (tous les paramètres MVP) |
-| **Critères d'acceptation** | Le config loader supporte : (1) chargement du default, (2) override par fichier custom, (3) override par CLI args. Tous les champs de `configs/default.yaml` sont accessibles par attribut. |
+| **Critères d'acceptation** | Le config loader supporte : (1) chargement du default, (2) override par fichier custom, (3) override par CLI args en dot notation (`--set key.subkey=value`). Tous les champs de `configs/default.yaml` sont accessibles par attribut. La config est une instance Pydantic v2 avec validation automatique. |
 | **Dépendances** | WS-1.1 |
 
 ### WS-1.3 — Validation de la configuration
 
 | Champ | Valeur |
 |---|---|
-| **Description** | Ajouter une validation stricte de la configuration : types, bornes (ex: `embargo_bars >= 0`, `val_frac_in_train ∈ [0, 0.5]`), contraintes croisées (ex: `sma.fast < sma.slow <= min_warmup`), règle MVP `len(symbols) == 1`, et **règles non négociables du backtest** : `backtest.mode == "one_at_a_time"` et `backtest.direction == "long_only"` (§12.1, Annexe E.2.3). Erreur explicite (`raise`) si invalide. |
+| **Description** | Ajouter une validation stricte de la configuration : types, bornes (ex: `embargo_bars >= 0`, `val_frac_in_train ∈ [0, 0.5]`), contraintes croisées (ex: `sma.fast < sma.slow <= min_warmup`), règle MVP `len(symbols) == 1`, **contrainte warmup-features** : `min_warmup >= max(features.params.rsi_period, features.params.ema_slow, max(features.params.vol_windows))` (garantit que toutes les features sont calculables après la zone warmup), et **règles non négociables du backtest** : `backtest.mode == "one_at_a_time"` et `backtest.direction == "long_only"` (§12.1, Annexe E.2.3). Erreur explicite (`raise`) si invalide. **Bornes numériques complètes (via Pydantic `Field`)** : `label.horizon_H_bars >= 1`, `window.L >= 2`, `splits.train_days >= 1`, `splits.test_days >= 1`, `splits.step_days >= 1`, `costs.fee_rate_per_side >= 0`, `costs.slippage_rate_per_side >= 0`, `thresholding.q_grid` chaque valeur ∈ `[0, 1]` et triée croissante, `backtest.initial_equity > 0`, `backtest.position_fraction ∈ (0, 1]`, `models.*.dropout ∈ [0, 1)`. |
 | **Réf. spec** | Annexe E.2.6 (un seul symbole), §8.1, §12.1, §13.3, Annexe E.2.3 |
-| **Critères d'acceptation** | Tests unitaires couvrant : config valide OK, chaque violation levée avec message clair. En particulier : `backtest.mode != "one_at_a_time"` → erreur, `backtest.direction != "long_only"` → erreur. |
+| **Critères d'acceptation** | Tests unitaires couvrant : config valide OK, chaque violation levée avec message clair. En particulier : `backtest.mode != "one_at_a_time"` → erreur, `backtest.direction != "long_only"` → erreur, `min_warmup < max(rsi_period, ema_slow, max(vol_windows))` → erreur. Tests de bornes numériques : `horizon_H_bars=0` → erreur, `window.L=1` → erreur, `position_fraction=0` → erreur, `dropout=1.0` → erreur, `q_grid` non triée → erreur. |
 | **Dépendances** | WS-1.2 |
 
 
@@ -178,7 +181,7 @@ graph TD
 
 | Champ | Valeur |
 |---|---|
-| **Description** | Implémenter un module `data/ingestion.py` qui télécharge les données OHLCV via l'API Binance (ccxt) pour le symbole, timeframe et période configurés. Stockage en Parquet avec colonnes canoniques : `timestamp_utc, open, high, low, close, volume, symbol`. Tri croissant par `timestamp_utc`. Calcul du SHA-256 du fichier pour traçabilité. |
+| **Description** | Implémenter un module `data/ingestion.py` qui télécharge les données OHLCV via l'API Binance (ccxt) pour le symbole, timeframe et période configurés. **Convention de bornes** : `dataset.start` est inclus, `dataset.end` est **exclusif** (convention Python `[start, end[`). La dernière bougie téléchargée a donc `timestamp_utc < end`. **Pagination** : ccxt retourne un maximum de bougies par appel (~1000) ; le module doit boucler sur `fetch_ohlcv()` avec le paramètre `since` incrémenté jusqu'à couvrir toute la période demandée. **Retry** : en cas d'erreur réseau ou rate-limit (429), retenter avec backoff exponentiel (max 3 retries). **Cache locale** : si le fichier Parquet existe déjà et couvre la période, ne pas re-télécharger (vérification par bornes temporelles). Stockage en Parquet avec colonnes canoniques : `timestamp_utc, open, high, low, close, volume, symbol`. Tri croissant par `timestamp_utc`. Calcul du SHA-256 du fichier pour traçabilité. |
 | **Réf. spec** | §4.1 (format canonique) |
 | **Critères d'acceptation** | Fichier Parquet généré avec les colonnes attendues. SHA-256 stable sur relance. Tri vérifié par test. |
 | **Dépendances** | WS-1.2 (config pour symbole, timeframe, période) |
@@ -270,7 +273,8 @@ graph TD
    - `FEATURE_REGISTRY: dict[str, type[BaseFeature]]` — dictionnaire nom → classe.
    - `@register_feature(name: str)` — décorateur qui enregistre la classe. Lève `ValueError` si doublon.
    - `BaseFeature(ABC)` — interface minimale :
-     - `compute(self, ohlcv: pd.DataFrame, params: dict) -> pd.Series` — calcul causal, retourne une Series indexée par timestamp.
+     - `compute(self, ohlcv: pd.DataFrame, params: dict) -> pd.Series` — calcul causal, retourne une Series indexée par timestamp. Le dict `params` est le dict complet `config.features.params`.
+     - `required_params -> list[str]` (class attribute) — liste des clés requises dans `params` pour cette feature (ex: `["rsi_period"]` pour RSI). Le pipeline valide la présence de ces clés avant l'appel à `compute()`.
      - `min_periods -> int` (property) — nombre minimum de bougies avant première valeur valide.
 
 2. **Chaque module feature** (`log_returns.py`, `volatility.py`, etc.) :
@@ -280,7 +284,7 @@ graph TD
 
 3. **`features/pipeline.py`** — Orchestrateur :
    - Importe `FEATURE_REGISTRY` (les imports des modules feature peuplent le registre).
-   - `compute_features(ohlcv, config) -> pd.DataFrame` : itère sur `feature_list`, résout dans le registre, appelle `compute()`, assemble.
+   - `compute_features(ohlcv, config) -> pd.DataFrame` : itère sur `feature_list`, résout dans le registre, **valide que les `required_params` de chaque feature sont présents dans `config.features.params`** (erreur explicite sinon), appelle `compute(ohlcv, config.features.params)`, assemble.
    - Validation : erreur explicite si feature manquante ou si le registre est vide.
 
 4. **Ajout d'une feature future** : créer un fichier, implémenter `BaseFeature`, annoter `@register_feature("ma_feature")`, ajouter le nom dans `config.features.feature_list`. Aucun autre fichier à modifier.
@@ -327,7 +331,7 @@ graph TD
 
 | Champ | Valeur |
 |---|---|
-| **Description** | Fonction `flatten_seq_to_tab(X_seq) -> X_tab` qui aplatit (N, L, F) → (N, L*F) par concaténation temporelle. Nommage des colonnes : `{feature}_{lag}`. |
+| **Description** | Fonction `flatten_seq_to_tab(X_seq) -> X_tab` qui aplatit (N, L, F) → (N, L*F) par concaténation temporelle. Nommage des colonnes : `{feature}_{lag}`. **Ordre d'exécution** : le flatten intervient **après le scaling** (le scaler opère sur X_seq (N,L,F), puis le modèle XGBoost appelle le flatten dans son `fit()`/`predict()`). |
 | **Réf. spec** | §7.2 |
 | **Critères d'acceptation** | Shape `(N, L*F)` correcte (ex : avec L=128, F=9 → 1152 colonnes). Nommage des colonnes `{feature}_{lag}`. Valeurs identiques à X_seq réarrangé. |
 | **Dépendances** | WS-4.2 |
@@ -338,26 +342,38 @@ graph TD
 |---|---|
 | **Description** | Pour chaque sample t, stocker : `decision_time`, `entry_time` (open t+1), `exit_time` (close t+H), `entry_price` (Open[t+1]), `exit_price` (Close[t+H]). Retourner un DataFrame `meta` de shape (N, 5+). |
 | **Réf. spec** | §7.3 |
-| **Critères d'acceptation** | Les prix sont ceux des bonnes bougies. Test de cohérence : `y_t ≈ log(exit_price / entry_price)` pour target_type = `log_return_trade`. |
+| **Critères d'acceptation** | Les prix sont ceux des bonnes bougies. Test de cohérence : `y_t ≈ log(exit_price / entry_price)` pour `target_type = log_return_trade`. Test de cohérence `close_to_close` : pour `target_type = log_return_close_to_close`, `y_t ≈ log(Close[t+H] / Close[t])` (indépendant de `entry_price`). |
 | **Dépendances** | WS-4.2 |
 
 ### WS-4.5 — Walk-forward splitter
 
 | Champ | Valeur |
 |---|---|
-| **Description** | Module `data/splitter.py`. Implémenter le rolling walk-forward : (1) pour chaque fold k, calculer les bornes temporelles `train_start, train_end, val_start, val_end, test_start, test_end` en jours. (2) Extraire les indices de samples correspondants. (3) Le val est le dernier `val_frac_in_train` du train (sub-split temporel). (4) Retourner un itérateur de folds avec indices ou masques. |
+| **Description** | Module `data/splitter.py`. Implémenter le rolling walk-forward avec bornes calculées en **dates UTC** (pas en nombre de bougies). Le nombre effectif de bougies par période dépend de la disponibilité des données dans l'intervalle de dates. **Convention** : `dataset.end` est exclusif (cf. WS-2.1). Soit `Δ_hours` la résolution du timeframe (1h pour le MVP, lu depuis `config.dataset.timeframe`). (1) Définir `total_days = (dataset.end - dataset.start).days` (jours calendaires, `dataset.end` exclus). (2) Pour chaque fold k, calculer les bornes temporelles en dates UTC : `train_start[k] = dataset.start + timedelta(days=k * step_days)`, `train_val_end[k] = train_start[k] + timedelta(days=train_days) - timedelta(hours=Δ_hours)` (dernière bougie incluse), `test_start[k] = train_start[k] + timedelta(days=train_days) + timedelta(hours=embargo_bars * Δ_hours)` (après embargo), `test_end[k] = test_start[k] + timedelta(days=test_days) - timedelta(hours=Δ_hours)`. (3) Extraction du val **en jours calendaires** : `val_days = floor(train_days * val_frac_in_train)`, `val_start[k] = train_start[k] + timedelta(days=train_days - val_days)`, `train_only_end[k] = val_start[k] - timedelta(hours=Δ_hours)`. (4) **Politique de troncation** : tout fold dont `test_end[k] > dataset.end` est **supprimé**. Seuls les folds pouvant couvrir `test_days` jours complets sont conservés. Assertion : `last_fold.test_end <= dataset.end`. (5) **Politique de samples minimum** : tout fold dont `N_train < min_samples_train` (défaut : 100) ou `N_test == 0` est **exclu** avec un warning loggé. Les métriques agrégées ne comptent que les folds valides. Les constantes `MIN_SAMPLES_TRAIN = 100` et `MIN_SAMPLES_TEST = 1` sont définies dans le module (modifiables en config si besoin futur). (6) Retourner un itérateur de folds avec indices ou masques + bornes UTC par fold + nombre de samples (`N_train`, `N_val`, `N_test`) par fold. |
 | **Réf. spec** | §8.1, §8.3, Annexe E.2.1 |
-| **Critères d'acceptation** | Folds disjoints (aucun timestamp commun). Nombre de folds calculable : `n_folds = floor((total_days - train_days - test_days) / step_days) + 1`. Si `test_days == step_days` (cas MVP), cela se simplifie en `floor((total_days - train_days) / step_days)`. Bornes UTC enregistrées. **Test de bord** : vérifier que la période test du dernier fold ne dépasse pas `dataset.end`, et que la formule reste correcte lorsque la période totale n'est pas un multiple exact de `step_days`. |
+| **Critères d'acceptation** | Folds disjoints (aucun timestamp commun). Nombre de folds calculable : `n_folds = floor((total_days - train_days - test_days) / step_days) + 1`. Si `test_days == step_days` (cas MVP), cela se simplifie en `floor((total_days - train_days) / step_days)`. Bornes UTC enregistrées. **Test de troncation** : un fold dont `test_end > dataset.end` est exclu. **Test de bord** : la formule reste correcte lorsque la période totale n'est pas un multiple exact de `step_days`. **Test dates** : les bornes de split sont des dates UTC, pas des comptages de bougies — un gap de données dans l'intervalle ne décale pas les bornes temporelles mais réduit le nombre de samples du fold. **Test min samples** : un fold avec `N_train < MIN_SAMPLES_TRAIN` ou `N_test == 0` est exclu avec warning. |
 | **Dépendances** | WS-4.2 |
 
 ### WS-4.6 — Embargo et purge
 
 | Champ | Valeur |
 |---|---|
-| **Description** | Appliquer la règle de purge exacte de §8.2 : (1) définir `train_end_purged = test_start − embargo_bars`, (2) un sample t est autorisé dans train/val si et seulement si `t + H <= train_end_purged`. Supprimer les samples de la zone tampon entre val et test. Vérifier la disjonction stricte par test automatisé. **Attention** : l'embargo est appliqué une seule fois (entre fin de val et début de test), pas en double. |
+| **Description** | Appliquer la règle de purge exacte de §8.2 : (1) définir `purge_cutoff = test_start − embargo_bars * Δ`, (2) un sample t est autorisé dans train/val si et seulement si `t + H <= purge_cutoff`. Supprimer les samples de la zone tampon entre val et test. Vérifier la disjonction stricte par test automatisé. **Attention** : l'embargo est appliqué une seule fois (entre fin de val et début de test), pas en double. Le splitter (WS-4.5) fixe `test_start` après l'embargo ; la purge retire ensuite les samples dont le label **chevauche** cette zone. Il n'y a pas de double embargo. |
 | **Réf. spec** | §8.2, §8.4 |
-| **Critères d'acceptation** | Test : aucun label du train ne dépend d'un prix dans la zone test. Gap d'au moins `embargo_bars` bougies vérifié. Test : la formule `t + H <= test_start − embargo_bars` est respectée pour tout sample t du train/val. |
+| **Critères d'acceptation** | Test : aucun label du train ne dépend d'un prix dans la zone test. Gap d'au moins `embargo_bars` bougies vérifié. Test : la formule `t + H <= purge_cutoff` est respectée pour tout sample t du train/val. |
 | **Dépendances** | WS-4.5 |
+
+**Schéma temporel d'un fold (référence) :**
+
+```
+|---- train_only ----|---- val ----|--embargo--|---- test ----|
+^                    ^            ^           ^              ^
+train_start    train_only_end  train_val_end  test_start     test_end
+                                     |
+                               purge_cutoff = test_start - embargo_bars * Δ
+                               Règle : sample t autorisé dans train/val
+                               ssi t + H <= purge_cutoff
+```
 
 
 ---
@@ -372,9 +388,9 @@ graph TD
 
 | Champ | Valeur |
 |---|---|
-| **Description** | Module `data/scaler.py`. Implémenter le standard scaler : (1) estimer μ_j et σ_j sur l'ensemble des N_train × L valeurs du train pour chaque feature j, (2) transformer train/val/test avec `(x - μ) / (σ + ε)`. Un seul scaler global par feature (§ E.2.7). Sauvegarder les paramètres pour reproductibilité. |
+| **Description** | Module `data/scaler.py`. **Pré-condition** : X_train ne contient aucun NaN (garanti par le sample builder WS-4.2). Si NaN détecté → `raise ValueError("NaN in X_train before scaling")`. Implémenter le standard scaler : (1) estimer μ_j et σ_j sur l'ensemble des N_train × L valeurs du train pour chaque feature j, (2) transformer train/val/test avec `(x - μ) / (σ + ε)`. Un seul scaler global par feature (§ E.2.7). Sauvegarder les paramètres pour reproductibilité. **Guard constante** : si `σ_j < 1e-8`, la feature j est fixée à `0.0` après scaling et un `warning` est émis via logging. Ce seuil (`CONSTANT_FEATURE_SIGMA_THRESHOLD = 1e-8`) est défini comme constante dans le module. |
 | **Réf. spec** | §9.1, Annexe E.2.7 |
-| **Critères d'acceptation** | Stats estimées uniquement sur train (test non vu). Test : la moyenne du train transformé ≈ 0. Paramètres sérialisables. |
+| **Critères d'acceptation** | Stats estimées uniquement sur train (test non vu). Test : la moyenne du train transformé ≈ 0. Paramètres sérialisables. Test : feature constante (σ < 1e-8) → sortie = 0.0 + warning émis. |
 | **Dépendances** | WS-4.6 |
 
 ### WS-5.2 — Robust scaler (option)
@@ -407,29 +423,31 @@ graph TD
 
 > **Note** : l'implémentation interne des modèles (XGBoost, CNN, GRU, LSTM, PatchTST, RL-PPO) est **hors scope** de ce plan. Seule l'interface et le framework d'entraînement sont couverts.
 
-### WS-6.1 — Interface abstraite BaseModel
+### WS-6.1 — Interface abstraite BaseModel (contrat plug-in modèle et baselines)
 
 | Champ | Valeur |
 |---|---|
-| **Description** | Classe abstraite `models/base.py` : `BaseModel` avec méthodes `fit(X_train, y_train, X_val, y_val, config, run_dir) -> artifacts`, `predict(X) -> y_hat`, `save(path)`, `load(path)`. Conventions d'entrée/sortie : X_seq (N,L,F), y (N,), y_hat (N,). Documentation du contrat pour le cas RL (predict retourne actions binaires). |
-| **Réf. spec** | §10.1, §10.2 |
-| **Critères d'acceptation** | Classe abstraite importable. Les modèles qui n'implémentent pas les méthodes lèvent `NotImplementedError`. |
+| **Description** | Définir le **contrat d'interface plug-in** que tout modèle (XGBoost, CNN, GRU, LSTM, PatchTST, RL-PPO) **et toute baseline** (no-trade, buy & hold, SMA) doit respecter pour être intégré au pipeline. Ce contrat découple totalement le pipeline de la logique interne des modèles : le trainer, le calibrateur, le backtest et l'orchestrateur interagissent **uniquement** avec `BaseModel` — jamais avec un modèle concret. Classe abstraite `models/base.py` : `BaseModel(ABC)` exposant les méthodes `fit(X_train, y_train, X_val, y_val, config, run_dir, meta_train=None, meta_val=None, ohlcv=None) -> artifacts`, `predict(X, meta=None, ohlcv=None) -> y_hat`, `save(path)`, `load(path)`. Conventions d'entrée/sortie : X_seq (N,L,F), y (N,), y_hat (N,) en float. Le paramètre optionnel `meta_train` / `meta_val` est un DataFrame contenant les métadonnées d'exécution (colonnes : `decision_time`, `entry_time`, `exit_time`, `entry_price`, `exit_price`) produites par WS-4.4. Il est **nécessaire** pour le modèle RL (PPO) qui construit son environnement d'entraînement interactif à partir de ces prix et du `config.costs` pour calculer les rewards (net return après coûts), et gère les transitions `one_at_a_time` en interne. Le paramètre optionnel `ohlcv` est le DataFrame OHLCV complet (nécessaire pour la baseline SMA qui calcule ses signaux sur les clôtures brutes causales, cf. E.2.4). Pour les modèles supervisés (XGBoost, CNN, GRU, LSTM, PatchTST), `meta` et `ohlcv` sont ignorés par `fit()`/`predict()`. Cas RL : `predict()` retourne des actions binaires (N,). **Les baselines implémentent également `BaseModel`** : `fit()` est un no-op, `predict()` retourne directement les signaux (0/1). Un **registre unique de modèles** (`MODEL_REGISTRY` + décorateur `@register_model`) permet la résolution dynamique du modèle ou de la baseline depuis `config.strategy.name`, symétriquement au registre de features (WS-3.6). L'orchestrateur (WS-12.2) route par `strategy_type` pour skipper train/calibration sur les baselines. |
+| **Réf. spec** | §10.1, §10.2, §10.4 |
+| **Critères d'acceptation** | (1) Classe abstraite importable. (2) Un modèle qui n'implémente pas les méthodes lève `NotImplementedError`. (3) Le registre résout `config.strategy.name` → classe modèle (y compris pour les baselines). (4) Un nom inconnu lève `ValueError`. (5) Docstring du contrat exhaustive (shapes, types, contraintes anti-fuite). (6) La signature `fit()` accepte `meta_train`, `meta_val` et `ohlcv` optionnels — un `DummyModel` ou modèle supervisé peut les ignorer sans erreur, un modèle RL utilise `meta` pour construire son environnement, la SMA baseline utilise `ohlcv` pour calculer ses signaux. |
 | **Dépendances** | WS-1.1 |
+
+**Rôle architectural :** WS-6.1 est la **fondation du pattern plug-in**. Sans ce contrat, chaque modèle ou baseline nécessiterait du code spécifique dans le trainer et le pipeline, violant le principe §10 ("le pipeline ne doit pas contenir de logique spécifique à un modèle"). Tous les WS en aval (WS-6.2 DummyModel, WS-6.3 Fold trainer, WS-7 Calibration, WS-8 Backtest, WS-9 Baselines) dépendent de cette interface pour fonctionner de manière générique. Les baselines sont enregistrées dans le même `MODEL_REGISTRY` que les modèles ; l'orchestrateur (WS-12.2) utilise `strategy_type` (`model` ou `baseline`) pour déterminer s'il faut appeler `fit()` et la calibration θ, mais le backtest et les métriques suivent le même chemin.
 
 ### WS-6.2 — Dummy model (pour tests d'intégration)
 
 | Champ | Valeur |
 |---|---|
-| **Description** | Implémenter un `DummyModel(BaseModel)` qui retourne des prédictions aléatoires (seed fixée) ou une constante. Utilisé pour valider le pipeline de bout en bout avant d'intégrer les vrais modèles. |
+| **Description** | Implémenter un `DummyModel(BaseModel)` qui retourne des prédictions aléatoires (seed fixée) ou une constante. Utilisé pour valider le pipeline de bout en bout avant d'intégrer les vrais modèles. **Sérialisation** : `save()` exporte un fichier JSON minimal (`{"seed": 42, "constant": 0.0}`) ; `load()` le recharge. Ce format sert également de test du contrat save/load. |
 | **Réf. spec** | §10 |
 | **Critères d'acceptation** | `DummyModel` passe fit/predict/save/load. Prédictions reproductibles avec seed fixée. |
 | **Dépendances** | WS-6.1 |
 
-### WS-6.3 — Training loop et early stopping
+### WS-6.3 — Fold trainer (orchestration fit/predict par fold)
 
 | Champ | Valeur |
 |---|---|
-| **Description** | Module `training/trainer.py`. Boucle d'entraînement générique : (1) appeler `model.fit()` avec early stopping sur loss validation (patience configurable). (2) Logger loss train/val, best_epoch. (3) Pas de logique spécifique au modèle dans le trainer. (4) Gérer le cas RL (bypass possible du trainer standard si le modèle gère son propre loop d'entraînement). |
+| **Description** | Module `training/trainer.py`. Orchestrateur d'entraînement par fold : (1) appeler `model.fit(X_train, y_train, X_val, y_val, config, run_dir, meta_train, meta_val, ohlcv)` — le modèle gère en interne l'early stopping (patience configurable). (2) Logger loss train/val, best_epoch. (3) Pas de logique spécifique au modèle dans le trainer — le trainer passe systématiquement `meta_train`, `meta_val` et `ohlcv` ; les modèles supervisés les ignorent, le modèle RL utilise `meta` pour construire son environnement interactif, la SMA baseline utilise `ohlcv` pour ses signaux. (4) Le trainer délègue l'early stopping au modèle via `model.fit()` : les modèles DL implémentent la boucle epoch + patience dans leur `fit()`, XGBoost utilise son API native (`early_stopping_rounds`). Le trainer ne fait **pas** de boucle epoch lui-même — son rôle est l'orchestration du workflow (scale → fit → predict → save), pas la boucle d'entraînement interne. |
 | **Réf. spec** | §10.3 |
 | **Critères d'acceptation** | Early stopping fonctionnel avec DummyModel. Logs de loss exportés. Patience configurable. |
 | **Dépendances** | WS-6.2, WS-5.1 |
@@ -510,16 +528,16 @@ graph TD
 
 | Champ | Valeur |
 |---|---|
-| **Description** | Construire la courbe d'équité normalisée (E_0 = 1.0). En mode `one_at_a_time` : `E_exit = E_entry * (1 + w * r_net)` où `w = config.backtest.position_fraction` (§12.4). Dans le MVP, w = 1.0 (all-in). Hors trade : équité constante. Résolution par bougie (pas par trade). |
+| **Description** | Construire la courbe d'équité normalisée (E_0 = 1.0) en mode **mark-to-market** avec résolution par bougie. **Pendant un trade ouvert** (entrée à Open[t+1], sortie à Close[t+H]) : l'equity est actualisée à chaque bougie intermédiaire t' avec `E_t' = E_entry * (1 + w * r_unrealized_t')`, où `r_unrealized_t'` est le rendement net simulé si la position était fermée à Close[t'] (coûts de sortie inclus : `M_unrealized = (1-f) * Close[t']*(1-s) / (p_entry_eff)`, `r_unrealized = M_unrealized - 1`). À la bougie de sortie réelle (t+H), l'equity est mise à jour avec le rendement net effectif du trade : `E_exit = E_entry * (1 + w * r_net)` où `w = config.backtest.position_fraction` (§12.4). Dans le MVP, w = 1.0 (all-in). **Hors trade** : équité constante. Cette approche mark-to-market garantit que le MDD reflète les drawdowns intra-trade et que le Sharpe ratio (§14.2, calculé sur les `r_t = E_t / E_{t-1} - 1` par bougie) est correctement estimé. |
 | **Réf. spec** | §12.4, Annexe E.2.8 (`equity_curve.csv`) |
-| **Critères d'acceptation** | Courbe constante entre les trades (équité inchangée hors position). E final = produit des (1 + w * r_net_i). Format CSV conforme (time_utc, equity, in_trade). Test : avec w < 1.0, l'impact d'un trade est réduit proportionnellement. |
+| **Critères d'acceptation** | Courbe constante hors position. Pendant un trade ouvert, l'equity varie à chaque bougie (mark-to-market). E final = produit des (1 + w * r_net_i). Format CSV conforme (time_utc, equity, in_trade). Test : avec w < 1.0, l'impact d'un trade est réduit proportionnellement. Test mark-to-market : un trade avec drawdown intra-trade → l'equity baisse puis remonte avant la sortie réelle. |
 | **Dépendances** | WS-8.2 |
 
 ### WS-8.4 — Journal de trades (trades.csv)
 
 | Champ | Valeur |
 |---|---|
-| **Description** | Exporter chaque trade avec : `entry_time_utc, exit_time_utc, entry_price, exit_price, entry_price_eff, exit_price_eff, f, s, fees_paid, slippage_paid, y_true, y_hat, gross_return, net_return`. |
+| **Description** | Exporter chaque trade avec : `entry_time_utc, exit_time_utc, entry_price, exit_price, entry_price_eff, exit_price_eff, f, s, fees_paid, slippage_paid, y_true, y_hat, gross_return, net_return`. **Décomposition des coûts (approximation additive)** : `fees_paid = f * (entry_price + exit_price)` et `slippage_paid = s * (entry_price + exit_price)`. Cette approximation est cohérente à l'ordre 1 avec le modèle multiplicatif (l'écart est < 0.001% pour les taux MVP). Les colonnes `f` et `s` sont également exportées pour un recalcul exact si nécessaire. |
 | **Réf. spec** | §12.6 |
 | **Critères d'acceptation** | CSV parseable. Somme des net_return cohérente avec l'équité finale. Colonnes conformes. |
 | **Dépendances** | WS-8.3 |
@@ -533,11 +551,13 @@ graph TD
 **Objectif** : implémenter les 3 baselines une seule fois dans un module réutilisable.
 **Réf. spec** : §13
 
+> **Architecture** : chaque baseline implémente `BaseModel` (WS-6.1) et est enregistrée dans le `MODEL_REGISTRY` via `@register_model`. `fit()` est un no-op (pas d'entraînement). `predict()` retourne directement les signaux Go/No-Go (vecteur d'entiers 0/1). L'orchestrateur (WS-12.2) passe systématiquement `ohlcv` et `meta` ; seule la SMA baseline utilise `ohlcv`.
+
 ### WS-9.1 — Baseline no-trade
 
 | Champ | Valeur |
 |---|---|
-| **Description** | Module `baselines/no_trade.py`. Aucun trade. Équité constante E_t = 1.0. Métriques : net_pnl = 0, n_trades = 0, MDD = 0. |
+| **Description** | Module `baselines/no_trade.py`. Classe `NoTradeBaseline(BaseModel)` enregistrée `@register_model("no_trade")`. `fit()` = no-op. `predict()` retourne un vecteur de zéros (N,). Aucun trade. Équité constante E_t = 1.0. Métriques : net_pnl = 0, n_trades = 0, MDD = 0. |
 | **Réf. spec** | §13.1 |
 | **Critères d'acceptation** | Résultat trivial vérifié par test. |
 | **Dépendances** | WS-8.1 |
@@ -546,7 +566,7 @@ graph TD
 
 | Champ | Valeur |
 |---|---|
-| **Description** | Module `baselines/buy_hold.py`. Un seul trade : entrée au début du test (Open 1er timestamp), sortie à la fin (Close dernier timestamp). Coûts (f, s) appliqués une fois à l'entrée et une fois à la sortie. |
+| **Description** | Module `baselines/buy_hold.py`. Classe `BuyHoldBaseline(BaseModel)` enregistrée `@register_model("buy_hold")`. `fit()` = no-op. `predict()` retourne un vecteur de uns (N,). **Traitement spécial dans le moteur de backtest** : lorsque `strategy.name == "buy_hold"`, le moteur exécute un trade unique couvrant toute la période test (entrée à Open du 1er timestamp, sortie à Close du dernier timestamp), au lieu de trades de H bougies. Cette logique est nécessaire car un vecteur de uns soumis au backtest standard (mode `one_at_a_time`, H=4 bougies) produirait une série de trades courts et non un trade long unique conforme à §12.5. Coûts (f, s) appliqués une fois à l'entrée et une fois à la sortie. La courbe d'équité mark-to-market est calculée bougie par bougie sur toute la période. |
 | **Réf. spec** | §12.5, §13.2 |
 | **Critères d'acceptation** | Test : net_return cohérent avec le calcul (1-f)^2 * Close_end*(1-s) / (Open_start*(1+s)) - 1. n_trades = 1. |
 | **Dépendances** | WS-8.2 |
@@ -555,7 +575,7 @@ graph TD
 
 | Champ | Valeur |
 |---|---|
-| **Description** | Module `baselines/sma_rule.py`. Calculer SMA_fast et SMA_slow sur toutes les clôtures disponibles causalement (E.2.4). Signal Go si SMA_fast > SMA_slow. Soumettre les signaux au backtest commun. Les premières décisions où SMA_slow n'est pas définie → No-Go. |
+| **Description** | Module `baselines/sma_rule.py`. Classe `SmaRuleBaseline(BaseModel)` enregistrée `@register_model("sma_rule")`. `fit()` = no-op. `predict(X, meta=None, ohlcv=None)` utilise le paramètre `ohlcv` (DataFrame OHLCV complet passé par l'orchestrateur) pour calculer SMA_fast et SMA_slow sur toutes les clôtures disponibles causalement (E.2.4). Signal Go si SMA_fast > SMA_slow. Retourne un vecteur de signaux (0/1) soumis au backtest commun. Les premières décisions où SMA_slow n'est pas définie → No-Go. |
 | **Réf. spec** | §13.3, Annexe E.2.4 |
 | **Critères d'acceptation** | Paramètres fast=20, slow=50 par défaut. Test : signal correct sur séries synthétiques (tendance haussière → Go, baissière → No-Go). Utilise le backtest commun. |
 | **Dépendances** | WS-8.1 |
@@ -573,7 +593,7 @@ graph TD
 
 | Champ | Valeur |
 |---|---|
-| **Description** | Module `metrics/prediction.py`. Calculer sur la période test de chaque fold : MAE, RMSE, Directional Accuracy, Spearman IC (optionnel). Pour le modèle RL : toutes les métriques de prédiction → `null`. |
+| **Description** | Module `metrics/prediction.py`. Calculer sur la période test de chaque fold : MAE, RMSE, Directional Accuracy, Spearman IC (optionnel). Pour le modèle RL **et toutes les baselines** (`strategy_type == "baseline"`) : toutes les métriques de prédiction → `null` (les baselines ne prédisent pas un rendement en float, elles retournent des signaux binaires 0/1 ; MAE, RMSE, Spearman IC n'ont pas de sens). |
 | **Réf. spec** | §14.1, §11.5 |
 | **Critères d'acceptation** | Tests numériques sur vecteurs connus. DA ∈ [0,1]. RL → null values. |
 | **Dépendances** | WS-6.3 (prédictions), WS-4.1 (labels) |
@@ -582,7 +602,7 @@ graph TD
 
 | Champ | Valeur |
 |---|---|
-| **Description** | Module `metrics/trading.py`. À partir de la courbe d'équité et de trades.csv : net_pnl, net_return, max_drawdown, Sharpe (non annualisé par défaut), profit_factor, hit_rate, n_trades, avg_trade_return, median_trade_return, exposure_time_frac. Cas limites du profit_factor (Annexe E.2.5). |
+| **Description** | Module `metrics/trading.py`. À partir de la courbe d'équité et de trades.csv : net_pnl, net_return, max_drawdown, Sharpe (non annualisé par défaut, calculé sur **toute la grille test** y compris les pas hors trade où `r_t = 0` — cohérent avec la formule spec §14.2 `r_t = E_t / E_{t-1} - 1` où E est constante hors trade), profit_factor, hit_rate, n_trades, avg_trade_return, median_trade_return, `exposure_time_frac = n_bougies_en_trade / n_bougies_total_test` (les bougies d'entrée et sortie comptent comme « en trade »). Cas limites du profit_factor (Annexe E.2.5). |
 | **Réf. spec** | §14.2, Annexe E.2.5 |
 | **Critères d'acceptation** | Tests numériques. Cas : 0 trades → profit_factor = null. Que des gagnants → null. Que des perdants → 0.0. MDD ∈ [0,1]. |
 | **Dépendances** | WS-8.3, WS-8.4 |
@@ -591,9 +611,9 @@ graph TD
 
 | Champ | Valeur |
 |---|---|
-| **Description** | Module `metrics/aggregation.py`. Pour chaque métrique m : calculer `mean(m)` et `std(m)` sur tous les folds test. Optionnel : courbe d'équité stitchée (concaténation chronologique des périodes test). Optionnel : export `summary_metrics.csv` (tableau flat des métriques agrégées, artefact optionnel post-MVP, cf. §15.1). **Vérification des critères d'acceptation §14.4** : après agrégation, émettre des warnings si `net_pnl_mean <= 0`, `profit_factor_mean <= 1.0`, ou `max_drawdown_mean >= mdd_cap`. Ces avertissements sont informatifs (le run ne crashe pas) mais sont enregistrés dans les logs et dans le champ `aggregate.notes` du `metrics.json`. **Note §14.4 — comparaison inter-stratégies** : le critère « le meilleur modèle bat au moins une baseline » est un critère **cross-run** qui ne peut être vérifié automatiquement à l'intérieur d'un seul run. Il doit être évalué via le script `scripts/compare_runs.py` (cf. WS-12.5) après l'exécution de tous les runs (modèles + baselines). **Distinction §13.4 — types de comparaison** : le module doit étiqueter les métriques agrégées avec `comparison_type` = `go_nogo` (modèles, SMA, no-trade) ou `contextual` (buy & hold) afin de séparer la comparaison « pomme-à-pomme » (mêmes décisions Go/No-Go à horizon H) de la comparaison contextuelle (position continue). Le rapport final (`summary_metrics.csv` et `aggregate.notes`) doit refléter cette distinction. **Note schéma** : le champ `comparison_type` n'est pas structurel dans `metrics.schema.json` ; il doit être inclus en texte libre dans le champ `aggregate.notes` (conforme au schéma actuel) et dans le fichier `summary_metrics.csv` (post-MVP). |
+| **Description** | Module `metrics/aggregation.py`. Pour chaque métrique m : calculer `mean(m)` et `std(m)` sur tous les folds test. Courbe d'équité stitchée avec **continuation** : `E_start[k+1] = E_end[k]` (l'equity du fold k+1 commence à la valeur finale du fold k, permettant de visualiser la performance cumulée sur tout le walk-forward). Export optionnel : `summary_metrics.csv` (tableau flat des métriques agrégées, artefact optionnel post-MVP, cf. §15.1). **Vérification des critères d'acceptation §14.4** : après agrégation, émettre des warnings si `net_pnl_mean <= 0`, `profit_factor_mean <= 1.0`, ou `max_drawdown_mean >= mdd_cap`. Ces avertissements sont informatifs (le run ne crashe pas) mais sont enregistrés dans les logs et dans le champ `aggregate.notes` du `metrics.json`. **Note §14.4 — comparaison inter-stratégies** : le critère « le meilleur modèle bat au moins une baseline » est un critère **cross-run** qui ne peut être vérifié automatiquement à l'intérieur d'un seul run. Il doit être évalué via le script `scripts/compare_runs.py` (cf. WS-12.5) après l'exécution de tous les runs (modèles + baselines). **Distinction §13.4 — types de comparaison** : le module doit étiqueter les métriques agrégées avec `comparison_type` = `go_nogo` (modèles, SMA, no-trade) ou `contextual` (buy & hold) afin de séparer la comparaison « pomme-à-pomme » (mêmes décisions Go/No-Go à horizon H) de la comparaison contextuelle (position continue). Le rapport final (`summary_metrics.csv` et `aggregate.notes`) doit refléter cette distinction. **Note schéma** : le champ `comparison_type` n'est pas structurel dans `metrics.schema.json` ; il doit être inclus en texte libre dans le champ `aggregate.notes` (conforme au schéma actuel) et dans le fichier `summary_metrics.csv` (post-MVP). |
 | **Réf. spec** | §14.3, §14.4 |
-| **Critères d'acceptation** | Test avec 3 folds synthétiques → mean et std corrects. Conforme à la structure `aggregate` du schéma metrics.schema.json. Test : avertissement émis si `net_pnl_mean <= 0`. |
+| **Critères d'acceptation** | Test avec 3 folds synthétiques → mean et std corrects. Conforme à la structure `aggregate` du schéma metrics.schema.json. Test : avertissement émis si `net_pnl_mean <= 0`. Test stitched equity : `E_start[k+1] == E_end[k]` pour tout k. |
 | **Dépendances** | WS-10.1, WS-10.2 |
 
 
@@ -618,16 +638,16 @@ graph TD
 
 | Champ | Valeur |
 |---|---|
-| **Description** | Module `artifacts/manifest.py`. Construire le `manifest.json` à partir de la config, des métadonnées dataset (SHA-256), des splits (bornes par fold), de la stratégie, des coûts, de l'environnement (python_version, platform, packages), du **commit Git** courant (`git_commit`, obtenu via `git rev-parse HEAD` ou `subprocess`), et de la liste des artefacts. **Important** : la période `train` de chaque fold dans le manifest correspond à `train_only` (sans la portion val), conformément à la convention E.2.1. |
+| **Description** | Module `artifacts/manifest.py`. Construire le `manifest.json` à partir de la config, des métadonnées dataset (SHA-256), des splits (bornes par fold), de la stratégie, des coûts, de l'environnement (python_version, platform, packages), du **commit Git** courant (`git_commit`, obtenu via `git rev-parse HEAD` ou `subprocess`), de la **version du pipeline** (`pipeline_version`, lue depuis `ai_trading.__version__`), et de la liste des artefacts. **Important** : la période `train` de chaque fold dans le manifest correspond à `train_only` (sans la portion val), conformément à la convention E.2.1. |
 | **Réf. spec** | §15.2, Annexe A (schéma), Annexe E.2.1 |
-| **Critères d'acceptation** | Le JSON produit est valide contre `manifest.schema.json`. Test d'intégration avec `jsonschema.validate()`. Test : la période `train` de chaque fold exclut la période `val` (bornes disjointes, cf. E.2.1). Test : le champ `git_commit` est présent et contient un hash hexadécimal valide (ou une valeur explicite `"unknown"` si non disponible). |
+| **Critères d'acceptation** | Le JSON produit est valide contre `manifest.schema.json`. Test d'intégration avec `jsonschema.validate()`. Test : la période `train` de chaque fold exclut la période `val` (bornes disjointes, cf. E.2.1). Test : le champ `git_commit` est présent et contient un hash hexadécimal valide (ou une valeur explicite `"unknown"` si non disponible). Test : le champ `pipeline_version` est présent et correspond à `ai_trading.__version__`. |
 | **Dépendances** | WS-11.1, WS-4.5 (splits), WS-2.1 (SHA-256) |
 
 ### WS-11.3 — Metrics builder
 
 | Champ | Valeur |
 |---|---|
-| **Description** | Module `artifacts/metrics_builder.py`. Construire le `metrics.json` avec : strategy, folds (par fold : period_test, threshold, prediction, trading), aggregate (mean/std). **En outre**, produire un fichier `metrics_fold.json` dans chaque répertoire `folds/fold_XX/` (conformément à l'arborescence §15.1 et au schéma manifest `per_fold.files.metrics_fold_json`). Ce fichier contient les métriques du fold individuel (même structure que l'objet fold dans `metrics.json`). |
+| **Description** | Module `artifacts/metrics_builder.py`. Construire le `metrics.json` avec : strategy, folds (par fold : period_test, threshold, prediction, trading), aggregate (mean/std). **En outre**, produire un fichier `metrics_fold.json` dans chaque répertoire `folds/fold_XX/` (conformément à l'arborescence §15.1 et au schéma manifest `per_fold.files.metrics_fold_json`). Ce fichier contient les métriques du fold individuel (même structure que l'objet fold dans `metrics.json`) **plus les champs `n_samples_train`, `n_samples_val`, `n_samples_test`** pour la traçabilité (cf. §8.4). |
 | **Réf. spec** | §15.3, Annexe B (schéma) |
 | **Critères d'acceptation** | Le JSON produit est valide contre `metrics.schema.json`. Test d'intégration. Chaque `folds/fold_XX/metrics_fold.json` est généré et cohérent avec l'entrée correspondante dans le `metrics.json` global. |
 | **Dépendances** | WS-10.3, WS-7.2 |
@@ -663,7 +683,7 @@ graph TD
 
 | Champ | Valeur |
 |---|---|
-| **Description** | Module `pipeline/runner.py`. Orchestrer le pipeline complet : (1) charger config, (2) fixer seed, (3) ingestion + QA, (4) features, (5) dataset, (6) pour chaque fold : split → scale → train → predict val → calibrer θ → predict test → backtest → métriques, (7) agréger inter-fold avec vérification §14.4, (8) écrire artefacts (manifest, metrics, CSVs). Gestion du cas baselines (skip train/calibration). |
+| **Description** | Module `pipeline/runner.py`. Orchestrer le pipeline complet : (1) charger config, (2) fixer seed, (3) ingestion + QA, (4) features, (5) dataset, (6) pour chaque fold : split → scale → train → predict val → calibrer θ → predict test → backtest → métriques, (7) agréger inter-fold avec vérification §14.4, (8) écrire artefacts (manifest, metrics, CSVs). L'orchestrateur passe systématiquement `ohlcv` et `meta` au trainer et au modèle via les signatures `BaseModel`. Gestion du cas baselines : si `strategy_type = baseline`, skip `fit()` (no-op) et calibration θ (bypass), appeler directement `predict(X_test, meta=meta_test, ohlcv=ohlcv)` pour obtenir les signaux. |
 | **Réf. spec** | §3 (dataflow), §14.4, tout le pipeline |
 | **Critères d'acceptation** | Run complet avec DummyModel → arborescence correcte, JSON valides, métriques non nulles. Warnings §14.4 émis si seuils dépassés. |
 | **Dépendances** | Tous les WS précédents |
@@ -681,7 +701,7 @@ graph TD
 
 | Champ | Valeur |
 |---|---|
-| **Description** | Mettre à jour le `Dockerfile` existant pour : (1) installer toutes les dépendances, (2) copier le code, (3) `CMD` qui lance le pipeline. Ajouter un workflow CI minimal (GitHub Actions) : lint + tests unitaires. |
+| **Description** | Mettre à jour le `Dockerfile` existant pour : (1) installer toutes les dépendances, (2) copier le code, (3) `CMD` qui lance le pipeline. Ajouter un workflow CI minimal (GitHub Actions) : lint + tests unitaires. **Note GPU** : le Dockerfile de base utilise `python:3.11-slim` (CPU only). Pour les modèles DL nécessitant un GPU, prévoir un `Dockerfile.gpu` optionnel basé sur `nvidia/cuda:12.x-runtime-ubuntu22.04` avec PyTorch+CUDA (post-MVP). |
 | **Réf. spec** | §16 (reproductibilité, Dockerfile) |
 | **Critères d'acceptation** | `docker build` + `docker run` exécutent un run complet. CI passe sur push. |
 | **Dépendances** | WS-12.3 |
@@ -785,9 +805,12 @@ ai_trading_agent/
 │   ├── test_backtest.py
 │   ├── test_baselines.py
 │   ├── test_metrics.py
-│   ├── test_artifacts.py
-│   └── test_integration.py
+│   ├── test_artifacts.py              # Couvre WS-11.1 à WS-11.4
+│   ├── test_seed.py                    # WS-12.1
+│   ├── test_runner.py                  # WS-12.2
+│   └── test_integration.py             # WS-12.2, WS-12.3 (bout en bout)
 ├── Dockerfile                          # WS-12.4
+├── pyproject.toml                      # WS-1.1 (PEP 621)
 ├── requirements.txt
 └── README.md
 ```
@@ -800,7 +823,7 @@ ai_trading_agent/
 | **Langue code** | Anglais (noms de variables, fonctions, classes, docstrings) |
 | **Langue docs** | Français (docs/, tâches, plan) |
 | **Style** | snake_case, PEP 8, imports explicites (pas de `*`) |
-| **Tests** | pytest, un fichier par module, TDD encouragé (RED → GREEN → REFACTOR) |
+| **Tests** | pytest, un fichier par module (`test_config.py`, `test_features.py`, etc.), TDD encouragé (RED → GREEN → REFACTOR). Les identifiants de tâche (`#NNN`) sont référencés dans les docstrings des classes/fonctions de test, pas dans le nom des fichiers. |
 | **Strict code** | Aucun fallback silencieux, `raise` explicite en cas d'erreur, pas d'`except` trop large |
 | **Anti-fuite** | Toute donnée future inaccessible à t. Scaler fit sur train uniquement. Embargo respecté. |
 | **Reproductibilité** | Seed fixée, SHA-256 des données, config versionée, environnement tracé |

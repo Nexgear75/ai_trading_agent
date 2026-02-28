@@ -4,6 +4,12 @@
 # Version  : 1.1 (addendum inclus)
 # ============================================================================
 
+# --- Logging -----------------------------------------------------------------
+logging:
+  level: INFO                     # DEBUG | INFO | WARNING | ERROR
+  format: text                    # text | json
+  file: null                      # null = stdout only, sinon chemin relatif au run_dir
+
 # --- Dataset -----------------------------------------------------------------
 dataset:
   exchange: binance
@@ -78,7 +84,7 @@ scaling:
 strategy:
   strategy_type: model            # model | baseline
   name: xgboost_reg              # xgboost_reg | cnn1d_reg | gru_reg | lstm_reg | patchtst_reg | rl_ppo | no_trade | buy_hold | sma_rule
-  framework: xgboost
+  framework: xgboost              # Informatif uniquement (manifest). Le modèle est résolu par strategy.name via MODEL_REGISTRY.
 
 # --- Thresholding (calibration θ) -------------------------------------------
 thresholding:

@@ -20,11 +20,8 @@ RUN apt-get update && \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copier le code source et la config
-COPY configs/ configs/
-COPY docs/ docs/
+# Copier tout le code source (configs, docs, ai_trading/, scripts/, etc.)
 COPY . .
 
-# Point d'entrée par défaut (à adapter quand le pipeline sera implémenté)
-# Exemple : python -m stockgpt.run --config configs/default.yaml
-CMD ["python", "--version"]
+# Point d'entrée par défaut
+CMD ["python", "-m", "ai_trading", "--config", "configs/default.yaml"]
