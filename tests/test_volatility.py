@@ -139,9 +139,10 @@ class TestNumericalCorrectness:
         close = ohlcv["close"].values
         logreturns = np.log(close[1:] / close[:-1])
 
-        # Check a specific position: t = 30 (0-indexed), window [7..30] = 24 logreturns
+        # pandas logret[t] = log(close[t]/close[t-1]) = logreturns[t-1]
+        # rolling(24) at index t uses logret[t-23..t] → logreturns[t-24..t-1]
         t = 30
-        window = logreturns[t - 23: t + 1]  # 24 logreturns ending at index t
+        window = logreturns[t - 24: t]  # 24 logreturns ending at logret[t]
         expected = np.std(window, ddof=0)
         # result index is aligned with ohlcv; logret at t=0 is NaN, vol at t maps to
         # the rolling std ending at bar t
@@ -158,9 +159,9 @@ class TestNumericalCorrectness:
         close = ohlcv["close"].values
         logreturns = np.log(close[1:] / close[:-1])
 
-        # Check t = 80 (0-indexed), window [9..80] = 72 logreturns
+        # pandas logret[t] = logreturns[t-1]; rolling(72) at t uses logreturns[t-72..t-1]
         t = 80
-        window = logreturns[t - 71: t + 1]
+        window = logreturns[t - 72: t]
         expected = np.std(window, ddof=0)
         np.testing.assert_allclose(result.iloc[t], expected, rtol=1e-10)
 
@@ -176,7 +177,7 @@ class TestNumericalCorrectness:
         logreturns = np.log(close[1:] / close[:-1])
 
         for t in [24, 40, 60, 99]:
-            window = logreturns[t - 23: t + 1]
+            window = logreturns[t - 24: t]
             expected = np.std(window, ddof=0)
             np.testing.assert_allclose(
                 result.iloc[t], expected, rtol=1e-10,
@@ -221,7 +222,7 @@ class TestDdofConfig:
         logreturns = np.log(close[1:] / close[:-1])
 
         t = 30
-        window = logreturns[t - 23: t + 1]
+        window = logreturns[t - 24: t]
         expected = np.std(window, ddof=1)
         np.testing.assert_allclose(result.iloc[t], expected, rtol=1e-10)
 
