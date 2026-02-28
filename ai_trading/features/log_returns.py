@@ -49,7 +49,12 @@ def _make_log_return_class(k: int) -> type[BaseFeature]:
         def compute(self, ohlcv: pd.DataFrame, params: dict) -> pd.Series:
             """Compute k-bar log-return from close prices."""
             close = ohlcv["close"]
-            return pd.Series(np.log(close / close.shift(k)), index=ohlcv.index)
+            result = np.log(close / close.shift(k))
+            # Preserve current behavior: return a Series without a name,
+            # while avoiding an unnecessary Series construction.
+            if isinstance(result, pd.Series):
+                result = result.rename(None)
+            return result
 
     _LogReturn.__name__ = f"LogReturn{k}"
     _LogReturn.__qualname__ = f"LogReturn{k}"
