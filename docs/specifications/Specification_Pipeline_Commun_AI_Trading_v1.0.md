@@ -269,7 +269,7 @@ Les features sont calculées de manière strictement causale: la feature au temp
 ## 6.1 Série de base et conventions
 
 On définit pour chaque bougie $t$ (timezone UTC):
-- $O_t = \text{Open}_t$, $H_t = \text{High}_t$, $L_t = \text{Low}_t$, $C_t = \text{Close}_t$, $V_t = \text{Volume}_t$.
+- $O\_t = \text{Open}\_t$, $H\_t = \text{High}\_t$, $L\_t = \text{Low}\_t$, $C\_t = \text{Close}\_t$, $V\_t = \text{Volume}\_t$.
 
 Les indicateurs ci-dessous utilisent par défaut la série des clôtures $C_t$.
 
@@ -280,15 +280,15 @@ La liste ci-dessous est le jeu de features minimal commun (MVP). Tout ajout de f
 
 | Feature | Définition (math) | Paramètres / notes |
 | --- | --- | --- |
-| `logret_1` | $\text{logret\\_1}(t) = \log(C_t / C_{t-1})$ | Return log à 1 pas. |
-| `logret_2` | $\text{logret\\_2}(t) = \log(C_t / C_{t-2})$ | Return log à 2 pas. |
-| `logret_4` | $\text{logret\\_4}(t) = \log(C_t / C_{t-4})$ | Return log à 4 pas (ex: 4h si $\Delta$=1h). |
+| `logret_1` | $\text{logret\\_1}(t) = \log(C\_t / C\_{t-1})$ | Return log à 1 pas. |
+| `logret_2` | $\text{logret\\_2}(t) = \log(C\_t / C\_{t-2})$ | Return log à 2 pas. |
+| `logret_4` | $\text{logret\\_4}(t) = \log(C\_t / C\_{t-4})$ | Return log à 4 pas (ex: 4h si $\Delta$=1h). |
 | `vol_24` | $\text{vol\\_24}(t) = \text{std}( \text{logret\\_1}(t-i) )_{i=0..23}$ | Écart-type sur 24 pas (ddof=0). |
 | `vol_72` | $\text{vol\\_72}(t) = \text{std}( \text{logret\\_1}(t-i) )_{i=0..71}$ | Écart-type sur 72 pas (ddof=0). |
 | `logvol` | $\text{logvol}(t) = \log(V_t + \varepsilon)$ | $\varepsilon = 10^{-8}$ (évite log(0)). |
 | `dlogvol` | $\text{dlogvol}(t) = \text{logvol}(t) - \text{logvol}(t-1)$ | Différence première du log-volume. |
-| `rsi_14` | $\text{RSI}_{14}(t) = 100 - 100/(1 + RS_t)$ | $RS_t$ défini via lissage de Wilder (voir §6.3). |
-| `ema_ratio_12_26` | $\text{ema\\_ratio}(t) = \text{EMA}_{12}(t) / \text{EMA}_{26}(t) - 1$ | EMA définie en §6.4, $\alpha = 2/(n+1)$. |
+| `rsi_14` | $\text{RSI}\_{14}(t) = 100 - 100/(1 + RS\_t)$ | $RS_t$ défini via lissage de Wilder (voir §6.3). |
+| `ema_ratio_12_26` | $\text{ema\\_ratio}(t) = \text{EMA}\_{12}(t) / \text{EMA}\_{26}(t) - 1$ | EMA définie en §6.4, $\alpha = 2/(n+1)$. |
 
 
 ## 6.3 RSI (Relative Strength Index) - lissage de Wilder
@@ -333,7 +333,7 @@ Initialisation ($t = n$): $AG_n$ et $AL_n$ peuvent être initialisés comme les 
 **Conventions :**
 - Si $AL_t \approx 0$ et $AG_t > 0$ → $RSI_t \to 100$.
 - Si $AG_t \approx 0$ et $AL_t > 0$ → $RSI_t \to 0$.
-- Si $AG_t = AL_t = 0$ → $RSI_t = 50$.
+- Si $AG\_t = AL\_t = 0$ → $RSI_t = 50$.
 
 
 ## 6.4 EMA (Exponential Moving Average)
@@ -350,8 +350,8 @@ $$
 \text{EMA}_n(t) = \alpha_n \cdot C_t + (1 - \alpha_n) \cdot \text{EMA}_n(t-1)
 $$
 
-Initialisation: $\text{EMA}_n(t_0)$ = moyenne simple des $n$ premières clôtures disponibles.
-La feature `ema_ratio_12_26` est définie comme $\text{EMA}_{12}(t) / \text{EMA}_{26}(t) - 1$ (ratio sans dimension).
+Initialisation: $\text{EMA}\_n(t\_0)$ = moyenne simple des $n$ premières clôtures disponibles.
+La feature `ema_ratio_12_26` est définie comme $\text{EMA}\_{12}(t) / \text{EMA}\_{26}(t) - 1$ (ratio sans dimension).
 
 
 ## 6.5 Volatilité rolling (écart-type) - convention ddof
@@ -478,9 +478,9 @@ $$
 ## 8.3 Définition formelle des périodes par fold
 
 Pour chaque fold $k$, le splitter doit produire des périodes disjointes (train/val/test) en timestamps UTC:
-- $\text{train}_k = [T_{\text{train\\_start}}, T_{\text{train\\_end}}]$
+- $\text{train}\_k = [T\_{\text{train\\_start}}, T\_{\text{train\\_end}}]$
 - $\text{val}_k$ = sous-intervalle terminal de $\text{train}_k$ (`val_frac_in_train`)
-- $\text{test}_k = [T_{\text{test\\_start}}, T_{\text{test\\_end}}]$
+- $\text{test}\_k = [T\_{\text{test\\_start}}, T\_{\text{test\\_end}}]$
 
 Le `manifest.json` doit enregistrer précisément ces bornes pour audit.
 
@@ -558,7 +558,7 @@ save(path) / load(path)    # optionnel mais recommandé
 
 - Entrée canonique: `X_seq` de shape $(N, L, F)$ et `y` de shape $(N,)$.
 - Sortie: `y_hat` de shape $(N,)$, en float (prédiction de log-return).
-- XGBoost utilise l'adapter tabulaire standard $X_{\text{tab}} = \text{vec}(X_{\text{seq}})$.
+- XGBoost utilise l'adapter tabulaire standard $X\_{\text{tab}} = \text{vec}(X\_{\text{seq}})$.
 - Le modèle RL (PPO) ne prédit pas de log-return : il émet directement une action Go (1) ou No-Go (0). Sa sortie `predict()` retourne un vecteur d'actions binaires de shape $(N,)$. Le pipeline bypass la calibration de $\theta$ pour ce modèle (voir §11.5).
 - Aucune fuite: le modèle ne doit pas accéder au test pendant fit, ni recalculer des scalers sur val/test.
 
@@ -590,9 +590,9 @@ On considère le faux positif (Go mais trade perdant) plus grave que le faux né
 
 ## 11.2 Méthode par défaut: grille de quantiles
 
-Soit $\hat{y}_{\text{val}}$ l'ensemble des prédictions sur la validation. On définit une grille de quantiles $Q = \{q_1, q_2, \ldots\}$.
+Soit $\hat{y}_{\text{val}}$ l'ensemble des prédictions sur la validation. On définit une grille de quantiles $Q = \{q\_1, q\_2, \ldots\}$.
 Pour chaque $q \in Q$:
-- $\theta(q) = \text{quantile}_q(\hat{y}_{\text{val}})$
+- $\theta(q) = \text{quantile}\_q(\hat{y}\_{\text{val}})$
 - on génère des signaux Go/No-Go sur la validation
 - on backteste (règles + coûts identiques)
 - on calcule les métriques trading sur validation
@@ -649,7 +649,7 @@ Les valeurs 'par trade' round-trip se déduisent par: $f_{\text{rt}} \approx 2f$
 
 ## 12.3 Calcul du rendement net d'un trade (long-only)
 
-Soit $p_{\text{entry}} = O_{t+1}$ et $p_{\text{exit}} = C_{t+H}$. On modélise un slippage proportionnel (worst-case):
+Soit $p\_{\text{entry}} = O\_{t+1}$ et $p\_{\text{exit}} = C\_{t+H}$. On modélise un slippage proportionnel (worst-case):
 
 $$
 p_{\text{entry\\_eff}} = p_{\text{entry}} \cdot (1 + s)
@@ -664,9 +664,9 @@ $$
 M_{\text{net}} = (1 - f)^2 \cdot \frac{p_{\text{exit\\_eff}}}{p_{\text{entry\\_eff}}}
 $$
 
-Return net (simple): $r_{\text{net}} = M_{\text{net}} - 1$
+Return net (simple): $r\_{\text{net}} = M\_{\text{net}} - 1$
 
-Log-return net: $\text{lr}_{\text{net}} = \log(M_{\text{net}})$
+Log-return net: $\text{lr}\_{\text{net}} = \log(M\_{\text{net}})$
 
 
 **Formule finale :**
@@ -690,7 +690,7 @@ $$
 
 En dehors des trades (No-Go), l'équité reste constante.
 
-Optionnel (si activé): une fraction d'exposition $w \in (0,1]$ peut être introduite: $E_{\text{exit}} = E_{\text{entry}} \cdot (1 + w \cdot r_{\text{net}})$. Dans le MVP, $w = 1$ (all-in, sans levier).
+Optionnel (si activé): une fraction d'exposition $w \in (0,1]$ peut être introduite: $E\_{\text{exit}} = E\_{\text{entry}} \cdot (1 + w \cdot r\_{\text{net}})$. Dans le MVP, $w = 1$ (all-in, sans levier).
 
 
 ## 12.5 Cas buy & hold (baseline continue)
@@ -737,7 +737,7 @@ $$
 $$
 
 Signal à $t$:
-Go si $\text{SMA}_{\text{fast}}(t) > \text{SMA}_{\text{slow}}(t)$, sinon No-Go.
+Go si $\text{SMA}\_{\text{fast}}(t) > \text{SMA}\_{\text{slow}}(t)$, sinon No-Go.
 
 La règle SMA est ensuite backtestée avec les mêmes règles d'exécution que les modèles (entrée $O_{t+1}$, sortie $C_{t+H}$) afin de rester comparable.
 
@@ -786,8 +786,8 @@ $$
 
 
 **Distinction `net_pnl` / `net_return` :**
-- `net_pnl` = variation absolue de l'équité sur le fold test : $E_T - E_0$ (avec $E_0 = 1.0$, c'est aussi $E_T - 1$). Sans dimension monétaire (équité normalisée).
-- `net_return` = rendement relatif du fold test : $(E_T - E_0) / E_0 = E_T - 1$. En mode all-in ($w = 1$) et équité initiale 1.0, `net_pnl == net_return` numériquement. La distinction devient significative si l'on introduit une fraction d'exposition $w < 1$ ou un capital initial différent.
+- `net_pnl` = variation absolue de l'équité sur le fold test : $E\_T - E\_0$ (avec $E_0 = 1.0$, c'est aussi $E_T - 1$). Sans dimension monétaire (équité normalisée).
+- `net_return` = rendement relatif du fold test : $(E\_T - E\_0) / E\_0 = E\_T - 1$. En mode all-in ($w = 1$) et équité initiale 1.0, `net_pnl == net_return` numériquement. La distinction devient significative si l'on introduit une fraction d'exposition $w < 1$ ou un capital initial différent.
 
 
 $$
@@ -2283,13 +2283,13 @@ Glossaire pédagogique des termes financiers, boursiers et de trading algorithmi
 | **Position** | Engagement financier ouvert sur le marché. Une position longue est ouverte à l'achat, puis clôturée à la vente. |
 | **Horizon (H)** | Nombre de bougies entre l'entrée et la sortie d'un trade. Exemple : H = 4 avec Δ = 1h signifie un trade de 4 heures. Définit aussi l'horizon de prédiction. |
 | **Rendement (Return)** | Variation relative du prix entre deux instants. Mesure le gain ou la perte d'un investissement. |
-| **Log-return (rendement logarithmique)** | Rendement calculé comme le logarithme du ratio des prix : $\log(P_{final}/P_{initial})$. Présente des propriétés mathématiques avantageuses (additivité temporelle, symétrie hausse/baisse). |
+| **Log-return (rendement logarithmique)** | Rendement calculé comme le logarithme du ratio des prix : $\log(P\_{final}/P\_{initial})$. Présente des propriétés mathématiques avantageuses (additivité temporelle, symétrie hausse/baisse). |
 | **Rendement net (Net return)** | Rendement d'un trade après déduction de tous les coûts (frais de transaction + slippage). C'est la mesure réelle de la performance. |
 | **P&L (Profit and Loss)** | Profit ou perte réalisé(e). Le P&L net est la différence entre l'équité finale et l'équité initiale, après coûts. |
 | **Équité (Equity)** | Valeur du portefeuille au cours du temps. Initialisée à 1.0 (normalisée), elle évolue via les rendements nets des trades. La courbe d'équité visualise la performance cumulée. |
 | **Courbe d'équité (Equity curve)** | Graphique montrant l'évolution de l'équité dans le temps. Permet de visualiser les périodes de gains, de pertes et les drawdowns. |
 | **Drawdown** | Baisse de l'équité depuis un sommet (peak) précédent. Mesure la perte subie avant de retrouver le niveau antérieur. |
-| **Max Drawdown (MDD)** | Plus grande baisse relative de l'équité observée sur une période : $\text{MDD} = \max_t \left(\frac{\text{peak}_t - E_t}{\text{peak}_t}\right)$. Indicateur clé du risque. Un MDD de 25% signifie que le portefeuille a perdu au maximum 25% depuis son plus haut. |
+| **Max Drawdown (MDD)** | Plus grande baisse relative de l'équité observée sur une période : $\text{MDD} = \max\_t \left(\frac{\text{peak}\_t - E\_t}{\text{peak}\_t}\right)$. Indicateur clé du risque. Un MDD de 25% signifie que le portefeuille a perdu au maximum 25% depuis son plus haut. |
 | **Frais de transaction (Fees)** | Commission prélevée par l'exchange à chaque opération d'achat ou de vente. Exprimée en pourcentage du montant échangé (ex : 0.05% par côté chez Binance en mode taker). |
 | **Slippage (glissement de prix)** | Différence entre le prix théorique d'exécution et le prix réellement obtenu, due à la liquidité limitée du marché. Modélisé ici comme un coût proportionnel au prix. |
 | **Per side (par côté)** | Convention de coût : le taux est appliqué séparément à l'entrée (achat) et à la sortie (vente). Le coût total round-trip est approximativement le double du coût par côté. |
@@ -2306,7 +2306,7 @@ Glossaire pédagogique des termes financiers, boursiers et de trading algorithmi
 | **Hit rate (taux de réussite)** | Pourcentage de trades dont le rendement net est positif. Un hit rate de 54% signifie que 54 trades sur 100 sont gagnants. |
 | **Sharpe ratio** | Ratio rendement/risque : $\text{Sharpe} = \frac{\text{mean}(r)}{\text{std}(r)}$. Mesure la performance ajustée au risque. Un Sharpe élevé signifie un bon rendement pour un niveau de volatilité donné. |
 | **Volatilité (Volatility)** | Mesure de la dispersion des rendements (écart-type). Une volatilité élevée signifie des variations de prix importantes. Peut être calculée sur une fenêtre glissante (rolling volatility). |
-| **SMA (Simple Moving Average)** | Moyenne arithmétique des $n$ dernières clôtures : $\text{SMA}_n(t) = \frac{1}{n}\sum_{i=0}^{n-1} C_{t-i}$. Lisse le prix pour identifier la tendance. |
+| **SMA (Simple Moving Average)** | Moyenne arithmétique des $n$ dernières clôtures : $\text{SMA}\_n(t) = \frac{1}{n}\sum\_{i=0}^{n-1} C\_{t-i}$. Lisse le prix pour identifier la tendance. |
 | **EMA (Exponential Moving Average)** | Moyenne mobile qui accorde un poids décroissant exponentiellement aux observations passées. Plus réactive aux changements récents que la SMA. Le coefficient de lissage est $\alpha = 2/(n+1)$. |
 | **RSI (Relative Strength Index)** | Oscillateur borné entre 0 et 100 qui mesure la vitesse et l'amplitude des mouvements de prix. Un RSI > 70 est traditionnellement considéré comme suracheté, < 30 comme survendu. |
 | **Lissage de Wilder** | Méthode de calcul de la moyenne mobile utilisée par J. W. Wilder pour le RSI. C'est une EMA avec un coefficient spécifique : $\alpha = 1/n$ (au lieu de $2/(n+1)$). |
