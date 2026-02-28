@@ -1,6 +1,6 @@
 # Tâche — Features log-returns (logret_1, logret_2, logret_4)
 
-Statut : TODO
+Statut : DONE
 Ordre : 008
 Workstream : WS-3
 Milestone : M2
@@ -36,26 +36,26 @@ Implémenter les trois features log-return en tant que classes `BaseFeature` enr
 - `required_params` est une liste vide (pas de paramètre configurable).
 
 ## Critères d'acceptation
-- [ ] 3 classes enregistrées : `logret_1`, `logret_2`, `logret_4` dans `FEATURE_REGISTRY`.
-- [ ] Valeurs numériques correctes sur données synthétiques calculées à la main.
-- [ ] NaN aux positions t < k pour chaque variante.
-- [ ] Causalité vérifiée : modifier `close[t > T]` ne modifie pas `logret_k[t <= T]`.
-- [ ] Résultat ≈ `np.log(close / close.shift(k))` (tolérance `atol=1e-12`).
-- [ ] Tests couvrent les scénarios nominaux + erreurs + bords.
-- [ ] Suite de tests verte après implémentation.
-- [ ] `ruff check` passe sans erreur.
+- [x] 3 classes enregistrées : `logret_1`, `logret_2`, `logret_4` dans `FEATURE_REGISTRY`.
+- [x] Valeurs numériques correctes sur données synthétiques calculées à la main.
+- [x] NaN aux positions t < k pour chaque variante.
+- [x] Causalité vérifiée : modifier `close[t > T]` ne modifie pas `logret_k[t <= T]`.
+- [x] Résultat ≈ `np.log(close / close.shift(k))` (tolérance `atol=1e-12`).
+- [x] Tests couvrent les scénarios nominaux + erreurs + bords.
+- [x] Suite de tests verte après implémentation.
+- [x] `ruff check` passe sans erreur.
 
 ## Pré-condition de démarrage
 - **Tous les tests existants sont GREEN** avant de commencer.
 - **Créer une branche dédiée** `task/008-log-returns` depuis `Max6000i1`.
 
 ## Checklist de fin de tâche
-- [ ] Branche `task/008-log-returns` créée depuis `Max6000i1`.
-- [ ] Tests RED écrits avant implémentation.
-- [ ] **Commit RED** : `[WS-3] #008 RED: tests log-returns features`.
-- [ ] Tests GREEN passants et reproductibles.
-- [ ] Critères d'acceptation tous satisfaits.
-- [ ] `ruff check ai_trading/ tests/` passe sans erreur.
-- [ ] Fichier de tâche mis à jour (statut DONE, critères cochés).
-- [ ] **Commit GREEN** : `[WS-3] #008 GREEN: log-returns features`.
-- [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-3] #008 — Features log-returns`.
+- [x] Branche `task/008-log-returns` créée depuis `Max6000i1`.
+- [x] Tests RED écrits avant implémentation.
+- [x] **Commit RED** : `[WS-3] #008 RED: tests log-returns features`.
+- [x] Tests GREEN passants et reproductibles.
+- [x] Critères d'acceptation tous satisfaits.
+- [x] `ruff check ai_trading/ tests/` passe sans erreur.
+- [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
+- [x] **Commit GREEN** : `[WS-3] #008 GREEN: log-returns features`.
+- [x] **Pull Request ouverte** vers `Max6000i1` : `[WS-3] #008 — Features log-returns`.
