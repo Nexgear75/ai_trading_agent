@@ -1,277 +1,132 @@
-# 📊 Crypto Dataset – Documentation des Features
+# AI Trading Pipeline
 
-> Dataset généré à partir des données Binance (OHLCV, daily) sur 10 cryptomonnaies.  
-> Ce fichier documente chaque feature ajoutée, sa formule, et sa justification.
+> Pipeline rigoureux de comparaison de modèles ML/DL et baselines sur données OHLCV crypto (Binance).
 
----
+## Objectif
 
-## Créer le dataset
+Comparer de manière systématique et reproductible des stratégies de trading (XGBoost, CNN 1D, GRU, LSTM, PatchTST, RL-PPO) contre des baselines (no-trade, buy & hold, SMA crossover) sur un walk-forward rolling, avec métriques standardisées et coûts réalistes.
 
-La commande suivante téléchargera sur 5 ans 10 crypto et créera l'ensemble des features décrite ci-dessous
+## Architecture
 
-```python3
-python3 -m data.main
+```
+ai_trading/                  ← package principal
+├── config.py                # Chargement + validation YAML (Pydantic v2)
+├── data/                    # Ingestion, QA, dataset, splitter, scaler
+├── features/                # Feature pipeline pluggable (registre)
+├── models/                  # Interface BaseModel + registre
+├── training/                # Fold trainer
+├── calibration/             # Seuil θ (quantile grid)
+├── backtest/                # Moteur de backtest mark-to-market
+├── baselines/               # no_trade, buy_hold, sma_rule
+├── metrics/                 # Prédiction + trading + agrégation
+├── artifacts/               # Manifest, metrics JSON, schémas
+├── utils/                   # Seed manager
+└── pipeline/                # Orchestrateur de run
 ```
 
----
+## Features MVP (9)
 
-## Table des matières
-
-1. [Vue d'ensemble](#vue-densemble)
-2. [Features de structure de bougie](#1-features-de-structure-de-bougie-candle_featurespy)
-3. [Features de momentum](#2-features-de-momentum-momentum_featurespy)
-4. [Features de tendance](#3-features-de-tendance-trend_featurespy)
-5. [Features d'oscillateur](#4-features-doscillateur-oscillator_featurespy)
-6. [Features de volume et volatilité](#5-features-de-volume-et-volatilité-volume_featurespy)
-7. [Label](#6-label--la-cible-à-prédire)
-8. [Pourquoi tout normaliser ?](#pourquoi-tout-normaliser-)
-
----
-
-## Vue d'ensemble
-
-Le dataset contient **20 features** par bougie journalière, construites à partir des 5 colonnes brutes Binance : `open`, `high`, `low`, `close`, `volume`.
-
-| Catégorie | Nombre de features | Fichier |
+| Feature | Formule | Réf. spec |
 |---|---|---|
-| Structure de bougie | 4 | `candle_features.py` |
-| Momentum (returns) | 5 | `momentum_features.py` |
-| Tendance (EMAs) | 4 | `trend_features.py` |
-| Oscillateurs | 4 | `oscillator_features.py` |
-| Volume & Volatilité | 3 | `volume_features.py` |
-| **Total** | **20** | |
+| `logret_1` | `log(C_t / C_{t-1})` | §6.2 |
+| `logret_2` | `log(C_t / C_{t-2})` | §6.2 |
+| `logret_4` | `log(C_t / C_{t-4})` | §6.2 |
+| `vol_24` | `std(logret_1, 24 pas, ddof=0)` | §6.5 |
+| `vol_72` | `std(logret_1, 72 pas, ddof=0)` | §6.5 |
+| `logvol` | `log(V_t + ε)` | §6.2 |
+| `dlogvol` | `logvol(t) - logvol(t-1)` | §6.2 |
+| `rsi_14` | RSI Wilder (n=14) | §6.3 |
+| `ema_ratio_12_26` | `EMA_12 / EMA_26 - 1` | §6.4 |
 
-Chaque exemple dans le dataset est une **fenêtre de 30 jours consécutifs**, ce qui donne un array de forme `(30, 20)` par sample — l'input idéal pour un CNN 1D, un LSTM ou un GRU.
+## Prérequis
 
----
+- Python ≥ 3.11
+- Dépendances : voir `requirements.txt`
 
-## 1. Features de structure de bougie (`candle_features.py`)
+## Installation
 
-Ces features décrivent la **forme géométrique** de chaque bougie japonaise. Ce sont les informations les plus directement lisibles par un trader humain, et donc les premières que le CNN doit apprendre à reconnaître.
+```bash
+# Clone
+git clone https://github.com/Nexgear75/ai_trading_agent.git
+cd ai_trading_agent
 
-> **Principe clé :** Toutes ces features sont divisées par `open` pour être exprimées en pourcentage relatif. Ainsi, une bougie BTC à 60 000$ et une bougie BTC à 10 000$ peuvent être comparées directement.
+# Environnement virtuel
+python -m venv .venv
+source .venv/bin/activate   # Linux/macOS
+.venv\Scripts\activate      # Windows
 
----
-
-### `body` — Corps de la bougie
-
-```
-body = (close - open) / open
-```
-
-**Ce que ça mesure :** La direction et l'intensité du mouvement pendant la journée.
-
-- Valeur positive → journée haussière (les acheteurs ont dominé)
-- Valeur négative → journée baissière (les vendeurs ont dominé)
-- Proche de 0 → indécision du marché (Doji)
-
-**Pourquoi c'est pertinent :** C'est la feature la plus fondamentale de l'analyse en chandeliers japonais. Un CNN qui enchaîne plusieurs valeurs de `body` peut détecter des séquences comme "3 grosses bougies vertes consécutives" (momentum haussier) ou "une longue bougie rouge après une série de hausses" (retournement potentiel).
-
----
-
-### `upper_wick` — Mèche supérieure
-
-```
-upper_wick = (high - max(open, close)) / open
+# Dépendances
+pip install -e ".[dev]"
 ```
 
-**Ce que ça mesure :** L'amplitude du rejet à la hausse pendant la journée. Le prix est monté jusqu'à `high`, mais les vendeurs ont ramené le cours vers le corps de la bougie.
+## Utilisation
 
-**Pourquoi c'est pertinent :** Une longue mèche supérieure est un signal de **rejet haussier** — le marché a essayé de monter mais les vendeurs étaient présents à ces niveaux. C'est un indicateur classique de résistance. Combinée avec d'autres features, elle aide le modèle à identifier des zones de retournement.
+```bash
+# Lancer un run complet
+python -m ai_trading --config configs/default.yaml
 
----
+# Override CLI (dot notation)
+python -m ai_trading --config configs/default.yaml --set costs.slippage_rate_per_side=0.0005
 
-### `lower_wick` — Mèche inférieure
-
-```
-lower_wick = (min(open, close) - low) / open
-```
-
-**Ce que ça mesure :** L'amplitude du rejet à la baisse. Symétrique de la mèche supérieure.
-
-**Pourquoi c'est pertinent :** Une longue mèche inférieure signale un **rejet baissier** — les vendeurs ont poussé le prix vers le bas mais les acheteurs ont repris le contrôle. C'est typiquement le signe d'un support fort, potentiellement le début d'un rebond. Le pattern "Hammer" ou "Pin Bar" (corps petit + longue mèche inférieure) est l'un des plus fiables en trading.
-
----
-
-### `range` — Amplitude totale de la bougie
-
-```
-range = (high - low) / open
+# Tests
+pytest
 ```
 
-**Ce que ça mesure :** La volatilité intra-journalière. Plus le `range` est grand, plus la journée a été volatile.
+## Configuration
 
-**Pourquoi c'est pertinent :** Un `range` anormalement élevé accompagné d'un fort volume signale souvent un **événement de marché majeur** (cassure d'un niveau, liquidation massive, news). Ces journées ont souvent un impact fort sur les jours suivants. Le CNN peut apprendre à les repérer dans une fenêtre.
+La configuration centralisée est dans `configs/default.yaml`. Tous les paramètres sont documentés dans la [spécification](docs/specifications/Specification_Pipeline_Commun_AI_Trading_v1.0.md) (Annexe E.1).
 
----
+Paramètres principaux :
 
-## 2. Features de momentum (`momentum_features.py`)
+| Section | Paramètres clés |
+|---|---|
+| `dataset` | symbole, timeframe 1h, période 2024-2026 |
+| `label` | horizon H=4 bougies, log-return trade |
+| `window` | L=128 pas, warmup=200 |
+| `splits` | train 180j, test 30j, step 30j, val 20%, embargo=H |
+| `costs` | fee 0.05% + slippage 0.025% per side |
+| `backtest` | one_at_a_time, long_only |
 
-Ces features mesurent la **vitesse et la direction** du mouvement de prix sur différents horizons temporels passés.
+## Walk-Forward Rolling
 
-```
-return_Nd = (close_aujourd'hui - close_il_y_a_N_jours) / close_il_y_a_N_jours
-```
-
-| Feature | Fenêtre | Ce que ça capture |
-|---|---|---|
-| `return_1d` | 1 jour | Momentum immédiat |
-| `return_3d` | 3 jours | Tendance très court terme |
-| `return_7d` | 7 jours | Tendance hebdomadaire |
-| `return_14d` | 14 jours | Tendance bi-mensuelle |
-| `return_21d` | 21 jours | Tendance mensuelle |
-
-**Pourquoi plusieurs horizons ?**
-
-Un marché peut être haussier sur 21 jours mais en train de corriger sur 3 jours. Donner ces deux informations simultanément au modèle lui permet de distinguer une **correction temporelle dans une tendance haussière** (potentiellement une opportunité d'achat) d'un **vrai retournement de tendance** (signal de vente).
-
-C'est le principe du **multi-timeframe analysis** utilisé par les traders professionnels, ici encodé directement dans les features.
-
----
-
-## 3. Features de tendance (`trend_features.py`)
-
-Les moyennes mobiles exponentielles (EMA) lissent le prix pour révéler la tendance sous-jacente, en donnant plus de poids aux données récentes.
+Le pipeline évalue chaque stratégie sur des folds glissants :
 
 ```
-emaX_ratio = EMA(close, X périodes) / close
+Fold 0:  |--- train 180j ---|-- val --|--emb--|-- test 30j --|
+Fold 1:       |--- train 180j ---|-- val --|--emb--|-- test 30j --|
+Fold 2:            |--- train 180j ---|-- val --|--emb--|-- test 30j --|
+...
 ```
 
-| Feature | Période | Rôle classique |
-|---|---|---|
-| `ema9_ratio` | 9 jours | Tendance très court terme |
-| `ema21_ratio` | 21 jours | Tendance court terme |
-| `ema50_ratio` | 50 jours | Tendance moyen terme |
-| `ema100_ratio` | 100 jours | Tendance long terme |
+Embargo = H bougies entre val et test pour éviter toute fuite d'information.
 
-**Pourquoi diviser par `close` ?**
+## Artefacts de sortie
 
-Un ratio autour de `1.0` signifie que le prix est proche de son EMA. Un ratio de `1.05` signifie que le prix est 5% au-dessus de son EMA → le marché est potentiellement suracheté et une correction est probable. Un ratio de `0.95` → le marché est 5% sous son EMA → potentiellement survendu.
+Chaque run produit dans `runs/<run_id>/` :
 
-Cette normalisation rend les valeurs **comparables entre BTC, ETH, et toutes les autres cryptos**, quelle que soit leur échelle de prix absolue.
+- `manifest.json` — métadonnées du run (config, splits, hashes)
+- `metrics.json` — métriques par fold + agrégées
+- `config_snapshot.yaml` — config figée
+- `folds/fold_XX/` — equity curve, trades, prédictions par fold
 
-**Pourquoi plusieurs EMAs ?**
+Les JSON sont validés contre les schémas (`docs/specifications/manifest.schema.json`, `metrics.schema.json`).
 
-Le **croisement d'EMAs** est l'un des signaux les plus utilisés en trading algorithmique. Quand `ema9_ratio < ema50_ratio`, l'EMA courte passe sous l'EMA longue — c'est un signal baissier classique ("death cross"). Le CNN peut apprendre ces configurations sans qu'on les lui code explicitement.
+## Documentation
 
----
+| Document | Contenu |
+|---|---|
+| [Spécification v1.0](docs/specifications/Specification_Pipeline_Commun_AI_Trading_v1.0.md) | Spec complète (features, labels, walk-forward, backtest, métriques) |
+| [Plan d'implémentation](docs/plan/implementation.md) | Découpage en Work Streams et Milestones |
+| [Config par défaut](configs/default.yaml) | Tous les paramètres MVP |
 
-## 4. Features d'oscillateurs (`oscillator_features.py`)
+## Principes
 
-Les oscillateurs mesurent si un actif est en situation de **surachat ou survente**, indépendamment de la direction de la tendance.
+- **Strict code** : pas de fallback silencieux, `raise` explicite
+- **Anti-fuite** : scaler fit-on-train, embargo, purge
+- **Reproductibilité** : seed fixée, SHA-256, config versionnée
+- **Plug-in** : registres de features et de modèles
+- **TDD** : tests d'acceptation avant implémentation
 
----
+## Licence
 
-### `rsi` — Relative Strength Index
-
-```
-RSI = 100 - (100 / (1 + moyenne_gains_14j / moyenne_pertes_14j))
-Feature : rsi = RSI / 100  → normalisé entre 0 et 1
-```
-
-**Ce que ça mesure :** La force relative des mouvements haussiers vs baissiers sur 14 jours.
-
-- `rsi > 0.70` → surachat (le marché a monté trop vite, correction probable)
-- `rsi < 0.30` → survente (le marché a chuté trop vite, rebond probable)
-- `rsi ≈ 0.50` → marché équilibré
-
-**Pourquoi c'est pertinent :** Le RSI est l'indicateur le plus utilisé au monde en trading. Il capture des informations que les returns seuls ne voient pas — un actif peut avoir un `return_14d` positif mais un RSI en divergence baissière (les nouveaux hauts sont faits avec moins de force), ce qui signale un essoufflement.
-
----
-
-### `macd`, `macd_signal`, `macd_hist` — MACD
-
-```
-MACD      = EMA(12) - EMA(26)
-Signal    = EMA(MACD, 9)
-Histogramme = MACD - Signal
-
-Features normalisées par close pour comparaison inter-crypto
-```
-
-**Ce que ça mesure :** La convergence/divergence de deux moyennes mobiles. C'est essentiellement un indicateur de momentum qui détecte les changements de tendance.
-
-**Pourquoi 3 features et pas une seule ?**
-
-- `macd` seul indique la direction du momentum
-- `macd_signal` est le lissage du MACD — son croisement avec `macd` génère les signaux buy/sell
-- `macd_hist` (la différence entre les deux) montre **l'accélération ou le ralentissement** du momentum — c'est souvent le premier signe d'un retournement, avant même que le croisement se produise
-
-Un CNN qui voit l'évolution de ces 3 valeurs sur 30 jours peut apprendre à reconnaître des patterns de divergence MACD-prix, ce que très peu de modèles simples capturent.
-
----
-
-## 5. Features de volume et volatilité (`volume_features.py`)
-
-Le volume est souvent appelé "le carburant du marché". Un mouvement de prix sans volume est suspect ; avec volume, il est confirmé.
-
----
-
-### `volume_ratio` — Volume relatif
-
-```
-volume_ratio = volume_aujourd'hui / moyenne_mobile_volume(20 jours)
-```
-
-**Ce que ça mesure :** Si le volume du jour est anormalement élevé ou faible par rapport aux 20 derniers jours.
-
-- `volume_ratio > 2.0` → volume 2x supérieur à la normale → événement significatif
-- `volume_ratio < 0.5` → marché apathique, mouvement peu fiable
-
-**Pourquoi c'est pertinent :** En analyse technique, le principe est : *"le volume confirme le prix"*. Une cassure à la hausse avec un `volume_ratio` élevé est beaucoup plus fiable qu'une cassure avec un volume faible. Cette feature permet au modèle de pondérer la fiabilité des mouvements de prix.
-
----
-
-### `volume_return` — Variation du volume
-
-```
-volume_return = (volume_aujourd'hui - volume_hier) / volume_hier
-```
-
-**Ce que ça mesure :** L'accélération ou la décélération du volume, jour après jour.
-
-**Pourquoi c'est pertinent :** Un volume qui augmente progressivement pendant une hausse signale une accumulation institutionnelle. Un volume qui s'effondre pendant une hausse signale un essoufflement. Cette feature capture cette dynamique temporelle que `volume_ratio` seul ne voit pas.
-
----
-
-### `volatility` — Volatilité réalisée
-
-```
-volatility = écart-type des return_1d sur les 14 derniers jours
-```
-
-**Ce que ça mesure :** Le niveau de risque et d'incertitude actuel du marché.
-
-**Pourquoi c'est pertinent :** Les marchés alternent entre phases de **basse volatilité** (consolidation, accumulation silencieuse) et phases de **haute volatilité** (tendances fortes, paniques). Ces régimes de marché ont des comportements très différents. Un CNN entraîné sans cette feature confondrait des patterns identiques dans des contextes de volatilité radicalement différents — avec des conséquences opposées.
-
----
-
-## 6. Label — La cible à prédire
-
-```
-future_return = close(J+3) / close(J) - 1
-
-label =  1  si future_return > +2%   → signal HAUSSE
-label =  0  si -2% ≤ future_return ≤ +2%  → NEUTRE (pas de trade)
-label = -1  si future_return < -2%   → signal BAISSE
-```
-
-**Pourquoi J+3 et pas J+1 ?**
-
-Prédire le lendemain exact est trop sensible au bruit quotidien. Sur 3 jours, les mouvements aléatoires se lissent et les vrais signaux directionnels ressortent mieux.
-
-**Pourquoi un seuil de ±2% ?**
-
-Les mouvements inférieurs à 2% sur les cryptos sont souvent du bruit de marché. En filtrant ces cas neutres, on force le modèle à n'émettre des signaux que quand un vrai mouvement est attendu — ce qui correspond à une stratégie de trading réaliste où l'on ne prend position que sur des opportunités claires.
-
----
-
-## Pourquoi tout normaliser ?
-
-Un réseau de neurones est fondamentalement une machine qui fait des multiplications et des additions. Si une feature vaut 60 000 (prix BTC) et une autre vaut 0.65 (RSI), le gradient de la première va écraser celui de la seconde pendant l'entraînement — le modèle ignorera le RSI.
-
-En exprimant tout en **ratios, pourcentages et scores entre 0 et 1**, toutes les features contribuent de manière équilibrée à l'apprentissage, et le modèle peut être entraîné indifféremment sur BTC, DOGE ou n'importe quelle autre crypto sans jamais voir de valeur absolue.
-
----
-
-*Dataset généré via `main.py` — voir `config.py` pour modifier les paramètres.*
+MIT
