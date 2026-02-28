@@ -30,8 +30,8 @@ Exécuter des tâches décrites dans `docs/tasks/NNN__slug.md` selon un workflow
 - **Anti-fuite** : ne jamais introduire de look-ahead. Données point-in-time. Embargo `embargo_bars >= H`. Scaler fit sur train uniquement. Splits walk-forward séquentiels (train < val < test).
 - **Reproductibilité** : seeds fixées et tracées. Hashes SHA-256 (données, config).
 - **Traçabilité** : commits liés au workstream et au numéro de tâche.
-- **Branche dédiée** : `task/NNN-short-slug` depuis `main`. Jamais de commit direct sur `main`.
-- **Pull Request obligatoire** vers `main` après commit GREEN.
+- **Branche dédiée** : `task/NNN-short-slug` depuis `Max6000i1`. Jamais de commit direct sur `Max6000i1`.
+- **Pull Request obligatoire** vers `Max6000i1` après commit GREEN.
 - **Ambiguïté** : si specs ou tâche ambiguës → demander des clarifications avant d'implémenter.
 
 ## Discipline de contexte
@@ -48,7 +48,7 @@ Si RED : corriger d'abord les régressions avant de commencer la tâche.
 
 ### 0b. Créer la branche dédiée
 ```bash
-git checkout main
+git checkout Max6000i1
 git pull
 git checkout -b task/NNN-short-slug
 ```

@@ -17,7 +17,7 @@ Auditer un ou plusieurs gates du plan d'implémentation AI Trading Pipeline et p
 - **Code source** : `ai_trading/`
 - **Tests** : `tests/`
 - **Configs** : `configs/default.yaml`
-- **Artefacts attendus** : `runs/`, `reports/`
+- **Artefacts attendus** : `runs/`
 
 ## Rôle de l'agent
 

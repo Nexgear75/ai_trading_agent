@@ -31,44 +31,9 @@
 
 ## Template 2 — Tâche d'implémentation
 
-```markdown
-# Tâche #NNN — <Titre court>
-
-> <Résumé : ce que la tâche produit.>
-
-| Champ | Valeur |
-|---|---|
-| **ID** | #NNN |
-| **Workstream** | WS-X |
-| **Milestone** | MN |
-| **Statut** | TODO / IN_PROGRESS / DONE |
-| **Dépendances** | #NNN, #NNN |
-| **Branche** | `task/NNN-short-slug` |
-
-## Objectif
-
-<Ce que cette tâche accomplit en 2-3 phrases.>
-
-## Critères d'acceptation
-
-- [ ] <Critère mesurable 1>
-- [ ] <Critère mesurable 2>
-- [ ] <Critère mesurable 3>
-
-## Références spec
-
-- §X.Y — <titre de la section>
-
-## Checklist
-
-- [ ] Tests écrits (RED)
-- [ ] Implémentation (GREEN)
-- [ ] `pytest` GREEN, 0 échec
-- [ ] `ruff check ai_trading/ tests/` clean
-- [ ] Config-driven (pas de hardcoding)
-- [ ] Anti-fuite vérifié
-- [ ] Tâche mise à jour (statut DONE, critères cochés)
-```
+> **Note** : le template canonique des tâches est défini dans le skill `task-creator`
+> (`.github/skills/task-creator/SKILL.md` § Format des fichiers de tâche).
+> Utiliser ce template-là pour toute création de tâche `docs/tasks/NNN__slug.md`.
 
 ## Template 3 — Guide technique
 

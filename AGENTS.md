@@ -74,6 +74,18 @@ Si specs ou tâche ambiguës → demander des clarifications avant d'implémente
 ## Priorisation
 M1 → M2 → M3 → M4 → M5 (séquentiel, chaque milestone dépend du précédent).
 
+## Skills
+
+Les skills `.github/skills/*/SKILL.md` fournissent des workflows spécialisés invocables par Copilot.
+
+| Skill | Déclencheur | Description |
+|---|---|---|
+| `implementing-task` | « implémente la tâche #NNN » | TDD strict RED→GREEN, conventions du repo |
+| `pr-reviewer` | « review la PR », « vérifie avant merge » | Revue systématique de PR |
+| `task-creator` | « crée les tâches pour WS-X » | Génération de tâches structurées depuis spec/plan |
+| `gate-validator` | « valide le gate M2 » | Audit Go/No-Go des gates M1–M5, G-* |
+| `markdown-redaction` | « rédige un document Markdown » | Conventions GFM, mode Corporate FR, templates |
+
 ## Instructions automatiques
 
 Les fichiers `.github/instructions/*.instructions.md` sont injectés automatiquement par VS Code Copilot selon le pattern `applyTo` défini dans leur front matter.
