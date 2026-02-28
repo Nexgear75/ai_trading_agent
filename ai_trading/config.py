@@ -332,16 +332,19 @@ class PipelineConfig(_StrictBase):
                 f"MVP requires exactly 1 symbol, got {len(self.dataset.symbols)}"
             )
 
-        # --- Warmup >= max(rsi_period, ema_slow, max(vol_windows)) ---
+        # --- Warmup >= max(rsi_period, ema_slow, max(vol_windows), 72) ---
+        # vol_24/vol_72 use fixed windows of 24/72 (spec §6.5) regardless of
+        # vol_windows config, so 72 must always be included in this bound.
         feature_min = max(
             self.features.params.rsi_period,
             self.features.params.ema_slow,
             max(self.features.params.vol_windows),
+            72,  # vol_72 fixed window (spec §6.5)
         )
         if self.window.min_warmup < feature_min:
             errors.append(
                 f"window.min_warmup ({self.window.min_warmup}) must be >= "
-                f"max(rsi_period, ema_slow, max(vol_windows)) = {feature_min}"
+                f"max(rsi_period, ema_slow, max(vol_windows), 72) = {feature_min}"
             )
 
         # --- Warmup >= L ---
