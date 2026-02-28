@@ -103,7 +103,7 @@ class TestMinPeriods:
 # ---------------------------------------------------------------------------
 
 class TestRequiredParams:
-    """Verify required_params includes vol_windows and volatility_ddof."""
+    """Verify required_params includes volatility_ddof and does not require vol_windows."""
 
     def test_vol_24_required_params(self):
         """#009 vol_24 must require volatility_ddof."""
