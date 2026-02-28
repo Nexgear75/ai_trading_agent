@@ -8,7 +8,7 @@
 logging:
   level: INFO                     # DEBUG | INFO | WARNING | ERROR
   format: text                    # text | json
-  file: null                      # null = stdout only, sinon chemin relatif au run_dir
+  file: "pipeline.log"            # "pipeline.log" par défaut, null = stdout only
 
 # --- Dataset -----------------------------------------------------------------
 dataset:
@@ -136,7 +136,10 @@ training:
   learning_rate: 1.0e-3           # DL uniquement (CNN1D, GRU, LSTM, PatchTST). Ignoré par XGBoost et RL PPO qui ont leur propre LR ci-dessous.
   batch_size: 64
   max_epochs: 100
-  early_stopping_patience: 10     # Epochs (DL) ou rounds (XGBoost)
+  early_stopping_patience: 10     # Epochs sans amélioration (DL) ou boosting rounds
+                                    # sans amélioration (XGBoost). NOTE : 10 epochs DL ≠
+                                    # 10 rounds XGBoost en coût computationnel ; la valeur
+                                    # par défaut est un compromis raisonnable pour les deux.
 
 # --- Hyperparamètres par modèle ----------------------------------------------
 # NOTE : Certains hyperparamètres ci-dessous (subsample, colsample_bytree,

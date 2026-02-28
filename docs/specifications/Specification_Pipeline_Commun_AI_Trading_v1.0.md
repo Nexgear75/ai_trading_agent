@@ -511,6 +511,7 @@ Le `manifest.json` doit enregistrer précisément ces bornes pour audit.
 - Purge: aucun label train/val ne dépend d'un prix dans la zone test.
 - Causalité: toutes les features à $t$ sont calculées sans utiliser de données $> t$.
 - Traçabilité: sauvegarder pour chaque fold les bornes temporelles + le nombre de samples ($N_{\text{train}}$, $N_{\text{val}}$, $N_{\text{test}}$).
+- Non-chevauchement inter-fold: `step_days >= test_days` (garantit l'absence de chevauchement entre les périodes test de folds consécutifs ; évite les doubles comptages de bougies test dans l'équité stitchée).
 
 # 9. Normalisation / scaling (fit sur train uniquement)
 
@@ -605,6 +606,9 @@ Le pipeline impose un early stopping sur validation temporelle (sous-split de tr
 - la loss train et val,
 - l'epoch/best_iteration retenue,
 - les hyperparamètres effectifs.
+
+Le paramètre `training.early_stopping_patience` définit le nombre d'itérations sans amélioration avant arrêt. Sa sémantique dépend du framework : **epochs** pour les modèles DL (CNN1D, GRU, LSTM, PatchTST), **boosting rounds** pour XGBoost. La valeur par défaut (10) est un compromis raisonnable pour les deux cas. Note : 10 epochs DL ≠ 10 rounds XGBoost en coût computationnel ; cette asymétrie est acceptée au MVP.
+
 Le tuning est volontairement limité (2-3 hyperparamètres max) pour réduire le risque de sur-optimisation.
 
 
@@ -2067,7 +2071,7 @@ Exemples minimaux (valeurs fictives) pour illustrer la structure. Ces fichiers s
       {
         "path": "data/raw/BTCUSDT_1h_2024-01-01_2026-01-01.parquet",
         "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-        "n_rows": 17520
+        "n_rows": 17544
       }
     ]
   },

@@ -237,6 +237,14 @@
         },
         "notes": {
           "type": "string"
+        },
+        "comparison_type": {
+          "type": "string",
+          "enum": [
+            "contextual",
+            "go_nogo"
+          ],
+          "description": "Type de comparaison : contextual (buy_hold) ou go_nogo (modèles et autres baselines). Dérivé automatiquement de strategy.name par WS-10.3."
         }
       }
     }
