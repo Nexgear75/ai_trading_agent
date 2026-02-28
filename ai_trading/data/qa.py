@@ -191,16 +191,10 @@ def _check_irregular_delta(
 
     diffs = ts_sorted.diff().dropna()
     # A diff is regular if it's an exact positive multiple of expected_delta
-    irregular_count = 0
-    for diff_val in diffs:
-        if diff_val <= pd.Timedelta(0):
-            continue
-        # Check if diff is an exact multiple of expected_delta
-        ratio = diff_val / expected_delta
-        if abs(ratio - round(ratio)) > 1e-9:
-            irregular_count += 1
-
-    return irregular_count
+    ratio = diffs / expected_delta
+    positive = ratio > 0
+    irregular = (ratio - ratio.round()).abs() > 1e-9
+    return int((positive & irregular).sum())
 
 
 def run_qa_checks(df: pd.DataFrame, timeframe: str) -> QAReport:

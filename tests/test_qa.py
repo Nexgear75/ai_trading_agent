@@ -63,6 +63,8 @@ class TestCleanDataPass:
         assert len(report.missing_timestamps) == 0
         assert report.negative_price_count == 0
         assert report.ohlc_inconsistency_count == 0
+        assert report.zero_volume_streak_count == 0
+        assert report.irregular_delta_count == 0
 
     def test_clean_data_different_timeframes(self):
         """Clean data with different timeframes should all pass."""
@@ -179,7 +181,7 @@ class TestNegativePrices:
         df = _make_ohlcv(n=10, timeframe="1h")
         df.loc[2, "open"] = -1.0
         df.loc[5, "close"] = -2.0
-        with pytest.raises(ValueError, match="[Nn]egative.*price"):
+        with pytest.raises(ValueError, match="2 row"):
             run_qa_checks(df, timeframe="1h")
 
 
