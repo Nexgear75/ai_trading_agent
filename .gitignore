@@ -28,8 +28,6 @@ Thumbs.db
 ~$*
 *.docx
 
-# === Agents ===
-AGENTS.md
 
 # === Logs ===
 *.log
