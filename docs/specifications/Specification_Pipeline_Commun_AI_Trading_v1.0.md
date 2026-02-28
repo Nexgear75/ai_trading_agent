@@ -172,19 +172,19 @@ Figure 1 - Dataflow du pipeline commun (vue fonctionnelle).
 
 ```mermaid
 flowchart TD
-  A["Ingestion OHLCV Binance\n(raw Parquet/CSV)"] --> B["QA & Cleaning\n(timestamps, trous, outliers)"]
-  B --> C["Feature Engineering\n(causal, past-only)"]
-  C --> D["Build Samples\nX_seq(N,L,F), y_t, meta"]
-  D --> E["Walk-Forward Splitter\n(train/val/test + embargo)"]
-  E -->|Fold i| F["Scaler fit sur TRAIN\ntransform val/test"]
-  F --> G["Entraînement modèle\n(XGBoost/CNN/GRU/LSTM/PatchTST/RL-PPO)"]
+  A["Ingestion OHLCV Binance<br/>(raw Parquet/CSV)"] --> B["QA & Cleaning<br/>(timestamps, trous, outliers)"]
+  B --> C["Feature Engineering<br/>(causal, past-only)"]
+  C --> D["Build Samples<br/>X_seq(N,L,F), y_t, meta"]
+  D --> E["Walk-Forward Splitter<br/>(train/val/test + embargo)"]
+  E -->|Fold i| F["Scaler fit sur TRAIN<br/>transform val/test"]
+  F --> G["Entraînement modèle<br/>(XGBoost/CNN/GRU/LSTM/PatchTST/RL-PPO)"]
   G --> H["Prédictions sur VALIDATION"]
-  H --> I["Calibration seuil θ\nobjectif trading\n(biais anti faux positifs)"]
+  H --> I["Calibration seuil θ<br/>objectif trading<br/>(biais anti faux positifs)"]
   I --> J["Prédictions sur TEST"]
-  J --> K["Backtest commun\nentry Open t+1, exit Close t+H\ncoûts (fees+slippage)"]
-  K --> L["Métriques\nML + Trading"]
-  L --> M["Artefacts fold\n(preds, trades, metrics, model)"]
-  M --> N["Agrégation inter-fold\n+ rapport final"]
+  J --> K["Backtest commun<br/>entry Open t+1, exit Close t+H<br/>coûts (fees+slippage)"]
+  K --> L["Métriques<br/>ML + Trading"]
+  L --> M["Artefacts fold<br/>(preds, trades, metrics, model)"]
+  M --> N["Agrégation inter-fold<br/>+ rapport final"]
   subgraph Baselines
     B0["no-trade"] --> K
     B1["buy&hold"] --> K
