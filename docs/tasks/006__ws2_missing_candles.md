@@ -45,10 +45,10 @@ Implémenter la politique MVP de traitement des bougies manquantes : pas d'inter
 
 ## Pré-condition de démarrage
 - **Tous les tests existants sont GREEN** avant de commencer.
-- **Créer une branche dédiée** `task/006-missing-candles` depuis `main`.
+- **Créer une branche dédiée** `task/006-missing-candles` depuis `Max6000i1`.
 
 ## Checklist de fin de tâche
-- [ ] Branche `task/006-missing-candles` créée depuis `main`.
+- [ ] Branche `task/006-missing-candles` créée depuis `Max6000i1`.
 - [ ] Tests RED écrits avant implémentation.
 - [ ] **Commit RED** : `[WS-2] #006 RED: tests politique missing candles`.
 - [ ] Tests GREEN passants et reproductibles.
@@ -56,4 +56,4 @@ Implémenter la politique MVP de traitement des bougies manquantes : pas d'inter
 - [ ] `ruff check ai_trading/ tests/` passe sans erreur.
 - [ ] Fichier de tâche mis à jour (statut DONE, critères cochés).
 - [ ] **Commit GREEN** : `[WS-2] #006 GREEN: politique missing candles`.
-- [ ] **Pull Request ouverte** vers `main` : `[WS-2] #006 — Politique missing candles`.
+- [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-2] #006 — Politique missing candles`.

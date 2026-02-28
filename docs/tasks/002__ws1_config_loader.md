@@ -53,10 +53,10 @@ Implémenter un module `ai_trading/config.py` qui :
 
 ## Pré-condition de démarrage
 - **Tous les tests existants sont GREEN** avant de commencer.
-- **Créer une branche dédiée** `task/002-config-loader` depuis `main`.
+- **Créer une branche dédiée** `task/002-config-loader` depuis `Max6000i1`.
 
 ## Checklist de fin de tâche
-- [x] Branche `task/002-config-loader` créée depuis `main`.
+- [x] Branche `task/002-config-loader` créée depuis `Max6000i1`.
 - [x] Tests RED écrits avant implémentation.
 - [x] **Commit RED** : `[WS-1] #002 RED: tests config loader Pydantic v2`.
 - [x] Tests GREEN passants et reproductibles.
@@ -64,4 +64,4 @@ Implémenter un module `ai_trading/config.py` qui :
 - [x] `ruff check ai_trading/ tests/` passe sans erreur.
 - [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
 - [x] **Commit GREEN** : `[WS-1] #002 GREEN: config loader Pydantic v2`.
-- [x] **Pull Request ouverte** vers `main` : `[WS-1] #002 — Config loader Pydantic v2`.
+- [x] **Pull Request ouverte** vers `Max6000i1` : `[WS-1] #002 — Config loader Pydantic v2`.

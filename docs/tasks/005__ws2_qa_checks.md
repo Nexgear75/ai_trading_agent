@@ -51,10 +51,10 @@ Implémenter un module `ai_trading/data/qa.py` qui effectue les contrôles quali
 
 ## Pré-condition de démarrage
 - **Tous les tests existants sont GREEN** avant de commencer.
-- **Créer une branche dédiée** `task/005-qa-checks` depuis `main`.
+- **Créer une branche dédiée** `task/005-qa-checks` depuis `Max6000i1`.
 
 ## Checklist de fin de tâche
-- [ ] Branche `task/005-qa-checks` créée depuis `main`.
+- [ ] Branche `task/005-qa-checks` créée depuis `Max6000i1`.
 - [ ] Tests RED écrits avant implémentation.
 - [ ] **Commit RED** : `[WS-2] #005 RED: tests contrôles qualité QA`.
 - [ ] Tests GREEN passants et reproductibles.
@@ -62,4 +62,4 @@ Implémenter un module `ai_trading/data/qa.py` qui effectue les contrôles quali
 - [ ] `ruff check ai_trading/ tests/` passe sans erreur.
 - [ ] Fichier de tâche mis à jour (statut DONE, critères cochés).
 - [ ] **Commit GREEN** : `[WS-2] #005 GREEN: contrôles qualité QA`.
-- [ ] **Pull Request ouverte** vers `main` : `[WS-2] #005 — Contrôles qualité QA`.
+- [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-2] #005 — Contrôles qualité QA`.

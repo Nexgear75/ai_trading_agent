@@ -52,10 +52,10 @@ Compléter la structure du projet avec le module de logging configurable en deux
 
 ## Pré-condition de démarrage
 - **Tous les tests existants sont GREEN** avant de commencer.
-- **Créer une branche dédiée** `task/001-project-structure` depuis `main`.
+- **Créer une branche dédiée** `task/001-project-structure` depuis `Max6000i1`.
 
 ## Checklist de fin de tâche
-- [x] Branche `task/001-project-structure` créée depuis `main`.
+- [x] Branche `task/001-project-structure` créée depuis `Max6000i1`.
 - [x] Tests RED écrits avant implémentation.
 - [x] **Commit RED** : `[WS-1] #001 RED: tests logging setup deux phases`.
 - [x] Tests GREEN passants et reproductibles.
@@ -63,4 +63,4 @@ Compléter la structure du projet avec le module de logging configurable en deux
 - [x] `ruff check ai_trading/ tests/` passe sans erreur.
 - [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
 - [x] **Commit GREEN** : `[WS-1] #001 GREEN: logging setup deux phases`.
-- [x] **Pull Request ouverte** vers `main` : `[WS-1] #001 — Structure du projet et logging`.
+- [x] **Pull Request ouverte** vers `Max6000i1` : `[WS-1] #001 — Structure du projet et logging`.

@@ -88,10 +88,10 @@ Dépendances :
 
 ## Pré-condition de démarrage
 - **Tous les tests existants sont GREEN** avant de commencer.
-- **Créer une branche dédiée** `task/NNN-short-slug` depuis `main`.
+- **Créer une branche dédiée** `task/NNN-short-slug` depuis `Max6000i1`.
 
 ## Checklist de fin de tâche
-- [ ] Branche `task/NNN-short-slug` créée depuis `main`.
+- [ ] Branche `task/NNN-short-slug` créée depuis `Max6000i1`.
 - [ ] Tests RED écrits avant implémentation.
 - [ ] **Commit RED** : `[WS-X] #NNN RED: <résumé>` (fichiers de tests uniquement).
 - [ ] Tests GREEN passants et reproductibles.
@@ -99,7 +99,7 @@ Dépendances :
 - [ ] `ruff check ai_trading/ tests/` passe sans erreur.
 - [ ] Fichier de tâche mis à jour (statut DONE, critères cochés).
 - [ ] **Commit GREEN** : `[WS-X] #NNN GREEN: <résumé>`.
-- [ ] **Pull Request ouverte** vers `main` : `[WS-X] #NNN — <titre>`.
+- [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-X] #NNN — <titre>`.
 ```
 
 ## Convention de nommage
@@ -133,8 +133,8 @@ Deux commits par tâche :
 2. **Commit GREEN** : `[WS-X] #NNN GREEN: <résumé>` (implémentation + tâche mise à jour)
 
 ### 4) Branche et PR
-- Branche : `task/NNN-short-slug` depuis `main`
-- PR vers `main` : `[WS-X] #NNN — <titre>`
+- Branche : `task/NNN-short-slug` depuis `Max6000i1`
+- PR vers `Max6000i1` : `[WS-X] #NNN — <titre>`
 
 ### 5) Dépendances explicites
 Si une tâche dépend d'une autre, la dépendance est écrite dans `Contexte > Dépendances`.

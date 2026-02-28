@@ -56,10 +56,10 @@ Implémenter un module `ai_trading/data/ingestion.py` qui télécharge les donn�
 
 ## Pré-condition de démarrage
 - **Tous les tests existants sont GREEN** avant de commencer.
-- **Créer une branche dédiée** `task/004-ingestion-ohlcv` depuis `main`.
+- **Créer une branche dédiée** `task/004-ingestion-ohlcv` depuis `Max6000i1`.
 
 ## Checklist de fin de tâche
-- [ ] Branche `task/004-ingestion-ohlcv` créée depuis `main`.
+- [ ] Branche `task/004-ingestion-ohlcv` créée depuis `Max6000i1`.
 - [ ] Tests RED écrits avant implémentation.
 - [ ] **Commit RED** : `[WS-2] #004 RED: tests ingestion OHLCV Binance`.
 - [ ] Tests GREEN passants et reproductibles.
@@ -67,4 +67,4 @@ Implémenter un module `ai_trading/data/ingestion.py` qui télécharge les donn�
 - [ ] `ruff check ai_trading/ tests/` passe sans erreur.
 - [ ] Fichier de tâche mis à jour (statut DONE, critères cochés).
 - [ ] **Commit GREEN** : `[WS-2] #004 GREEN: ingestion OHLCV Binance`.
-- [ ] **Pull Request ouverte** vers `main` : `[WS-2] #004 — Ingestion OHLCV Binance`.
+- [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-2] #004 — Ingestion OHLCV Binance`.

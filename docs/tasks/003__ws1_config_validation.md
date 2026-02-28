@@ -113,10 +113,10 @@ VALID_STRATEGIES = {
 
 ## Pré-condition de démarrage
 - **Tous les tests existants sont GREEN** avant de commencer.
-- **Créer une branche dédiée** `task/003-config-validation` depuis `main`.
+- **Créer une branche dédiée** `task/003-config-validation` depuis `Max6000i1`.
 
 ## Checklist de fin de tâche
-- [ ] Branche `task/003-config-validation` créée depuis `main`.
+- [ ] Branche `task/003-config-validation` créée depuis `Max6000i1`.
 - [ ] Tests RED écrits avant implémentation.
 - [ ] **Commit RED** : `[WS-1] #003 RED: tests validation stricte configuration`.
 - [ ] Tests GREEN passants et reproductibles.
@@ -124,4 +124,4 @@ VALID_STRATEGIES = {
 - [ ] `ruff check ai_trading/ tests/` passe sans erreur.
 - [ ] Fichier de tâche mis à jour (statut DONE, critères cochés).
 - [ ] **Commit GREEN** : `[WS-1] #003 GREEN: validation stricte configuration`.
-- [ ] **Pull Request ouverte** vers `main` : `[WS-1] #003 — Validation stricte de la configuration`.
+- [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-1] #003 — Validation stricte de la configuration`.
