@@ -291,3 +291,103 @@ class TestEdgeCases:
         """Decorating a function (not a class) raises TypeError."""
         with pytest.raises(TypeError, match="not a BaseFeature subclass"):
             register_feature("func")(lambda: None)
+
+
+# ---------------------------------------------------------------------------
+# AC (task #023): min_periods contract enforcement
+# ---------------------------------------------------------------------------
+
+
+class TestMinPeriodsContract:
+    """#023: min_periods must equal the number of leading NaN in compute() output."""
+
+    def test_min_periods_matches_leading_nan_logret(self):
+        """#023: logret features — min_periods == count of leading NaN."""
+        import numpy as np
+
+        from ai_trading.features.log_returns import LogReturn1, LogReturn2, LogReturn4
+
+        n_bars = 50
+        close = np.linspace(100.0, 150.0, n_bars)
+        ohlcv = pd.DataFrame({
+            "open": close,
+            "high": close,
+            "low": close,
+            "close": close,
+            "volume": np.ones(n_bars),
+        }, index=pd.date_range("2024-01-01", periods=n_bars, freq="h"))
+
+        for cls in [LogReturn1, LogReturn2, LogReturn4]:
+            feat = cls()
+            result = feat.compute(ohlcv, {})
+            leading_nan = 0
+            for v in result:
+                if np.isnan(v):
+                    leading_nan += 1
+                else:
+                    break
+            assert feat.min_periods == leading_nan, (
+                f"{cls.__name__}: min_periods={feat.min_periods} "
+                f"but leading NaN count={leading_nan}"
+            )
+
+    def test_min_periods_matches_leading_nan_volatility(self):
+        """#023: vol features — min_periods == count of leading NaN."""
+        import numpy as np
+
+        from ai_trading.features.volatility import Volatility24, Volatility72
+
+        n_bars = 200
+        close = np.linspace(100.0, 200.0, n_bars)
+        ohlcv = pd.DataFrame({
+            "open": close,
+            "high": close,
+            "low": close,
+            "close": close,
+            "volume": np.ones(n_bars),
+        }, index=pd.date_range("2024-01-01", periods=n_bars, freq="h"))
+        params = {"volatility_ddof": 0}
+
+        for cls in [Volatility24, Volatility72]:
+            feat = cls()
+            result = feat.compute(ohlcv, params)
+            leading_nan = 0
+            for v in result:
+                if np.isnan(v):
+                    leading_nan += 1
+                else:
+                    break
+            assert feat.min_periods == leading_nan, (
+                f"{cls.__name__}: min_periods={feat.min_periods} "
+                f"but leading NaN count={leading_nan}"
+            )
+
+    def test_min_periods_matches_leading_nan_rsi(self):
+        """#023: RSI — min_periods == count of leading NaN."""
+        import numpy as np
+
+        from ai_trading.features.rsi import RSI14
+
+        n_bars = 50
+        close = np.linspace(100.0, 150.0, n_bars)
+        ohlcv = pd.DataFrame({
+            "open": close,
+            "high": close,
+            "low": close,
+            "close": close,
+            "volume": np.ones(n_bars),
+        }, index=pd.date_range("2024-01-01", periods=n_bars, freq="h"))
+        params = {"rsi_period": 14, "rsi_epsilon": 1e-12}
+
+        feat = RSI14()
+        result = feat.compute(ohlcv, params)
+        leading_nan = 0
+        for v in result:
+            if np.isnan(v):
+                leading_nan += 1
+            else:
+                break
+        assert feat.min_periods == leading_nan, (
+            f"RSI14: min_periods={feat.min_periods} "
+            f"but leading NaN count={leading_nan}"
+        )
