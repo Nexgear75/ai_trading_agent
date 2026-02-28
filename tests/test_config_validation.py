@@ -491,6 +491,30 @@ class TestNumLayersBounds:
             load_config(tmp_yaml(data))
 
 
+class TestPatchTSTFieldBounds:
+    """#003 — PatchTST patch_size, stride, d_model, n_heads >= 1."""
+
+    def test_patch_size_zero_raises(self, default_yaml_data, tmp_yaml):
+        data = _mutate(default_yaml_data, "models.patchtst.patch_size", 0)
+        with pytest.raises(ValidationError, match="patch_size"):
+            load_config(tmp_yaml(data))
+
+    def test_stride_zero_raises(self, default_yaml_data, tmp_yaml):
+        data = _mutate(default_yaml_data, "models.patchtst.stride", 0)
+        with pytest.raises(ValidationError, match="stride"):
+            load_config(tmp_yaml(data))
+
+    def test_d_model_zero_raises(self, default_yaml_data, tmp_yaml):
+        data = _mutate(default_yaml_data, "models.patchtst.d_model", 0)
+        with pytest.raises(ValidationError, match="d_model"):
+            load_config(tmp_yaml(data))
+
+    def test_n_heads_zero_raises(self, default_yaml_data, tmp_yaml):
+        data = _mutate(default_yaml_data, "models.patchtst.n_heads", 0)
+        with pytest.raises(ValidationError, match="n_heads"):
+            load_config(tmp_yaml(data))
+
+
 # ===========================================================================
 # SMA cross constraint (if strategy is sma_rule)
 # ===========================================================================

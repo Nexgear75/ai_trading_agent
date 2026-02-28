@@ -223,10 +223,10 @@ class LSTMModelConfig(_StrictBase):
 
 
 class PatchTSTModelConfig(_StrictBase):
-    patch_size: int
-    stride: int
-    d_model: int
-    n_heads: int
+    patch_size: int = Field(ge=1)
+    stride: int = Field(ge=1)
+    d_model: int = Field(ge=1)
+    n_heads: int = Field(ge=1)
     n_layers: int = Field(ge=1)
     ff_dim: int
     dropout: float = Field(ge=0, lt=1)
