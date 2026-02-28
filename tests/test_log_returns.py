@@ -123,7 +123,7 @@ class TestNumericalCorrectness:
         result = feature.compute(ohlcv_10bars, {})
         close = ohlcv_10bars["close"]
         expected = np.log(close / close.shift(1))
-        pd.testing.assert_series_equal(result, expected, atol=1e-12)
+        pd.testing.assert_series_equal(result, expected, check_names=False, atol=1e-12)
 
     def test_logret_2_values(self, ohlcv_10bars: pd.DataFrame) -> None:
         """#008: logret_2 = log(close / close.shift(2))."""
@@ -131,7 +131,7 @@ class TestNumericalCorrectness:
         result = feature.compute(ohlcv_10bars, {})
         close = ohlcv_10bars["close"]
         expected = np.log(close / close.shift(2))
-        pd.testing.assert_series_equal(result, expected, atol=1e-12)
+        pd.testing.assert_series_equal(result, expected, check_names=False, atol=1e-12)
 
     def test_logret_4_values(self, ohlcv_10bars: pd.DataFrame) -> None:
         """#008: logret_4 = log(close / close.shift(4))."""
@@ -139,7 +139,7 @@ class TestNumericalCorrectness:
         result = feature.compute(ohlcv_10bars, {})
         close = ohlcv_10bars["close"]
         expected = np.log(close / close.shift(4))
-        pd.testing.assert_series_equal(result, expected, atol=1e-12)
+        pd.testing.assert_series_equal(result, expected, check_names=False, atol=1e-12)
 
     def test_logret_1_hand_calculated(self) -> None:
         """#008: logret_1 hand-verified on 3-bar example."""
@@ -384,7 +384,10 @@ class TestEdgeCases:
         assert result.isna().all()
 
     def test_logret_4_with_exactly_4_bars_all_nan(self) -> None:
-        """#008: logret_4 with exactly 4 bars → all NaN (shift(4) needs at least 5 rows for first non-NaN)."""
+        """#008: logret_4 with exactly 4 bars → all NaN.
+
+        shift(4) needs at least 5 rows for first non-NaN.
+        """
         close = np.array([100.0, 110.0, 105.0, 120.0])
         ohlcv = pd.DataFrame({
             "open": close,
