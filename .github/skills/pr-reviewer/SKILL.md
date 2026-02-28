@@ -116,6 +116,15 @@ Tu dois :
 - [ ] `.gitignore` couvre les artefacts générés.
 - [ ] **DRY — pas de duplication de constantes/mappings** entre modules du même package. Si un dict, une constante ou un mapping est identique dans 2+ fichiers, exiger l'extraction vers un module partagé. Classer comme **bloquant** (risque de drift silencieux).
 
+### 6-bis. Bonnes pratiques métier (concepts de domaine)
+
+- [ ] **Exactitude des concepts financiers** : les indicateurs techniques (RSI, EMA, volatilité, log-returns, etc.) sont implémentés conformément à leur définition canonique (formules standard de référence). Toute déviation par rapport à la formule standard doit être justifiée et documentée.
+- [ ] **Nommage métier cohérent** : les noms de variables, fonctions et classes reflètent fidèlement les concepts financiers qu'ils modélisent (ex. `log_return` et non `lr`, `equity_curve` et non `curve`). Pas d'abréviation ambiguë.
+- [ ] **Séparation des responsabilités métier** : chaque module encapsule un concept métier unique (ex. features ≠ labels ≠ backtest). Pas de mélange de responsabilités de domaine dans un même module.
+- [ ] **Invariants de domaine respectés** : les invariants propres au domaine financier sont vérifiés explicitement dans le code (ex. prix > 0, volume >= 0, equity curve monotone sur un trade, etc.).
+- [ ] **Cohérence des unités et échelles** : les grandeurs sont manipulées avec des unités cohérentes (returns en log vs arithmétique, prix en quote currency, timestamps en UTC). Pas de mélange implicite d'échelles.
+- [ ] **Patterns de calcul financier** : utilisation des bonnes pratiques pour les calculs numériques financiers (ex. `np.log` au lieu de `math.log` sur des Series, rolling windows via pandas natif, éviter les boucles Python sur les séries temporelles).
+
 ### 7. Cohérence avec les specs
 
 - [ ] Le code est conforme à la spec v1.0 (sections référencées dans la tâche).
@@ -183,9 +192,26 @@ Date : YYYY-MM-DD
 | Spécification | ✅/❌ |
 | Plan d'implémentation | ✅/❌ |
 
+## Bonnes pratiques métier
+| Critère | Verdict | Commentaire |
+|---|---|---|
+| Exactitude des concepts financiers | ✅/❌ | |
+| Nommage métier cohérent | ✅/❌ | |
+| Séparation des responsabilités métier | ✅/❌ | |
+| Invariants de domaine | ✅/❌ | |
+| Cohérence des unités/échelles | ✅/❌ | |
+| Patterns de calcul financier | ✅/❌ | |
+
+## Remarques mineures
+> **Toutes les remarques, même mineures ou cosmétiques, doivent figurer ici.**
+> Elles ne bloquent pas le merge mais doivent être corrigées à terme.
+
+- [Remarque mineure 1]
+- [Remarque mineure 2]
+
 ## Remarques et blocages
-- [Remarque 1]
-- [Remarque 2]
+- [Blocage 1]
+- [Blocage 2]
 
 ## Actions requises (si REQUEST CHANGES ou REJECT)
 1. [Action corrective 1]
@@ -205,6 +231,7 @@ Date : YYYY-MM-DD
 1. **Factuel** : chaque verdict basé sur des preuves concrètes (fichiers, lignes, exécution).
 2. **Exhaustif** : passer en revue tous les fichiers modifiés.
 3. **Constructif** : chaque blocage accompagné d'une action corrective claire.
-4. **Proportionné** : ne pas bloquer pour du cosmétique. Bloquer pour les violations de fond.
+4. **Proportionné mais exhaustif** : ne pas **bloquer** pour du cosmétique, mais **toujours signaler** les points mineurs (style, nommage sous-optimal, opportunités de simplification, etc.) dans la section « Remarques mineures » du rapport. Aucune observation ne doit être omise sous prétexte qu'elle est mineure.
 5. **Exécuter les tests** : toujours lancer `pytest` et `ruff check` soi-même.
 6. **Adversarial** : ne pas se limiter aux tests existants. Pour chaque fonction modifiée, imaginer mentalement 2-3 inputs extrêmes (param > taille données, param = 0, tableaux vides) et vérifier que le code ou les tests les couvrent. Si non → bloquant.
+7. **Domain-aware** : vérifier que l'implémentation des concepts métier (indicateurs techniques, mécaniques de trading, calculs financiers) respecte les bonnes pratiques du domaine et les définitions canoniques. Une erreur de concept métier est **bloquante**.
