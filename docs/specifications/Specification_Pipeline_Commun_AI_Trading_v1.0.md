@@ -134,7 +134,7 @@ Le but premier est une comparaison méthodologiquement robuste (éviter les fuit
 - No-trade (jamais en position).
 - Buy & hold (achat initial, conservation sur la période test).
 - Règle SMA (signal basé sur moyenne mobile simple).
-- Remarque: les baselines sont codées une fois (module commun) et réutilisées par tous.
+- Remarque: les baselines sont codées une fois (Vmodule commun) et réutilisées par tous.
 
 ## 1.3 Hypothèses et choix imposés (MVP)
 
@@ -154,15 +154,16 @@ On indexe les bougies par un temps discret $t$ correspondant à la clôture de l
 
 | Symbole | Définition |
 | --- | --- |
-| $t$ | Indice temporel discret (bougie). Les features à $t$ n'utilisent que l'information $\leq t$. |
+| `ddof` | *Delta Degrees of Freedom*. Paramètre contrôlant le dénominateur de l'écart-type: `ddof=0` → écart-type population (diviseur $n$), `ddof=1` → écart-type échantillon (diviseur $n-1$). Convention du pipeline: `ddof=0` (§6.5). |
 | $\Delta$ | Timeframe (ex: 1h). |
+| $F$ | Nombre de features par pas de temps. |
 | $H$ | Horizon de prédiction/exécution en nombre de bougies (ex: 4). |
 | $L$ | Longueur de la fenêtre d'entrée pour les modèles séquentiels (ex: 128). |
-| $F$ | Nombre de features par pas de temps. |
-| $X_t$ | Entrée modèle à l'instant $t$. Format séquentiel: $X_t \in \mathbb{R}^{L \times F}$. |
-| $y_t$ | Cible (rendement futur à horizon $H$). |
-| $\hat{y}_t$ | Prédiction du modèle pour $y_t$. |
+| $t$ | Indice temporel discret (bougie). Les features à $t$ n'utilisent que l'information $\leq t$. |
 | $\theta$ | Seuil Go/No-Go calibré sur validation. |
+| $X_t$ | Entrée modèle à l'instant $t$. Format séquentiel: $X_t \in \mathbb{R}^{L \times F}$. |
+| $\hat{y}_t$ | Prédiction du modèle pour $y_t$. |
+| $y_t$ | Cible (rendement futur à horizon $H$). |
 
 
 # 3. Vue d'ensemble du pipeline
@@ -216,6 +217,7 @@ Les données sources sont des séries OHLCV (Open, High, Low, Close, Volume) ré
 - Fichier Parquet par symbole (ou fichier multi-symboles avec colonne symbol).
 - Colonnes minimales: `timestamp_utc`, `open`, `high`, `low`, `close`, `volume`, `symbol`.
 - Tri strict par `timestamp_utc` croissant (et par `symbol` puis `timestamp` si multi-symboles).
+- **Convention** : `dataset.end` est une borne **exclusive** (convention `[start, end[`). La dernière bougie du dataset a `timestamp_utc < end`. Le splitter walk-forward utilise cette même convention pour les bornes de périodes.
 
 ## 4.2 Contrôles qualité (QA) obligatoires
 
@@ -580,10 +582,13 @@ Chaque modèle doit exposer les méthodes suivantes:
 
 
 ```python
-fit(X_train, y_train, X_val, y_val, config, run_dir) -> artifacts
-predict(X) -> y_hat
+fit(X_train, y_train, X_val, y_val, config, run_dir,
+    meta_train=None, meta_val=None, ohlcv=None) -> artifacts
+predict(X, meta=None, ohlcv=None) -> y_hat
 save(path) / load(path)    # optionnel mais recommandé
 ```
+
+Les paramètres optionnels `meta_train`/`meta_val` (DataFrame de métadonnées d'exécution : `decision_time`, `entry_time`, `exit_time`, `entry_price`, `exit_price`) et `ohlcv` (DataFrame OHLCV complet) sont nécessaires pour le modèle RL (construction de l'environnement) et la baseline SMA (signaux sur clôtures brutes). Les modèles supervisés les ignorent.
 
 
 ## 10.2 Conventions d'entrée/sortie
@@ -807,6 +812,8 @@ $$
 $$
 \text{Directional accuracy} = \text{mean}( \mathbb{1}[ \text{sign}(y) = \text{sign}(\hat{y}) ] )
 $$
+
+**Convention** : les samples dont $y_t = 0$ exactement sont **exclus** du calcul de Directional Accuracy (direction indéterminée). Si tous les samples ont $y_t = 0$, DA = `null`.
 $$
 \text{IC (Spearman)} = \text{corr}_{\text{spearman}}(y, \hat{y}) \quad \text{(optionnel)}
 $$
@@ -1008,40 +1015,63 @@ Les dépendances exactes sont figées dans `requirements.txt`. Le `Dockerfile` f
 ai_trading_agent/
 ├── Makefile                      # Point d'entrée utilisateur (§17.3)
 ├── Dockerfile                    # Environnement reproductible
+├── pyproject.toml                # Métadonnées projet et build
 ├── requirements.txt              # Dépendances fixées
 ├── configs/
 │   └── default.yaml              # Configuration par défaut (MVP)
 ├── data/
 │   └── raw/                      # Données OHLCV brutes (Parquet) — non versionné dans git
 ├── runs/                         # Artefacts de sortie (§15.1) — non versionné dans git
-├── src/
-│   └── ai_trading/
+├── ai_trading/                   # Package principal (flat layout)
+│   ├── __init__.py
+│   ├── __main__.py               # Point d'entrée Python (argparse)
+│   ├── config.py                 # Chargement et validation YAML (pydantic)
+│   ├── data/                     # Ingestion, QA, dataset, splitter, scaler
+│   │   ├── __init__.py
+│   │   ├── ingestion.py          # Téléchargement OHLCV via ccxt (§17.4)
+│   │   ├── qa.py                 # Contrôles qualité (§4.2)
+│   │   ├── dataset.py            # Construction samples (§7)
+│   │   ├── splitter.py           # Walk-forward splitter (§8)
+│   │   └── scaler.py             # Normalisation (§9)
+│   ├── features/                 # Feature engineering (§6)
+│   │   ├── __init__.py           # FEATURE_REGISTRY
+│   │   └── registry.py
+│   ├── models/                   # Plug-ins modèles (§10)
+│   │   ├── __init__.py           # MODEL_REGISTRY
+│   │   ├── base.py               # BaseModel (ABC)
+│   │   ├── xgboost_reg.py
+│   │   ├── cnn1d_reg.py
+│   │   ├── gru_reg.py
+│   │   ├── lstm_reg.py
+│   │   ├── patchtst_reg.py
+│   │   └── rl_ppo.py
+│   ├── baselines/                # Baselines (§13)
+│   │   ├── __init__.py
+│   │   ├── no_trade.py
+│   │   ├── buy_hold.py
+│   │   └── sma_rule.py
+│   ├── calibration/              # Calibration θ (§11)
+│   │   └── __init__.py
+│   ├── backtest/                 # Moteur de backtest commun (§12)
+│   │   └── __init__.py
+│   ├── metrics/                  # Calcul des métriques (§14)
+│   │   ├── __init__.py
+│   │   ├── prediction.py
+│   │   ├── trading.py
+│   │   └── aggregation.py
+│   ├── training/                 # Boucle d'entraînement
+│   │   └── __init__.py
+│   ├── artifacts/                # Sauvegarde manifest/metrics/artefacts (§15)
+│   │   ├── __init__.py
+│   │   ├── run_dir.py
+│   │   ├── manifest.py
+│   │   └── metrics_builder.py
+│   ├── pipeline/                 # Orchestration
+│   │   ├── __init__.py
+│   │   └── runner.py
+│   └── utils/                    # Utilitaires (seed, helpers)
 │       ├── __init__.py
-│       ├── __main__.py           # Point d'entrée Python (argparse)
-│       ├── config.py             # Chargement et validation YAML (pydantic)
-│       ├── ingestion.py          # Téléchargement OHLCV via ccxt (§17.4)
-│       ├── qa.py                 # Contrôles qualité (§4.2)
-│       ├── features.py           # Feature engineering (§6)
-│       ├── dataset.py            # Construction samples (§7)
-│       ├── splits.py             # Walk-forward splitter (§8)
-│       ├── scaling.py            # Normalisation (§9)
-│       ├── models/               # Plug-ins modèles (§10)
-│       │   ├── __init__.py       # MODEL_REGISTRY
-│       │   ├── xgboost_reg.py
-│       │   ├── cnn1d_reg.py
-│       │   ├── gru_reg.py
-│       │   ├── lstm_reg.py
-│       │   ├── patchtst_reg.py
-│       │   └── rl_ppo.py
-│       ├── baselines/            # Baselines (§13)
-│       │   ├── __init__.py
-│       │   ├── no_trade.py
-│       │   ├── buy_hold.py
-│       │   └── sma_rule.py
-│       ├── threshold.py          # Calibration θ (§11)
-│       ├── backtest.py           # Moteur de backtest commun (§12)
-│       ├── metrics.py            # Calcul des métriques (§14)
-│       └── artifacts.py          # Sauvegarde manifest/metrics/artefacts (§15)
+│       └── seed.py
 ├── tests/
 │   ├── conftest.py               # Fixtures partagées
 │   ├── test_ingestion.py
@@ -1104,7 +1134,7 @@ test:             ## Lancer les tests unitaires
 	pytest tests/ -v
 
 lint:             ## Lint + type check
-	ruff check src/ && mypy src/
+	ruff check ai_trading/ tests/ && mypy ai_trading/
 
 docker-build:     ## Construire l'image Docker
 	docker build -t ai-trading-pipeline .
@@ -1114,7 +1144,7 @@ docker-run:       ## Lancer le pipeline dans Docker
 	  ai-trading-pipeline
 
 clean:            ## Supprimer les artefacts temporaires (pas les données)
-	rm -rf runs/__pycache__ src/**/__pycache__ .pytest_cache
+	rm -rf runs/__pycache__ ai_trading/**/__pycache__ .pytest_cache
 
 help:             ## Afficher cette aide
 	@grep -E '^[a-zA-Z_-]+:.*##' Makefile | sort | \
@@ -1959,10 +1989,10 @@ Le schéma suivant définit formellement le contenu attendu de metrics.json. Il 
 
 Exemples minimaux (valeurs fictives) pour illustrer la structure. Ces fichiers sont fournis séparément (example_manifest.json, example_metrics.json).
 
-> **Note** : dans l'exemple de fold ci-dessous, les bornes temporelles sont arrondies aux jours calendaires.
-> L'écart entre `val.end_utc` et `test.start_utc` (≈ 25 h) est supérieur aux 4 bougies d'embargo
-> car l'implémentation aligne le début du test sur un jour entier. L'embargo minimum (`embargo_bars = H`)
-> reste garanti ; l'arrondi ajoute un gap supplémentaire sans conséquence méthodologique.
+> **Note** : dans l'exemple de fold ci-dessous, les bornes temporelles correspondent au calcul
+> exact du plan d'implémentation (WS-4.5) avec `train_days=180`, `val_frac_in_train=0.2`,
+> `embargo_bars=4`, `H=4`, `Δ=1h`. La période `train` dans le manifest correspond à `train_only`
+> (sans la portion val), conformément à la convention E.2.1.
 
 
 ### C.1 example_manifest.json
@@ -2045,15 +2075,15 @@ Exemples minimaux (valeurs fictives) pour illustrer la structure. Ces fichiers s
         "fold_id": 0,
         "train": {
           "start_utc": "2024-01-01T00:00:00Z",
-          "end_utc": "2024-05-26T23:00:00Z"
+          "end_utc": "2024-05-23T23:00:00Z"
         },
         "val": {
-          "start_utc": "2024-05-27T00:00:00Z",
-          "end_utc": "2024-06-29T23:00:00Z"
+          "start_utc": "2024-05-24T00:00:00Z",
+          "end_utc": "2024-06-28T23:00:00Z"
         },
         "test": {
-          "start_utc": "2024-07-01T00:00:00Z",
-          "end_utc": "2024-07-30T23:00:00Z"
+          "start_utc": "2024-06-29T04:00:00Z",
+          "end_utc": "2024-07-29T03:00:00Z"
         }
       }
     ]
@@ -2133,8 +2163,8 @@ Exemples minimaux (valeurs fictives) pour illustrer la structure. Ces fichiers s
     {
       "fold_id": 0,
       "period_test": {
-        "start_utc": "2024-07-01T00:00:00Z",
-        "end_utc": "2024-07-30T23:00:00Z"
+        "start_utc": "2024-06-29T04:00:00Z",
+        "end_utc": "2024-07-29T03:00:00Z"
       },
       "threshold": {
         "method": "quantile_grid",
@@ -2447,82 +2477,82 @@ Glossaire pédagogique des termes de Machine Learning (ML), Deep Learning (DL) e
 
 | Terme | Définition |
 | --- | --- |
-| **Machine Learning (ML)** | Ensemble de techniques permettant à un programme d'apprendre des règles à partir de données, sans être explicitement programmé pour chaque cas. Le programme ajuste ses paramètres internes pour minimiser une mesure d'erreur sur des exemples passés. |
-| **Deep Learning (DL)** | Sous-domaine du ML utilisant des réseaux de neurones artificiels à plusieurs couches (d'où le terme « profond »). Chaque couche transforme progressivement les données en représentations de plus en plus abstraites. |
-| **Reinforcement Learning (RL)** | Paradigme d'apprentissage dans lequel un agent interagit avec un environnement par des actions, reçoit des récompenses (rewards) et apprend une stratégie (politique) qui maximise la récompense cumulée au fil du temps. |
-| **Régression** | Tâche de prédiction d'une valeur numérique continue (ici : un rendement futur), par opposition à la classification qui prédit une catégorie. |
+| **Adam** | Optimiseur adaptatif populaire qui combine les avantages de l'AdaGrad et du RMSProp. Il adapte le learning rate individuellement pour chaque paramètre en utilisant des moyennes mobiles des gradients. |
+| **Adapter (adaptateur)** | Composant qui transforme les données d'un format à un autre (ici : aplatissement du tenseur 3D en matrice 2D pour XGBoost) sans modifier l'information sous-jacente. |
+| **Advantage** | Mesure de combien une action est meilleure que l'action moyenne dans un état donné. $A(s, a) = Q(s, a) - V(s)$, où $Q$ est la valeur de l'action et $V$ la valeur de l'état. |
+| **Agrégation inter-fold** | Calcul de statistiques (moyenne, écart-type) d'une métrique sur l'ensemble des folds du walk-forward, donnant une estimation robuste de la performance et de sa stabilité. |
+| **Arbre de décision** | Modèle qui partitionne l'espace des features par des règles de type « si feature_j > seuil, aller à gauche, sinon à droite ». Simple et interprétable, mais souvent limité seul. |
+| **Attention (Self-Attention)** | Mécanisme qui permet à chaque position de la séquence de « regarder » toutes les autres positions pour pondérer leur importance. Le modèle apprend quelles parties de la séquence sont pertinentes pour chaque prédiction. |
+| **Batch (lot)** | Sous-ensemble de samples traité en une seule itération avant mise à jour des paramètres. Le batch size est sa taille (ex : 64 samples). |
+| **Causalité (en features)** | Contrainte stipulant que la feature calculée au temps $t$ ne dépend que de données observées à des temps $\leq t$. Prévient le look-ahead bias. |
 | **Classification** | Tâche de prédiction d'une catégorie ou classe discrète parmi un ensemble fini (ex : « Go » ou « No-Go »). |
+| **Clip epsilon** | Seuil qui limite l'amplitude de la mise à jour de la politique dans PPO. Empêche des changements trop brusques qui pourraient déstabiliser l'entraînement. |
+| **CNN 1D (Convolutional Neural Network 1D)** | Réseau de neurones convolutif appliqué à des séquences temporelles. Des filtres glissants (kernels) détectent des patterns locaux dans la séquence (ex : motifs de prix sur quelques bougies). |
+| **Couche (Layer)** | Unité structurelle d'un réseau de neurones. Chaque couche transforme les données reçues de la couche précédente. Types courants : Dense/Linear, Conv1D, GRU, LSTM, Attention. |
+| **Dataset** | Ensemble structuré de samples. Peut être divisé en sous-ensembles (train, validation, test). |
+| **Deep Learning (DL)** | Sous-domaine du ML utilisant des réseaux de neurones artificiels à plusieurs couches (d'où le terme « profond »). Chaque couche transforme progressivement les données en représentations de plus en plus abstraites. |
+| **Déterminisme (en ML)** | Propriété d'un processus qui produit les mêmes résultats à chaque exécution, à configuration et seed identiques. Essentiel pour la reproductibilité des expériences. |
+| **Directional accuracy** | Proportion des prédictions dont le signe (direction : hausse ou baisse) correspond au signe réel du rendement. Métrique simple mais informative pour le trading. |
+| **Discount factor (γ, gamma)** | Facteur de pondération (0 < γ ≤ 1) qui réduit l'importance des rewards futurs par rapport aux rewards immédiats. γ = 0.99 signifie que l'agent accorde une grande importance au long terme. |
+| **Dropout** | Technique de régularisation qui désactive aléatoirement une fraction des neurones à chaque itération d'entraînement, forçant le réseau à ne pas dépendre d'un petit nombre de neurones spécifiques. |
+| **Early stopping (arrêt précoce)** | Technique de régularisation qui interrompt l'entraînement lorsque la performance sur la validation cesse de s'améliorer pendant un nombre donné d'itérations (patience), afin de prévenir l'overfitting. |
+| **Embargo** | Période tampon entre la fin du train/validation et le début du test, pendant laquelle aucun sample n'est utilisé. Prévient la fuite d'information liée au chevauchement des labels. |
+| **Entropy (entropie)** | Mesure du degré d'incertitude de la politique. Le coefficient d'entropie (entropy_coeff) encourage l'agent à explorer davantage en pénalisant les politiques trop déterministes. |
+| **Epoch (époque)** | Un passage complet sur l'ensemble du jeu d'entraînement. L'entraînement DL se fait typiquement sur plusieurs epochs successives. |
+| **Épisode** | Séquence complète d'interactions du début à la fin. En RL trading, un épisode correspond typiquement à un fold walk-forward complet. |
 | **Feature (variable explicative)** | Grandeur numérique calculée à partir des données brutes et utilisée comme entrée d'un modèle. Exemple : le RSI, la volatilité rolling, le log-return. Synonyme : variable prédictive, attribut. |
 | **Feature engineering** | Processus de création, sélection et transformation de features à partir des données brutes, dans le but d'améliorer la qualité des prédictions du modèle. |
-| **Label (cible, target)** | Valeur que le modèle cherche à prédire. Dans ce pipeline, le label est le rendement futur à horizon H ($y_t$). |
-| **Sample (échantillon)** | Un couple (entrée, label) : une observation individuelle utilisée pour l'entraînement ou l'évaluation. Ici, un sample correspond à un instant de décision $t$ avec sa fenêtre de features $X_t$ et son label $y_t$. |
-| **Dataset** | Ensemble structuré de samples. Peut être divisé en sous-ensembles (train, validation, test). |
-| **Train set (ensemble d'entraînement)** | Portion des données sur laquelle le modèle apprend (ajuste ses paramètres). Le modèle a accès aux labels de cet ensemble. |
-| **Validation set (ensemble de validation)** | Portion des données utilisée pendant l'entraînement pour évaluer la qualité du modèle en cours d'apprentissage, guider l'early stopping et calibrer le seuil θ. Ne sert jamais directement à ajuster les poids du modèle. |
-| **Test set (ensemble de test)** | Portion des données jamais vue pendant l'entraînement ni la validation. Sert à mesurer la performance finale du modèle de façon non biaisée. |
-| **Overfitting (sur-apprentissage)** | Situation dans laquelle un modèle apprend le bruit des données d'entraînement plutôt que les patterns généralisables, ce qui dégrade sa performance sur de nouvelles données. |
-| **Underfitting (sous-apprentissage)** | Situation inverse : le modèle est trop simple pour capturer les structures pertinentes des données. |
-| **Early stopping (arrêt précoce)** | Technique de régularisation qui interrompt l'entraînement lorsque la performance sur la validation cesse de s'améliorer pendant un nombre donné d'itérations (patience), afin de prévenir l'overfitting. |
-| **Epoch (époque)** | Un passage complet sur l'ensemble du jeu d'entraînement. L'entraînement DL se fait typiquement sur plusieurs epochs successives. |
-| **Batch (lot)** | Sous-ensemble de samples traité en une seule itération avant mise à jour des paramètres. Le batch size est sa taille (ex : 64 samples). |
-| **Loss function (fonction de perte)** | Fonction mathématique qui mesure l'écart entre les prédictions du modèle et les labels réels. L'entraînement cherche à minimiser cette valeur. Exemple : MSE (Mean Squared Error). |
-| **MSE (Mean Squared Error)** | Moyenne des carrés des erreurs de prédiction : $\text{MSE} = \frac{1}{N}\sum(y - \hat{y})^2$. Pénalise fortement les grosses erreurs. |
-| **MAE (Mean Absolute Error)** | Moyenne des valeurs absolues des erreurs : $\text{MAE} = \frac{1}{N}\sum\lvert y - \hat{y}\rvert$. Plus robuste aux outliers que le MSE. |
-| **RMSE (Root Mean Squared Error)** | Racine carrée du MSE : $\text{RMSE} = \sqrt{\text{MSE}}$. S'exprime dans la même unité que la cible. |
-| **Directional accuracy** | Proportion des prédictions dont le signe (direction : hausse ou baisse) correspond au signe réel du rendement. Métrique simple mais informative pour le trading. |
-| **Spearman IC (Information Coefficient)** | Corrélation de rang de Spearman entre les prédictions et les valeurs réelles. Mesure la capacité du modèle à ordonner correctement les rendements, indépendamment de leur amplitude. |
-| **Hyperparamètre** | Paramètre du modèle fixé avant l'entraînement (non appris par le modèle lui-même). Exemples : le learning rate, le nombre de couches, la profondeur max d'un arbre. |
-| **Learning rate (taux d'apprentissage)** | Hyperparamètre qui contrôle l'amplitude des mises à jour des paramètres à chaque itération. Trop grand : instabilité ; trop petit : convergence lente. |
-| **Optimizer (optimiseur)** | Algorithme qui met à jour les paramètres du modèle en fonction du gradient de la loss. Adam est l'optimiseur par défaut dans ce pipeline. |
-| **Adam** | Optimiseur adaptatif populaire qui combine les avantages de l'AdaGrad et du RMSProp. Il adapte le learning rate individuellement pour chaque paramètre en utilisant des moyennes mobiles des gradients. |
-| **Gradient** | Vecteur de dérivées partielles de la loss par rapport à chaque paramètre du modèle. Il indique la direction dans laquelle modifier les paramètres pour réduire l'erreur. |
-| **Dropout** | Technique de régularisation qui désactive aléatoirement une fraction des neurones à chaque itération d'entraînement, forçant le réseau à ne pas dépendre d'un petit nombre de neurones spécifiques. |
-| **Régularisation** | Ensemble de techniques visant à limiter la complexité du modèle pour prévenir l'overfitting. Exemples : dropout, L1/L2 regularization, early stopping. |
-| **Normalisation / Scaling** | Transformation des features pour qu'elles aient une échelle comparable (ex : moyenne 0 et écart-type 1). Indispensable pour la plupart des modèles DL. |
-| **Standardisation (z-score)** | Normalisation par soustraction de la moyenne et division par l'écart-type : $z = (x - \mu) / \sigma$. |
-| **Seed (graine aléatoire)** | Valeur d'initialisation du générateur de nombres pseudo-aléatoires. Fixer la seed garantit la reproductibilité des résultats. |
-| **Réseau de neurones (Neural Network)** | Modèle composé de couches de neurones artificiels interconnectés. Chaque neurone applique une transformation linéaire suivie d'une fonction d'activation non linéaire. |
-| **Couche (Layer)** | Unité structurelle d'un réseau de neurones. Chaque couche transforme les données reçues de la couche précédente. Types courants : Dense/Linear, Conv1D, GRU, LSTM, Attention. |
-| **Fonction d'activation** | Fonction non linéaire appliquée après la transformation linéaire dans un neurone. Exemples : ReLU (Rectified Linear Unit), sigmoid, tanh. Sans elle, un réseau profond serait équivalent à une simple transformation linéaire. |
-| **ReLU (Rectified Linear Unit)** | Fonction d'activation définie par $\text{ReLU}(x) = \max(0, x)$. Simple, efficace, et largement utilisée en DL. |
-| **XGBoost** | Bibliothèque d'apprentissage par arbres de décision boostés (gradient boosting). Performante sur données tabulaires. Entraîne séquentiellement des arbres, chacun corrigeant les erreurs des précédents. |
-| **Arbre de décision** | Modèle qui partitionne l'espace des features par des règles de type « si feature_j > seuil, aller à gauche, sinon à droite ». Simple et interprétable, mais souvent limité seul. |
-| **Gradient Boosting** | Technique d'ensemble qui combine de nombreux modèles faibles (typiquement des arbres peu profonds) de manière séquentielle, chaque nouveau modèle se concentrant sur les erreurs résiduelles du précédent. |
-| **CNN 1D (Convolutional Neural Network 1D)** | Réseau de neurones convolutif appliqué à des séquences temporelles. Des filtres glissants (kernels) détectent des patterns locaux dans la séquence (ex : motifs de prix sur quelques bougies). |
-| **Kernel (filtre convolutif)** | Petit vecteur de poids appris qui glisse le long de la séquence d'entrée pour détecter des patterns locaux. Le kernel size définit la largeur de la fenêtre de détection. |
-| **Pooling** | Opération de réduction dimensionnelle qui agrège les valeurs d'une fenêtre (ex : moyenne — Global Average Pooling — ou maximum). Réduit le nombre de paramètres et rend le modèle plus robuste aux translations. |
-| **GRU (Gated Recurrent Unit)** | Type de réseau récurrent (RNN) doté de portes (gates) qui régulent le flux d'information. Plus simple que le LSTM, il capture les dépendances temporelles dans les séquences tout en atténuant le problème de vanishing gradient. |
-| **LSTM (Long Short-Term Memory)** | Type de réseau récurrent avec trois portes (oubli, entrée, sortie) et une cellule mémoire. Conçu pour capturer les dépendances à long terme dans les séquences temporelles. |
-| **RNN (Recurrent Neural Network)** | Famille de réseaux de neurones qui traitent les données séquentiellement, en maintenant un état caché (hidden state) qui résume l'information passée. GRU et LSTM sont des variantes avancées de RNN. |
-| **Hidden state (état caché)** | Vecteur interne d'un réseau récurrent qui encode un résumé de la séquence traitée jusqu'au pas courant. Il est transmis d'un pas de temps au suivant. |
-| **Transformer** | Architecture DL basée sur le mécanisme d'attention (self-attention), capable de traiter toute la séquence en parallèle au lieu de la parcourir séquentiellement. Très performante sur les séquences longues. |
-| **PatchTST** | Variante du Transformer adaptée aux séries temporelles. La séquence d'entrée est découpée en patches (sous-fenêtres) qui sont traités comme des tokens par le Transformer. Réduit la complexité et capture des dépendances multi-échelles. |
-| **Patch** | Sous-fenêtre contiguë de la séquence temporelle, utilisée comme unité d'entrée dans PatchTST. Définie par un `patch_size` et un `stride` (pas de glissement). |
-| **Attention (Self-Attention)** | Mécanisme qui permet à chaque position de la séquence de « regarder » toutes les autres positions pour pondérer leur importance. Le modèle apprend quelles parties de la séquence sont pertinentes pour chaque prédiction. |
-| **Multi-Head Attention** | Extension de l'attention où plusieurs « têtes » d'attention fonctionnent en parallèle, chacune apprenant à se concentrer sur des aspects différents de la séquence. |
-| **PPO (Proximal Policy Optimization)** | Algorithme de RL de type policy gradient qui optimise la politique de l'agent tout en limitant l'amplitude des mises à jour (clipping) pour stabiliser l'entraînement. |
-| **Politique (Policy) π** | Fonction apprise par l'agent RL qui associe à chaque état une distribution de probabilité sur les actions. Dans notre cas : $\pi(a \mid s)$ donne la probabilité de Go ou No-Go étant donné l'état du marché. |
-| **Récompense (Reward)** | Signal numérique reçu par l'agent RL après chaque action. Ici : le rendement net du trade si Go, 0 si No-Go. L'agent cherche à maximiser la somme cumulée des rewards. |
-| **Discount factor (γ, gamma)** | Facteur de pondération (0 < γ ≤ 1) qui réduit l'importance des rewards futurs par rapport aux rewards immédiats. γ = 0.99 signifie que l'agent accorde une grande importance au long terme. |
-| **GAE (Generalized Advantage Estimation)** | Technique qui estime l'avantage (advantage) d'une action par rapport à la moyenne, en combinant des estimations à différents horizons via un paramètre λ (gae_lambda). Réduit la variance des gradients en RL. |
-| **Advantage** | Mesure de combien une action est meilleure que l'action moyenne dans un état donné. $A(s, a) = Q(s, a) - V(s)$, où $Q$ est la valeur de l'action et $V$ la valeur de l'état. |
-| **Value function (fonction de valeur)** | Fonction $V(s)$ qui estime le rendement cumulé attendu à partir d'un état $s$ en suivant la politique courante. |
-| **Rollout** | Séquence d'interactions agent-environnement (états, actions, rewards) collectées sur un épisode ou un nombre fixe de pas, utilisée pour mettre à jour la politique. |
-| **Épisode** | Séquence complète d'interactions du début à la fin. En RL trading, un épisode correspond typiquement à un fold walk-forward complet. |
-| **Entropy (entropie)** | Mesure du degré d'incertitude de la politique. Le coefficient d'entropie (entropy_coeff) encourage l'agent à explorer davantage en pénalisant les politiques trop déterministes. |
-| **Clip epsilon** | Seuil qui limite l'amplitude de la mise à jour de la politique dans PPO. Empêche des changements trop brusques qui pourraient déstabiliser l'entraînement. |
-| **Tenseur (Tensor)** | Structure de données multidimensionnelle (généralisation d'un vecteur/matrice). Dans le pipeline : $X \in \mathbb{R}^{N \times L \times F}$ est un tenseur 3D. |
-| **Déterminisme (en ML)** | Propriété d'un processus qui produit les mêmes résultats à chaque exécution, à configuration et seed identiques. Essentiel pour la reproductibilité des expériences. |
-| **Walk-forward (validation glissante)** | Protocole d'évaluation temporelle dans lequel le modèle est entraîné sur une fenêtre passée et testé sur la fenêtre suivante, puis la fenêtre glisse dans le temps. Simule le déploiement réel. |
 | **Fold** | Une itération du protocole walk-forward : un triplet (train, validation, test) correspondant à une position temporelle de la fenêtre glissante. |
-| **Embargo** | Période tampon entre la fin du train/validation et le début du test, pendant laquelle aucun sample n'est utilisé. Prévient la fuite d'information liée au chevauchement des labels. |
-| **Purge** | Suppression des samples dont le label dépend de prix situés dans une période future interdite (test). Complémentaire de l'embargo pour garantir l'intégrité anti-fuite. |
+| **Fonction d'activation** | Fonction non linéaire appliquée après la transformation linéaire dans un neurone. Exemples : ReLU (Rectified Linear Unit), sigmoid, tanh. Sans elle, un réseau profond serait équivalent à une simple transformation linéaire. |
 | **Fuite d'information (Data leakage)** | Situation dans laquelle le modèle a accès, directement ou indirectement, à des informations du futur (test) pendant l'entraînement. Invalide les résultats. |
-| **Causalité (en features)** | Contrainte stipulant que la feature calculée au temps $t$ ne dépend que de données observées à des temps $\leq t$. Prévient le look-ahead bias. |
+| **GAE (Generalized Advantage Estimation)** | Technique qui estime l'avantage (advantage) d'une action par rapport à la moyenne, en combinant des estimations à différents horizons via un paramètre λ (gae_lambda). Réduit la variance des gradients en RL. |
+| **Gradient** | Vecteur de dérivées partielles de la loss par rapport à chaque paramètre du modèle. Il indique la direction dans laquelle modifier les paramètres pour réduire l'erreur. |
+| **Gradient Boosting** | Technique d'ensemble qui combine de nombreux modèles faibles (typiquement des arbres peu profonds) de manière séquentielle, chaque nouveau modèle se concentrant sur les erreurs résiduelles du précédent. |
+| **GRU (Gated Recurrent Unit)** | Type de réseau récurrent (RNN) doté de portes (gates) qui régulent le flux d'information. Plus simple que le LSTM, il capture les dépendances temporelles dans les séquences tout en atténuant le problème de vanishing gradient. |
+| **Hidden state (état caché)** | Vecteur interne d'un réseau récurrent qui encode un résumé de la séquence traitée jusqu'au pas courant. Il est transmis d'un pas de temps au suivant. |
+| **Hyperparamètre** | Paramètre du modèle fixé avant l'entraînement (non appris par le modèle lui-même). Exemples : le learning rate, le nombre de couches, la profondeur max d'un arbre. |
+| **Kernel (filtre convolutif)** | Petit vecteur de poids appris qui glisse le long de la séquence d'entrée pour détecter des patterns locaux. Le kernel size définit la largeur de la fenêtre de détection. |
+| **Label (cible, target)** | Valeur que le modèle cherche à prédire. Dans ce pipeline, le label est le rendement futur à horizon H ($y_t$). |
+| **Learning rate (taux d'apprentissage)** | Hyperparamètre qui contrôle l'amplitude des mises à jour des paramètres à chaque itération. Trop grand : instabilité ; trop petit : convergence lente. |
 | **Look-ahead bias** | Biais introduit lorsqu'une information future est utilisée dans le calcul d'une feature ou d'un label. Donne une fausse impression de performance. |
-| **Agrégation inter-fold** | Calcul de statistiques (moyenne, écart-type) d'une métrique sur l'ensemble des folds du walk-forward, donnant une estimation robuste de la performance et de sa stabilité. |
-| **Adapter (adaptateur)** | Composant qui transforme les données d'un format à un autre (ici : aplatissement du tenseur 3D en matrice 2D pour XGBoost) sans modifier l'information sous-jacente. |
+| **Loss function (fonction de perte)** | Fonction mathématique qui mesure l'écart entre les prédictions du modèle et les labels réels. L'entraînement cherche à minimiser cette valeur. Exemple : MSE (Mean Squared Error). |
+| **LSTM (Long Short-Term Memory)** | Type de réseau récurrent avec trois portes (oubli, entrée, sortie) et une cellule mémoire. Conçu pour capturer les dépendances à long terme dans les séquences temporelles. |
+| **Machine Learning (ML)** | Ensemble de techniques permettant à un programme d'apprendre des règles à partir de données, sans être explicitement programmé pour chaque cas. Le programme ajuste ses paramètres internes pour minimiser une mesure d'erreur sur des exemples passés. |
+| **MAE (Mean Absolute Error)** | Moyenne des valeurs absolues des erreurs : $\text{MAE} = \frac{1}{N}\sum\lvert y - \hat{y}\rvert$. Plus robuste aux outliers que le MSE. |
+| **MSE (Mean Squared Error)** | Moyenne des carrés des erreurs de prédiction : $\text{MSE} = \frac{1}{N}\sum(y - \hat{y})^2$. Pénalise fortement les grosses erreurs. |
+| **Multi-Head Attention** | Extension de l'attention où plusieurs « têtes » d'attention fonctionnent en parallèle, chacune apprenant à se concentrer sur des aspects différents de la séquence. |
+| **Normalisation / Scaling** | Transformation des features pour qu'elles aient une échelle comparable (ex : moyenne 0 et écart-type 1). Indispensable pour la plupart des modèles DL. |
+| **Optimizer (optimiseur)** | Algorithme qui met à jour les paramètres du modèle en fonction du gradient de la loss. Adam est l'optimiseur par défaut dans ce pipeline. |
+| **Overfitting (sur-apprentissage)** | Situation dans laquelle un modèle apprend le bruit des données d'entraînement plutôt que les patterns généralisables, ce qui dégrade sa performance sur de nouvelles données. |
+| **Patch** | Sous-fenêtre contiguë de la séquence temporelle, utilisée comme unité d'entrée dans PatchTST. Définie par un `patch_size` et un `stride` (pas de glissement). |
+| **PatchTST** | Variante du Transformer adaptée aux séries temporelles. La séquence d'entrée est découpée en patches (sous-fenêtres) qui sont traités comme des tokens par le Transformer. Réduit la complexité et capture des dépendances multi-échelles. |
+| **Politique (Policy) π** | Fonction apprise par l'agent RL qui associe à chaque état une distribution de probabilité sur les actions. Dans notre cas : $\pi(a \mid s)$ donne la probabilité de Go ou No-Go étant donné l'état du marché. |
+| **Pooling** | Opération de réduction dimensionnelle qui agrège les valeurs d'une fenêtre (ex : moyenne — Global Average Pooling — ou maximum). Réduit le nombre de paramètres et rend le modèle plus robuste aux translations. |
+| **PPO (Proximal Policy Optimization)** | Algorithme de RL de type policy gradient qui optimise la politique de l'agent tout en limitant l'amplitude des mises à jour (clipping) pour stabiliser l'entraînement. |
+| **Purge** | Suppression des samples dont le label dépend de prix situés dans une période future interdite (test). Complémentaire de l'embargo pour garantir l'intégrité anti-fuite. |
+| **Récompense (Reward)** | Signal numérique reçu par l'agent RL après chaque action. Ici : le rendement net du trade si Go, 0 si No-Go. L'agent cherche à maximiser la somme cumulée des rewards. |
+| **Régression** | Tâche de prédiction d'une valeur numérique continue (ici : un rendement futur), par opposition à la classification qui prédit une catégorie. |
+| **Régularisation** | Ensemble de techniques visant à limiter la complexité du modèle pour prévenir l'overfitting. Exemples : dropout, L1/L2 regularization, early stopping. |
+| **Reinforcement Learning (RL)** | Paradigme d'apprentissage dans lequel un agent interagit avec un environnement par des actions, reçoit des récompenses (rewards) et apprend une stratégie (politique) qui maximise la récompense cumulée au fil du temps. |
+| **ReLU (Rectified Linear Unit)** | Fonction d'activation définie par $\text{ReLU}(x) = \max(0, x)$. Simple, efficace, et largement utilisée en DL. |
+| **Réseau de neurones (Neural Network)** | Modèle composé de couches de neurones artificiels interconnectés. Chaque neurone applique une transformation linéaire suivie d'une fonction d'activation non linéaire. |
+| **RMSE (Root Mean Squared Error)** | Racine carrée du MSE : $\text{RMSE} = \sqrt{\text{MSE}}$. S'exprime dans la même unité que la cible. |
+| **RNN (Recurrent Neural Network)** | Famille de réseaux de neurones qui traitent les données séquentiellement, en maintenant un état caché (hidden state) qui résume l'information passée. GRU et LSTM sont des variantes avancées de RNN. |
+| **Rollout** | Séquence d'interactions agent-environnement (états, actions, rewards) collectées sur un épisode ou un nombre fixe de pas, utilisée pour mettre à jour la politique. |
+| **Sample (échantillon)** | Un couple (entrée, label) : une observation individuelle utilisée pour l'entraînement ou l'évaluation. Ici, un sample correspond à un instant de décision $t$ avec sa fenêtre de features $X_t$ et son label $y_t$. |
+| **Seed (graine aléatoire)** | Valeur d'initialisation du générateur de nombres pseudo-aléatoires. Fixer la seed garantit la reproductibilité des résultats. |
+| **Spearman IC (Information Coefficient)** | Corrélation de rang de Spearman entre les prédictions et les valeurs réelles. Mesure la capacité du modèle à ordonner correctement les rendements, indépendamment de leur amplitude. |
+| **Standardisation (z-score)** | Normalisation par soustraction de la moyenne et division par l'écart-type : $z = (x - \mu) / \sigma$. |
+| **Tenseur (Tensor)** | Structure de données multidimensionnelle (généralisation d'un vecteur/matrice). Dans le pipeline : $X \in \mathbb{R}^{N \times L \times F}$ est un tenseur 3D. |
+| **Test set (ensemble de test)** | Portion des données jamais vue pendant l'entraînement ni la validation. Sert à mesurer la performance finale du modèle de façon non biaisée. |
+| **Train set (ensemble d'entraînement)** | Portion des données sur laquelle le modèle apprend (ajuste ses paramètres). Le modèle a accès aux labels de cet ensemble. |
+| **Transformer** | Architecture DL basée sur le mécanisme d'attention (self-attention), capable de traiter toute la séquence en parallèle au lieu de la parcourir séquentiellement. Très performante sur les séquences longues. |
+| **Underfitting (sous-apprentissage)** | Situation inverse : le modèle est trop simple pour capturer les structures pertinentes des données. |
+| **Validation set (ensemble de validation)** | Portion des données utilisée pendant l'entraînement pour évaluer la qualité du modèle en cours d'apprentissage, guider l'early stopping et calibrer le seuil θ. Ne sert jamais directement à ajuster les poids du modèle. |
+| **Value function (fonction de valeur)** | Fonction $V(s)$ qui estime le rendement cumulé attendu à partir d'un état $s$ en suivant la politique courante. |
+| **Walk-forward (validation glissante)** | Protocole d'évaluation temporelle dans lequel le modèle est entraîné sur une fenêtre passée et testé sur la fenêtre suivante, puis la fenêtre glisse dans le temps. Simule le déploiement réel. |
 | **Warm-up** | Période initiale pendant laquelle les indicateurs techniques ne sont pas encore stables (insuffisamment de données passées). Les samples de cette zone sont exclus du dataset. |
+| **XGBoost** | Bibliothèque d'apprentissage par arbres de décision boostés (gradient boosting). Performante sur données tabulaires. Entraîne séquentiellement des arbres, chacun corrigeant les erreurs des précédents. |
 
 
 ## Annexe G — Glossaire Finance et Trading
@@ -2531,75 +2561,75 @@ Glossaire pédagogique des termes financiers, boursiers et de trading algorithmi
 
 | Terme | Définition |
 | --- | --- |
-| **OHLCV** | Acronyme pour Open, High, Low, Close, Volume. Les cinq valeurs qui résument l'activité de marché sur une période (bougie) : prix d'ouverture, plus haut, plus bas, clôture et volume échangé. |
-| **Bougie (Candle)** | Unité de temps élémentaire du marché. Chaque bougie couvre un intervalle fixe (ex : 1 heure) et est décrite par ses valeurs OHLCV. Le terme vient des graphiques en chandeliers japonais. |
-| **Timeframe (Δ)** | Durée d'une bougie. Exemples : 1h (une heure), 15m (quinze minutes), 1d (un jour). Détermine la granularité temporelle de l'analyse. |
-| **Open (prix d'ouverture, O_t)** | Premier prix auquel un échange a lieu au début de la bougie $t$. Dans ce pipeline, c'est le prix d'entrée d'un trade (à la bougie suivant la décision). |
-| **High (plus haut, H_t)** | Prix le plus élevé atteint pendant la bougie $t$. |
-| **Low (plus bas, L_t)** | Prix le plus bas atteint pendant la bougie $t$. |
-| **Close (prix de clôture, C_t)** | Dernier prix auquel un échange a lieu à la fin de la bougie $t$. La plupart des indicateurs techniques sont calculés sur les clôtures. |
-| **Volume (V_t)** | Quantité totale d'actif échangée pendant la bougie $t$. Un volume élevé traduit une liquidité importante et un intérêt marqué des participants. |
-| **Binance** | Plateforme d'échange de crypto-monnaies (exchange). Source des données OHLCV utilisées dans ce pipeline. |
-| **Exchange (place de marché)** | Plateforme électronique où acheteurs et vendeurs échangent des actifs financiers ou des crypto-monnaies. |
-| **Symbole (Symbol, Ticker)** | Identifiant court d'un actif sur un exchange. Exemple : BTCUSDT désigne la paire Bitcoin / Tether (dollar synthétique). |
-| **Paire de trading** | Couple de deux actifs échangeables l'un contre l'autre. BTCUSDT signifie qu'on achète ou vend du BTC contre de l'USDT. |
-| **Long (position longue)** | Position consistant à acheter un actif en anticipant sa hausse. L'investisseur profite si le prix monte. Ce pipeline n'utilise que des positions long (long-only). |
-| **Short (position courte, vente à découvert)** | Position inverse : vendre un actif emprunté en anticipant sa baisse pour le racheter moins cher. Exclu du MVP. |
-| **Long-only** | Stratégie restreinte aux positions longues uniquement (pas de vente à découvert). Simplifie le backtest et les hypothèses de coûts. |
-| **Go / No-Go** | Décision binaire prise à chaque instant de décision : « Go » = ouvrir une position long ; « No-Go » = rester hors du marché. Transforme la prédiction continue (rendement) en action discrète via le seuil θ. |
-| **Trade** | Opération complète d'achat puis de revente d'un actif. Décrit par un prix d'entrée, un prix de sortie, une durée et un rendement net après coûts. |
-| **Position** | Engagement financier ouvert sur le marché. Une position longue est ouverte à l'achat, puis clôturée à la vente. |
-| **Horizon (H)** | Nombre de bougies entre l'entrée et la sortie d'un trade. Exemple : H = 4 avec Δ = 1h signifie un trade de 4 heures. Définit aussi l'horizon de prédiction. |
-| **Rendement (Return)** | Variation relative du prix entre deux instants. Mesure le gain ou la perte d'un investissement. |
-| **Log-return (rendement logarithmique)** | Rendement calculé comme le logarithme du ratio des prix : $\log(P_{final}/P_{initial})$. Présente des propriétés mathématiques avantageuses (additivité temporelle, symétrie hausse/baisse). |
-| **Rendement net (Net return)** | Rendement d'un trade après déduction de tous les coûts (frais de transaction + slippage). C'est la mesure réelle de la performance. |
-| **P&L (Profit and Loss)** | Profit ou perte réalisé(e). Le P&L net est la différence entre l'équité finale et l'équité initiale, après coûts. |
-| **Équité (Equity)** | Valeur du portefeuille au cours du temps. Initialisée à 1.0 (normalisée), elle évolue via les rendements nets des trades. La courbe d'équité visualise la performance cumulée. |
-| **Courbe d'équité (Equity curve)** | Graphique montrant l'évolution de l'équité dans le temps. Permet de visualiser les périodes de gains, de pertes et les drawdowns. |
-| **Drawdown** | Baisse de l'équité depuis un sommet (peak) précédent. Mesure la perte subie avant de retrouver le niveau antérieur. |
-| **Max Drawdown (MDD)** | Plus grande baisse relative de l'équité observée sur une période : $\text{MDD} = \max_t \left(\frac{\text{peak\\\_t} - E_t}{\text{peak\\\_t}}\right)$. Indicateur clé du risque. Un MDD de 25% signifie que le portefeuille a perdu au maximum 25% depuis son plus haut. |
-| **Frais de transaction (Fees)** | Commission prélevée par l'exchange à chaque opération d'achat ou de vente. Exprimée en pourcentage du montant échangé (ex : 0.05% par côté chez Binance en mode taker). |
-| **Slippage (glissement de prix)** | Différence entre le prix théorique d'exécution et le prix réellement obtenu, due à la liquidité limitée du marché. Modélisé ici comme un coût proportionnel au prix. |
-| **Per side (par côté)** | Convention de coût : le taux est appliqué séparément à l'entrée (achat) et à la sortie (vente). Le coût total round-trip est approximativement le double du coût par côté. |
-| **Round-trip** | Aller-retour complet : achat puis vente. Les coûts round-trip cumulent les frais d'entrée et de sortie. |
-| **Taker** | Ordre de marché (market order) qui s'exécute immédiatement au meilleur prix disponible. Les frais taker sont généralement plus élevés que les frais maker. |
-| **Maker** | Ordre limite (limit order) qui ajoute de la liquidité au carnet d'ordres en attendant un contrepartiste. Les frais maker sont réduits. Non utilisé dans ce pipeline (hypothèse taker). |
-| **Backtest** | Simulation historique d'une stratégie de trading sur des données passées, en appliquant les mêmes règles d'exécution et de coûts qu'en temps réel. Permet d'estimer la performance avant un déploiement. |
-| **One at a time** | Mode de backtest dans lequel un seul trade peut être actif simultanément. Un nouveau signal Go est ignoré si une position est déjà ouverte. |
-| **Seuil θ (Threshold)** | Valeur numérique au-dessus de laquelle la prédiction du modèle déclenche un signal Go. Calibré sur la validation pour optimiser le compromis entre fréquence de trades et qualité des signaux. |
-| **Calibration du seuil** | Processus d'optimisation de θ sur les données de validation, en testant plusieurs valeurs candidates et en retenant celle qui maximise le P&L net sous contraintes de risque. |
-| **Faux positif (en trading)** | Trade déclenché par un signal Go alors que le rendement réel est négatif (trade perdant). La calibration de θ vise à réduire les faux positifs. |
-| **Faux négatif (en trading)** | Opportunité rentable manquée parce que le modèle a émis un signal No-Go. Considéré comme moins grave qu'un faux positif dans ce pipeline. |
-| **Profit factor** | Ratio entre la somme des gains bruts et la somme des pertes brutes sur l'ensemble des trades : $\text{PF} = \frac{\sum \text{gains}}{\sum \lvert\text{pertes}\rvert}$. Un PF > 1 indique une stratégie globalement rentable. |
-| **Hit rate (taux de réussite)** | Pourcentage de trades dont le rendement net est positif. Un hit rate de 54% signifie que 54 trades sur 100 sont gagnants. |
-| **Sharpe ratio** | Ratio rendement/risque : $\text{Sharpe} = \frac{\text{mean}(r)}{\text{std}(r)}$. Mesure la performance ajustée au risque. Un Sharpe élevé signifie un bon rendement pour un niveau de volatilité donné. |
-| **Volatilité (Volatility)** | Mesure de la dispersion des rendements (écart-type). Une volatilité élevée signifie des variations de prix importantes. Peut être calculée sur une fenêtre glissante (rolling volatility). |
-| **SMA (Simple Moving Average)** | Moyenne arithmétique des $n$ dernières clôtures : $\text{SMA\\\_n}(t) = \frac{1}{n}\sum_{i=0}^{n-1} C_{t-i}$. Lisse le prix pour identifier la tendance. |
-| **EMA (Exponential Moving Average)** | Moyenne mobile qui accorde un poids décroissant exponentiellement aux observations passées. Plus réactive aux changements récents que la SMA. Le coefficient de lissage est $\alpha = 2/(n+1)$. |
-| **RSI (Relative Strength Index)** | Oscillateur borné entre 0 et 100 qui mesure la vitesse et l'amplitude des mouvements de prix. Un RSI > 70 est traditionnellement considéré comme suracheté, < 30 comme survendu. |
-| **Lissage de Wilder** | Méthode de calcul de la moyenne mobile utilisée par J. W. Wilder pour le RSI. C'est une EMA avec un coefficient spécifique : $\alpha = 1/n$ (au lieu de $2/(n+1)$). |
-| **Indicateur technique** | Grandeur calculée à partir des données de prix et/ou de volume, utilisée pour analyser les marchés. Exemples : RSI, EMA, SMA, volatilité. |
-| **Baseline (référence)** | Stratégie simple et transparente servant de point de comparaison pour évaluer si un modèle ML apporte une vraie valeur ajoutée par rapport à des approches naïves. |
-| **No-trade (baseline)** | Stratégie qui n'ouvre jamais de position. L'équité reste constante à 1.0. Borne inférieure de toute stratégie : ne pas perdre d'argent en ne faisant rien. |
-| **Buy & Hold** | Stratégie consistant à acheter l'actif au début de la période et à le conserver jusqu'à la fin, sans aucune décision intermédiaire. Capture le rendement global du marché. |
-| **Walk-forward** | Voir glossaire ML (Annexe F). Protocole de validation temporelle essentiel en finance pour éviter la fuite d'information future. |
-| **Point-in-time** | Principe stipulant que chaque calcul ne doit utiliser que les données effectivement disponibles au moment considéré. Synonyme de causalité stricte. Prévient le look-ahead bias. |
-| **Parquet** | Format de fichier columnar efficace pour le stockage et la lecture rapide de grands jeux de données. Utilisé comme format de données brutes dans ce pipeline. |
-| **UTC (Coordinated Universal Time)** | Fuseau horaire de référence universel. Ce pipeline impose UTC pour tous les timestamps afin d'éviter les ambiguïtés liées aux fuseaux horaires locaux. |
-| **Timestamp** | Instant précis exprimé sous forme de date et heure (ex : 2024-07-01T00:00:00Z). Chaque bougie est identifiée par le timestamp de sa clôture en UTC. |
-| **Crypto-monnaie (Cryptocurrency)** | Actif numérique décentralisé basé sur la cryptographie (ex : Bitcoin — BTC, Ethereum — ETH). Échangé sur des plateformes comme Binance. |
-| **BTCUSDT** | Paire de trading représentant le Bitcoin (BTC) coté en Tether (USDT, stablecoin indexé sur le dollar). Symbole principal du MVP. |
-| **USDT (Tether)** | Stablecoin dont la valeur est arrimée au dollar américain (1 USDT ≈ 1 USD). Utilisé comme monnaie de cotation dans les paires de trading crypto. |
-| **Stablecoin** | Crypto-monnaie dont le prix est conçu pour rester stable par rapport à un actif de référence (typiquement le dollar). L'USDT en est l'exemple le plus courant. |
-| **Liquidité** | Facilité avec laquelle un actif peut être acheté ou vendu sans impact significatif sur son prix. Un marché liquide a un spread faible et un volume élevé. |
-| **Spread** | Écart entre le meilleur prix d'achat (bid) et le meilleur prix de vente (ask) sur un carnet d'ordres. Plus le spread est faible, plus le marché est liquide. |
-| **Carnet d'ordres (Order book)** | Liste en temps réel des ordres d'achat (bids) et de vente (asks) sur un exchange, classés par prix. |
-| **Outlier (valeur aberrante)** | Observation qui s'écarte fortement de la distribution habituelle des données. En finance : un flash crash, un prix négatif, ou un volume anormalement élevé. |
-| **Exposition (Exposure)** | Fraction du temps pendant laquelle une stratégie est investie (en position). L'exposure_time_frac mesure cette proportion sur la période de test. |
-| **Levier (Leverage)** | Mécanisme permettant de prendre des positions supérieures au capital disponible en empruntant. Exclu du MVP (w = 1, pas de levier). |
 | **All-in** | Mode dans lequel 100% du capital disponible est engagé dans chaque trade (fraction de position w = 1). C'est le mode par défaut du MVP. |
-| **Run** | Exécution complète du pipeline pour une stratégie donnée, produisant un ensemble d'artefacts (manifest, métriques, trades, etc.). |
 | **Artefact** | Fichier produit par le pipeline lors d'un run (modèle entraîné, prédictions, trades, métriques, courbe d'équité, etc.). Les artefacts permettent l'audit et la reproductibilité. |
-| **Quantile** | Valeur en dessous de laquelle se situe une certaine proportion des observations. Le quantile 0.9 signifie que 90% des valeurs sont inférieures. Utilisé pour la grille de calibration de θ. |
-| **Winsorization / Clipping** | Technique de traitement des outliers qui remplace les valeurs extrêmes par les valeurs des quantiles choisis (ex : 0.5% et 99.5%). |
+| **Backtest** | Simulation historique d'une stratégie de trading sur des données passées, en appliquant les mêmes règles d'exécution et de coûts qu'en temps réel. Permet d'estimer la performance avant un déploiement. |
+| **Baseline (référence)** | Stratégie simple et transparente servant de point de comparaison pour évaluer si un modèle ML apporte une vraie valeur ajoutée par rapport à des approches naïves. |
+| **Binance** | Plateforme d'échange de crypto-monnaies (exchange). Source des données OHLCV utilisées dans ce pipeline. |
+| **Bougie (Candle)** | Unité de temps élémentaire du marché. Chaque bougie couvre un intervalle fixe (ex : 1 heure) et est décrite par ses valeurs OHLCV. Le terme vient des graphiques en chandeliers japonais. |
+| **BTCUSDT** | Paire de trading représentant le Bitcoin (BTC) coté en Tether (USDT, stablecoin indexé sur le dollar). Symbole principal du MVP. |
+| **Buy & Hold** | Stratégie consistant à acheter l'actif au début de la période et à le conserver jusqu'à la fin, sans aucune décision intermédiaire. Capture le rendement global du marché. |
+| **Calibration du seuil** | Processus d'optimisation de θ sur les données de validation, en testant plusieurs valeurs candidates et en retenant celle qui maximise le P&L net sous contraintes de risque. |
+| **Carnet d'ordres (Order book)** | Liste en temps réel des ordres d'achat (bids) et de vente (asks) sur un exchange, classés par prix. |
+| **Close (prix de clôture, C_t)** | Dernier prix auquel un échange a lieu à la fin de la bougie $t$. La plupart des indicateurs techniques sont calculés sur les clôtures. |
+| **Courbe d'équité (Equity curve)** | Graphique montrant l'évolution de l'équité dans le temps. Permet de visualiser les périodes de gains, de pertes et les drawdowns. |
+| **Crypto-monnaie (Cryptocurrency)** | Actif numérique décentralisé basé sur la cryptographie (ex : Bitcoin — BTC, Ethereum — ETH). Échangé sur des plateformes comme Binance. |
+| **Drawdown** | Baisse de l'équité depuis un sommet (peak) précédent. Mesure la perte subie avant de retrouver le niveau antérieur. |
+| **EMA (Exponential Moving Average)** | Moyenne mobile qui accorde un poids décroissant exponentiellement aux observations passées. Plus réactive aux changements récents que la SMA. Le coefficient de lissage est $\alpha = 2/(n+1)$. |
+| **Équité (Equity)** | Valeur du portefeuille au cours du temps. Initialisée à 1.0 (normalisée), elle évolue via les rendements nets des trades. La courbe d'équité visualise la performance cumulée. |
+| **Exchange (place de marché)** | Plateforme électronique où acheteurs et vendeurs échangent des actifs financiers ou des crypto-monnaies. |
+| **Exposition (Exposure)** | Fraction du temps pendant laquelle une stratégie est investie (en position). L'exposure_time_frac mesure cette proportion sur la période de test. |
+| **Faux négatif (en trading)** | Opportunité rentable manquée parce que le modèle a émis un signal No-Go. Considéré comme moins grave qu'un faux positif dans ce pipeline. |
+| **Faux positif (en trading)** | Trade déclenché par un signal Go alors que le rendement réel est négatif (trade perdant). La calibration de θ vise à réduire les faux positifs. |
+| **Frais de transaction (Fees)** | Commission prélevée par l'exchange à chaque opération d'achat ou de vente. Exprimée en pourcentage du montant échangé (ex : 0.05% par côté chez Binance en mode taker). |
+| **Go / No-Go** | Décision binaire prise à chaque instant de décision : « Go » = ouvrir une position long ; « No-Go » = rester hors du marché. Transforme la prédiction continue (rendement) en action discrète via le seuil θ. |
+| **High (plus haut, H_t)** | Prix le plus élevé atteint pendant la bougie $t$. |
+| **Hit rate (taux de réussite)** | Pourcentage de trades dont le rendement net est positif. Un hit rate de 54% signifie que 54 trades sur 100 sont gagnants. |
+| **Horizon (H)** | Nombre de bougies entre l'entrée et la sortie d'un trade. Exemple : H = 4 avec Δ = 1h signifie un trade de 4 heures. Définit aussi l'horizon de prédiction. |
+| **Indicateur technique** | Grandeur calculée à partir des données de prix et/ou de volume, utilisée pour analyser les marchés. Exemples : RSI, EMA, SMA, volatilité. |
 | **IQR (Interquartile Range)** | Écart entre le 3e quartile (Q3, 75%) et le 1er quartile (Q1, 25%) : IQR = Q3 - Q1. Mesure robuste de la dispersion, utilisée dans le robust scaling. |
+| **Levier (Leverage)** | Mécanisme permettant de prendre des positions supérieures au capital disponible en empruntant. Exclu du MVP (w = 1, pas de levier). |
+| **Liquidité** | Facilité avec laquelle un actif peut être acheté ou vendu sans impact significatif sur son prix. Un marché liquide a un spread faible et un volume élevé. |
+| **Lissage de Wilder** | Méthode de calcul de la moyenne mobile utilisée par J. W. Wilder pour le RSI. C'est une EMA avec un coefficient spécifique : $\alpha = 1/n$ (au lieu de $2/(n+1)$). |
+| **Log-return (rendement logarithmique)** | Rendement calculé comme le logarithme du ratio des prix : $\log(P_{final}/P_{initial})$. Présente des propriétés mathématiques avantageuses (additivité temporelle, symétrie hausse/baisse). |
+| **Long (position longue)** | Position consistant à acheter un actif en anticipant sa hausse. L'investisseur profite si le prix monte. Ce pipeline n'utilise que des positions long (long-only). |
+| **Long-only** | Stratégie restreinte aux positions longues uniquement (pas de vente à découvert). Simplifie le backtest et les hypothèses de coûts. |
+| **Low (plus bas, L_t)** | Prix le plus bas atteint pendant la bougie $t$. |
+| **Maker** | Ordre limite (limit order) qui ajoute de la liquidité au carnet d'ordres en attendant un contrepartiste. Les frais maker sont réduits. Non utilisé dans ce pipeline (hypothèse taker). |
+| **Max Drawdown (MDD)** | Plus grande baisse relative de l'équité observée sur une période : $\text{MDD} = \max_t \left(\frac{\text{peak\\\_t} - E_t}{\text{peak\\\_t}}\right)$. Indicateur clé du risque. Un MDD de 25% signifie que le portefeuille a perdu au maximum 25% depuis son plus haut. |
+| **No-trade (baseline)** | Stratégie qui n'ouvre jamais de position. L'équité reste constante à 1.0. Borne inférieure de toute stratégie : ne pas perdre d'argent en ne faisant rien. |
+| **OHLCV** | Acronyme pour Open, High, Low, Close, Volume. Les cinq valeurs qui résument l'activité de marché sur une période (bougie) : prix d'ouverture, plus haut, plus bas, clôture et volume échangé. |
+| **One at a time** | Mode de backtest dans lequel un seul trade peut être actif simultanément. Un nouveau signal Go est ignoré si une position est déjà ouverte. |
+| **Open (prix d'ouverture, O_t)** | Premier prix auquel un échange a lieu au début de la bougie $t$. Dans ce pipeline, c'est le prix d'entrée d'un trade (à la bougie suivant la décision). |
+| **Outlier (valeur aberrante)** | Observation qui s'écarte fortement de la distribution habituelle des données. En finance : un flash crash, un prix négatif, ou un volume anormalement élevé. |
+| **P&L (Profit and Loss)** | Profit ou perte réalisé(e). Le P&L net est la différence entre l'équité finale et l'équité initiale, après coûts. |
+| **Paire de trading** | Couple de deux actifs échangeables l'un contre l'autre. BTCUSDT signifie qu'on achète ou vend du BTC contre de l'USDT. |
+| **Parquet** | Format de fichier columnar efficace pour le stockage et la lecture rapide de grands jeux de données. Utilisé comme format de données brutes dans ce pipeline. |
+| **Per side (par côté)** | Convention de coût : le taux est appliqué séparément à l'entrée (achat) et à la sortie (vente). Le coût total round-trip est approximativement le double du coût par côté. |
+| **Point-in-time** | Principe stipulant que chaque calcul ne doit utiliser que les données effectivement disponibles au moment considéré. Synonyme de causalité stricte. Prévient le look-ahead bias. |
+| **Position** | Engagement financier ouvert sur le marché. Une position longue est ouverte à l'achat, puis clôturée à la vente. |
+| **Profit factor** | Ratio entre la somme des gains bruts et la somme des pertes brutes sur l'ensemble des trades : $\text{PF} = \frac{\sum \text{gains}}{\sum \lvert\text{pertes}\rvert}$. Un PF > 1 indique une stratégie globalement rentable. |
+| **Quantile** | Valeur en dessous de laquelle se situe une certaine proportion des observations. Le quantile 0.9 signifie que 90% des valeurs sont inférieures. Utilisé pour la grille de calibration de θ. |
+| **Rendement (Return)** | Variation relative du prix entre deux instants. Mesure le gain ou la perte d'un investissement. |
+| **Rendement net (Net return)** | Rendement d'un trade après déduction de tous les coûts (frais de transaction + slippage). C'est la mesure réelle de la performance. |
+| **Round-trip** | Aller-retour complet : achat puis vente. Les coûts round-trip cumulent les frais d'entrée et de sortie. |
+| **RSI (Relative Strength Index)** | Oscillateur borné entre 0 et 100 qui mesure la vitesse et l'amplitude des mouvements de prix. Un RSI > 70 est traditionnellement considéré comme suracheté, < 30 comme survendu. |
+| **Run** | Exécution complète du pipeline pour une stratégie donnée, produisant un ensemble d'artefacts (manifest, métriques, trades, etc.). |
+| **Seuil θ (Threshold)** | Valeur numérique au-dessus de laquelle la prédiction du modèle déclenche un signal Go. Calibré sur la validation pour optimiser le compromis entre fréquence de trades et qualité des signaux. |
+| **Sharpe ratio** | Ratio rendement/risque : $\text{Sharpe} = \frac{\text{mean}(r)}{\text{std}(r)}$. Mesure la performance ajustée au risque. Un Sharpe élevé signifie un bon rendement pour un niveau de volatilité donné. |
+| **Short (position courte, vente à découvert)** | Position inverse : vendre un actif emprunté en anticipant sa baisse pour le racheter moins cher. Exclu du MVP. |
+| **Slippage (glissement de prix)** | Différence entre le prix théorique d'exécution et le prix réellement obtenu, due à la liquidité limitée du marché. Modélisé ici comme un coût proportionnel au prix. |
+| **SMA (Simple Moving Average)** | Moyenne arithmétique des $n$ dernières clôtures : $\text{SMA\\\_n}(t) = \frac{1}{n}\sum_{i=0}^{n-1} C_{t-i}$. Lisse le prix pour identifier la tendance. |
+| **Spread** | Écart entre le meilleur prix d'achat (bid) et le meilleur prix de vente (ask) sur un carnet d'ordres. Plus le spread est faible, plus le marché est liquide. |
+| **Stablecoin** | Crypto-monnaie dont le prix est conçu pour rester stable par rapport à un actif de référence (typiquement le dollar). L'USDT en est l'exemple le plus courant. |
+| **Symbole (Symbol, Ticker)** | Identifiant court d'un actif sur un exchange. Exemple : BTCUSDT désigne la paire Bitcoin / Tether (dollar synthétique). |
+| **Taker** | Ordre de marché (market order) qui s'exécute immédiatement au meilleur prix disponible. Les frais taker sont généralement plus élevés que les frais maker. |
+| **Timeframe (Δ)** | Durée d'une bougie. Exemples : 1h (une heure), 15m (quinze minutes), 1d (un jour). Détermine la granularité temporelle de l'analyse. |
+| **Timestamp** | Instant précis exprimé sous forme de date et heure (ex : 2024-07-01T00:00:00Z). Chaque bougie est identifiée par le timestamp de sa clôture en UTC. |
+| **Trade** | Opération complète d'achat puis de revente d'un actif. Décrit par un prix d'entrée, un prix de sortie, une durée et un rendement net après coûts. |
+| **USDT (Tether)** | Stablecoin dont la valeur est arrimée au dollar américain (1 USDT ≈ 1 USD). Utilisé comme monnaie de cotation dans les paires de trading crypto. |
+| **UTC (Coordinated Universal Time)** | Fuseau horaire de référence universel. Ce pipeline impose UTC pour tous les timestamps afin d'éviter les ambiguïtés liées aux fuseaux horaires locaux. |
+| **Volatilité (Volatility)** | Mesure de la dispersion des rendements (écart-type). Une volatilité élevée signifie des variations de prix importantes. Peut être calculée sur une fenêtre glissante (rolling volatility). |
+| **Volume (V_t)** | Quantité totale d'actif échangée pendant la bougie $t$. Un volume élevé traduit une liquidité importante et un intérêt marqué des participants. |
+| **Walk-forward** | Voir glossaire ML (Annexe F). Protocole de validation temporelle essentiel en finance pour éviter la fuite d'information future. |
+| **Winsorization / Clipping** | Technique de traitement des outliers qui remplace les valeurs extrêmes par les valeurs des quantiles choisis (ex : 0.5% et 99.5%). |
