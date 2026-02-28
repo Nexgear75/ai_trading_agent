@@ -64,3 +64,16 @@ def _make_log_return_class(k: int) -> type[BaseFeature]:
 LogReturn1 = register_feature("logret_1")(_make_log_return_class(1))
 LogReturn2 = register_feature("logret_2")(_make_log_return_class(2))
 LogReturn4 = register_feature("logret_4")(_make_log_return_class(4))
+
+
+def load_builtin_features() -> None:
+    """Ensure log-return features are registered in FEATURE_REGISTRY.
+
+    This function is intended to be called at pipeline startup so that the
+    built-in log-return features are registered even if this module has not
+    been imported elsewhere in the codebase.
+    """
+    # Access the feature classes to make the registration relationship explicit
+    # for static analysis tools and human readers. Registration itself happens
+    # at module import time via the decorators above.
+    _ = (LogReturn1, LogReturn2, LogReturn4)
