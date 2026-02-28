@@ -1,6 +1,6 @@
 # Tâche — Feature RSI avec lissage de Wilder (rsi_14)
 
-Statut : TODO
+Statut : DONE
 Ordre : 010
 Workstream : WS-3
 Milestone : M2
@@ -40,28 +40,28 @@ Implémenter la feature `rsi_14` avec lissage de Wilder :
 - Implémentation vectorisée avec boucle de lissage Wilder (inévitable pour le lissage récursif).
 
 ## Critères d'acceptation
-- [ ] Classe enregistrée : `rsi_14` dans `FEATURE_REGISTRY`.
-- [ ] Tests numériques sur séries connues avec valeurs calculées à la main.
-- [ ] Résultat ∈ [0, 100] pour toute entrée valide.
-- [ ] Cas limites couverts : série monotone croissante (RSI → 100), monotone décroissante (RSI → 0), constante (RSI = 50).
-- [ ] `rsi_period` et `rsi_epsilon` lus depuis params (pas hardcodés).
-- [ ] NaN aux positions t < rsi_period.
-- [ ] Causalité vérifiée : modifier `close[t > T]` ne modifie pas `rsi_14[t <= T]`.
-- [ ] Tests couvrent les scénarios nominaux + erreurs + bords.
-- [ ] Suite de tests verte après implémentation.
-- [ ] `ruff check` passe sans erreur.
+- [x] Classe enregistrée : `rsi_14` dans `FEATURE_REGISTRY`.
+- [x] Tests numériques sur séries connues avec valeurs calculées à la main.
+- [x] Résultat ∈ [0, 100] pour toute entrée valide.
+- [x] Cas limites couverts : série monotone croissante (RSI → 100), monotone décroissante (RSI → 0), constante (RSI = 50).
+- [x] `rsi_period` et `rsi_epsilon` lus depuis params (pas hardcodés).
+- [x] NaN aux positions t < rsi_period.
+- [x] Causalité vérifiée : modifier `close[t > T]` ne modifie pas `rsi_14[t <= T]`.
+- [x] Tests couvrent les scénarios nominaux + erreurs + bords.
+- [x] Suite de tests verte après implémentation.
+- [x] `ruff check` passe sans erreur.
 
 ## Pré-condition de démarrage
 - **Tous les tests existants sont GREEN** avant de commencer.
 - **Créer une branche dédiée** `task/010-rsi` depuis `Max6000i1`.
 
 ## Checklist de fin de tâche
-- [ ] Branche `task/010-rsi` créée depuis `Max6000i1`.
-- [ ] Tests RED écrits avant implémentation.
-- [ ] **Commit RED** : `[WS-3] #010 RED: tests RSI Wilder`.
-- [ ] Tests GREEN passants et reproductibles.
-- [ ] Critères d'acceptation tous satisfaits.
-- [ ] `ruff check ai_trading/ tests/` passe sans erreur.
-- [ ] Fichier de tâche mis à jour (statut DONE, critères cochés).
-- [ ] **Commit GREEN** : `[WS-3] #010 GREEN: RSI Wilder`.
-- [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-3] #010 — Feature RSI avec lissage de Wilder`.
+- [x] Branche `task/010-rsi` créée depuis `Max6000i1`.
+- [x] Tests RED écrits avant implémentation.
+- [x] **Commit RED** : `[WS-3] #010 RED: tests RSI Wilder`.
+- [x] Tests GREEN passants et reproductibles.
+- [x] Critères d'acceptation tous satisfaits.
+- [x] `ruff check ai_trading/ tests/` passe sans erreur.
+- [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
+- [x] **Commit GREEN** : `[WS-3] #010 GREEN: RSI Wilder`.
+- [x] **Pull Request ouverte** vers `Max6000i1` : `[WS-3] #010 — Feature RSI avec lissage de Wilder`.
