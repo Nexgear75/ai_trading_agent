@@ -48,6 +48,25 @@ def _import_volatility():
     import ai_trading.features.volatility  # noqa: F401
 
 
+@pytest.fixture(autouse=True)
+def _clean_registry():
+    """Save, clear, and restore FEATURE_REGISTRY around each test.
+
+    Re-registers volatility features that may have been wiped by another
+    test file's cleanup.
+    """
+    saved = dict(FEATURE_REGISTRY)
+    FEATURE_REGISTRY.clear()
+    from ai_trading.features.volatility import Volatility24, Volatility72
+
+    for name, cls in [("vol_24", Volatility24), ("vol_72", Volatility72)]:
+        if name not in FEATURE_REGISTRY:
+            FEATURE_REGISTRY[name] = cls
+    yield
+    FEATURE_REGISTRY.clear()
+    FEATURE_REGISTRY.update(saved)
+
+
 # ---------------------------------------------------------------------------
 # Registration tests
 # ---------------------------------------------------------------------------

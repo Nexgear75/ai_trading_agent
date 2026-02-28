@@ -68,9 +68,24 @@ def ohlcv_minimal_2() -> pd.DataFrame:
 
 
 @pytest.fixture(autouse=True)
-def _import_log_returns():
-    """Import log_returns module to trigger @register_feature decorators."""
-    import ai_trading.features.log_returns  # noqa: F401
+def _clean_registry():
+    """Save, clear, and restore FEATURE_REGISTRY around each test.
+
+    Re-imports log_returns to ensure features are registered even if a
+    previous test file's cleanup wiped the registry.
+    """
+    saved = dict(FEATURE_REGISTRY)
+    FEATURE_REGISTRY.clear()
+    # Module is already cached by Python; re-register manually.
+    from ai_trading.features.log_returns import LogReturn1, LogReturn2, LogReturn4
+
+    for name, cls in [("logret_1", LogReturn1), ("logret_2", LogReturn2),
+                      ("logret_4", LogReturn4)]:
+        if name not in FEATURE_REGISTRY:
+            FEATURE_REGISTRY[name] = cls
+    yield
+    FEATURE_REGISTRY.clear()
+    FEATURE_REGISTRY.update(saved)
 
 
 # ---------------------------------------------------------------------------

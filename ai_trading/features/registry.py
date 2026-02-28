@@ -88,7 +88,16 @@ class BaseFeature(ABC):
     @property
     @abstractmethod
     def min_periods(self) -> int:
-        """Minimum number of bars before the first valid (non-NaN) value."""
+        """Number of leading NaN values in the output of ``compute()``.
+
+        Equivalently, the 0-based index of the first non-NaN value.
+
+        Example: if ``compute()`` returns ``[NaN, NaN, 0.5, ...]``,
+        then ``min_periods = 2``.
+
+        The pipeline computes the global warmup as
+        ``max(f.min_periods for f in features)``.
+        """
 
     @abstractmethod
     def compute(self, ohlcv: pd.DataFrame, params: dict) -> pd.Series:
