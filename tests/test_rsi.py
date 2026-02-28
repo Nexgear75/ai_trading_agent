@@ -28,13 +28,17 @@ def _clean_registry():
 
 @pytest.fixture
 def rsi_class():
-    """Import and return the RSI14 class, ensuring it is registered."""
+    """Import RSI14 and ensure it is in the registry via the decorator mechanism."""
     from ai_trading.features.rsi import RSI14
 
-    # After _clean_registry clears the dict, we must re-register since
-    # @register_feature only fires at first import.
+    # The module may be imported here for the first time, which fires the
+    # @register_feature decorator.  On subsequent tests _clean_registry clears
+    # the dict, so we re-register through the decorator (not a raw dict insert)
+    # to validate the registration mechanism.
     if "rsi_14" not in FEATURE_REGISTRY:
-        FEATURE_REGISTRY["rsi_14"] = RSI14
+        from ai_trading.features.registry import register_feature
+
+        register_feature("rsi_14")(RSI14)
     return RSI14
 
 
@@ -282,7 +286,7 @@ class TestRSIConfigDriven:
     """#010 AC-5: rsi_period and rsi_epsilon are read from params."""
 
     def test_different_period(self, rsi_instance):
-        """Changing rsi_period changes min_periods and output."""
+        """Changing rsi_period changes NaN warmup positions and computed output."""
         params_7 = {"rsi_period": 7, "rsi_epsilon": 1e-12}
         rng = np.random.RandomState(99)
         close = 100.0 + np.cumsum(rng.randn(30))
@@ -325,6 +329,30 @@ class TestRSIConfigDriven:
         ohlcv = _make_ohlcv([100.0] * 20)
         with pytest.raises(KeyError, match="rsi_epsilon"):
             rsi_instance.compute(ohlcv, {"rsi_period": 14})
+
+    def test_invalid_rsi_period_zero_raises(self, rsi_instance):
+        """rsi_period=0 raises ValueError."""
+        ohlcv = _make_ohlcv([100.0] * 20)
+        with pytest.raises(ValueError, match="rsi_period must be >= 1"):
+            rsi_instance.compute(ohlcv, {"rsi_period": 0, "rsi_epsilon": 1e-12})
+
+    def test_invalid_rsi_period_negative_raises(self, rsi_instance):
+        """rsi_period=-1 raises ValueError."""
+        ohlcv = _make_ohlcv([100.0] * 20)
+        with pytest.raises(ValueError, match="rsi_period must be >= 1"):
+            rsi_instance.compute(ohlcv, {"rsi_period": -1, "rsi_epsilon": 1e-12})
+
+    def test_invalid_rsi_epsilon_zero_raises(self, rsi_instance):
+        """rsi_epsilon=0 raises ValueError."""
+        ohlcv = _make_ohlcv([100.0] * 20)
+        with pytest.raises(ValueError, match="rsi_epsilon must be > 0"):
+            rsi_instance.compute(ohlcv, {"rsi_period": 14, "rsi_epsilon": 0.0})
+
+    def test_invalid_rsi_epsilon_negative_raises(self, rsi_instance):
+        """rsi_epsilon=-1e-12 raises ValueError."""
+        ohlcv = _make_ohlcv([100.0] * 20)
+        with pytest.raises(ValueError, match="rsi_epsilon must be > 0"):
+            rsi_instance.compute(ohlcv, {"rsi_period": 14, "rsi_epsilon": -1e-12})
 
 
 # ===========================================================================
@@ -430,10 +458,8 @@ class TestRSIErrors:
     """#010 AC-8: Error and boundary scenarios."""
 
     def test_min_periods_property(self, rsi_instance):
-        """min_periods returns rsi_period + 1 (needs n+1 close values)."""
-        # Default period is part of the class, but min_periods depends
-        # on the spec: rsi_period + 1
-        assert rsi_instance.min_periods == 15  # 14 + 1
+        """min_periods returns fixed spec-default warmup: rsi_period(14) + 1 = 15."""
+        assert rsi_instance.min_periods == 15  # spec §6.3 default: 14 + 1
 
     def test_output_is_series(self, rsi_instance, default_params):
         """compute() returns a pd.Series."""
