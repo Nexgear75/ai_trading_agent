@@ -28,9 +28,13 @@ def _clean_registry():
 
 @pytest.fixture
 def rsi_class():
-    """Import and return the RSI14 class, registering it in the process."""
+    """Import and return the RSI14 class, ensuring it is registered."""
     from ai_trading.features.rsi import RSI14
 
+    # After _clean_registry clears the dict, we must re-register since
+    # @register_feature only fires at first import.
+    if "rsi_14" not in FEATURE_REGISTRY:
+        FEATURE_REGISTRY["rsi_14"] = RSI14
     return RSI14
 
 
@@ -68,63 +72,6 @@ def _make_ohlcv(close_values):
 
 
 def _compute_rsi_reference(close_values, n=14, epsilon=1e-12):
-    """Compute RSI using Wilder smoothing — pure Python reference.
-
-    Returns a list of RSI values (NaN for t < n).
-    """
-    close = list(close_values)
-    length = len(close)
-    result = [float("nan")] * length
-
-    if length < n + 1:
-        return result
-
-    # Gains and losses (starting at index 1)
-    gains = []
-    losses = []
-    for i in range(1, length):
-        delta = close[i] - close[i - 1]
-        gains.append(max(delta, 0.0))
-        losses.append(max(-delta, 0.0))
-
-    # SMA initialisation: average of first n gains/losses
-    # gains[0..n-1] corresponds to bars 1..n
-    ag = sum(gains[:n]) / n
-    al = sum(losses[:n]) / n
-
-    # RSI at index n (first valid, using 0-based bar indexing)
-    if ag < epsilon and al < epsilon:
-        result[n] = 50.0
-    else:
-        rs = ag / (al + epsilon)
-        result[n] = 100.0 - 100.0 / (1.0 + rs)
-
-    # Wilder smoothing for subsequent bars
-    for i in range(n, len(gains)):
-        if i == 0:
-            continue
-        if i < n:
-            continue
-        # bar index in original series = i + 1 (since gains start at bar 1)
-        bar_idx = i + 1
-        if bar_idx >= length:
-            break
-        # Only apply Wilder for i >= n (already handled SMA for i == n-1)
-        if i == n - 1:
-            # already handled above
-            continue
-        ag = ((n - 1) * ag + gains[i]) / n
-        al = ((n - 1) * al + losses[i]) / n
-        if ag < epsilon and al < epsilon:
-            result[bar_idx] = 50.0
-        else:
-            rs = ag / (al + epsilon)
-            result[bar_idx] = 100.0 - 100.0 / (1.0 + rs)
-
-    return result
-
-
-def _compute_rsi_reference_v2(close_values, n=14, epsilon=1e-12):
     """Cleaner reference implementation of Wilder RSI."""
     close = list(close_values)
     length = len(close)
@@ -205,8 +152,9 @@ class TestRSINumerical:
         # After warmup, RSI should be close to 50
         valid = result.iloc[14:]
         assert all(np.isfinite(valid))
-        # For alternating series, AG ≈ AL, so RSI ≈ 50
-        np.testing.assert_allclose(valid.values, 50.0, atol=1.0)
+        # For alternating series, AG ≈ AL, so RSI oscillates around 50.
+        # Due to Wilder smoothing, the oscillation amplitude is ~3.6 for n=14.
+        np.testing.assert_allclose(valid.values, 50.0, atol=4.0)
 
     def test_rsi_matches_reference(self, rsi_instance, default_params):
         """Compare output against pure-Python Wilder reference."""
@@ -215,7 +163,7 @@ class TestRSINumerical:
         ohlcv = _make_ohlcv(close)
         result = rsi_instance.compute(ohlcv, default_params)
 
-        expected = _compute_rsi_reference_v2(close.tolist(), n=14, epsilon=1e-12)
+        expected = _compute_rsi_reference(close.tolist(), n=14, epsilon=1e-12)
 
         for i in range(len(expected)):
             if np.isnan(expected[i]):
