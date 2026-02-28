@@ -127,6 +127,18 @@
               }
             }
           },
+          "n_samples_train": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "n_samples_val": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "n_samples_test": {
+            "type": "integer",
+            "minimum": 0
+          },
           "trading": {
             "type": "object",
             "additionalProperties": false,

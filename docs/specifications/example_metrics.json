@@ -8,8 +8,8 @@
     {
       "fold_id": 0,
       "period_test": {
-        "start_utc": "2024-07-01T00:00:00Z",
-        "end_utc": "2024-07-30T23:00:00Z"
+        "start_utc": "2024-06-29T04:00:00Z",
+        "end_utc": "2024-07-29T03:00:00Z"
       },
       "threshold": {
         "method": "quantile_grid",

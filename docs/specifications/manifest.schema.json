@@ -204,7 +204,7 @@
         },
         "val_frac_in_train": {
           "type": "number",
-          "minimum": 0.0,
+          "exclusiveMinimum": 0.0,
           "maximum": 0.5
         },
         "embargo_bars": {
@@ -330,10 +330,7 @@
     "environment": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "python_version",
-        "platform"
-      ],
+      "required": [],
       "properties": {
         "python_version": {
           "type": "string"
@@ -354,7 +351,8 @@
       "additionalProperties": false,
       "required": [
         "run_dir",
-        "files"
+        "files",
+        "per_fold"
       ],
       "properties": {
         "run_dir": {
