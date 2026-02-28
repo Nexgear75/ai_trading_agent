@@ -1,6 +1,6 @@
 # Tâche — Config loader (YAML → Pydantic v2 model)
 
-Statut : TODO
+Statut : DONE
 Ordre : 002
 Workstream : WS-1
 Milestone : M1
@@ -39,29 +39,29 @@ Implémenter un module `ai_trading/config.py` qui :
 - Chaque sous-modèle utilise `ConfigDict(extra="forbid")`.
 
 ## Critères d'acceptation
-- [ ] `load_config("configs/default.yaml")` retourne une instance `PipelineConfig` valide
-- [ ] Tous les champs de `configs/default.yaml` sont accessibles par attribut (ex: `config.dataset.symbols`, `config.splits.embargo_bars`)
-- [ ] Override par fichier custom : un YAML partiel surcharge les valeurs du défaut
-- [ ] Override CLI dot notation : `--set splits.train_days=240` modifie la valeur correspondante
-- [ ] Erreur explicite si le chemin dot notation n'existe pas dans le schéma
-- [ ] Erreur explicite si le fichier YAML n'existe pas (`FileNotFoundError`)
-- [ ] Erreur explicite si une clé YAML inconnue est présente (`extra="forbid"`)
-- [ ] Types automatiquement validés par Pydantic (ex: `embargo_bars` reçoit un string → erreur)
-- [ ] Tests couvrent les scénarios nominaux + erreurs + bords
-- [ ] Suite de tests verte après implémentation
-- [ ] `ruff check` passe sans erreur
+- [x] `load_config("configs/default.yaml")` retourne une instance `PipelineConfig` valide
+- [x] Tous les champs de `configs/default.yaml` sont accessibles par attribut (ex: `config.dataset.symbols`, `config.splits.embargo_bars`)
+- [x] Override par fichier custom : un YAML partiel surcharge les valeurs du défaut
+- [x] Override CLI dot notation : `--set splits.train_days=240` modifie la valeur correspondante
+- [x] Erreur explicite si le chemin dot notation n'existe pas dans le schéma
+- [x] Erreur explicite si le fichier YAML n'existe pas (`FileNotFoundError`)
+- [x] Erreur explicite si une clé YAML inconnue est présente (`extra="forbid"`)
+- [x] Types automatiquement validés par Pydantic (ex: `embargo_bars` reçoit un string → erreur)
+- [x] Tests couvrent les scénarios nominaux + erreurs + bords
+- [x] Suite de tests verte après implémentation
+- [x] `ruff check` passe sans erreur
 
 ## Pré-condition de démarrage
 - **Tous les tests existants sont GREEN** avant de commencer.
 - **Créer une branche dédiée** `task/002-config-loader` depuis `main`.
 
 ## Checklist de fin de tâche
-- [ ] Branche `task/002-config-loader` créée depuis `main`.
-- [ ] Tests RED écrits avant implémentation.
-- [ ] **Commit RED** : `[WS-1] #002 RED: tests config loader Pydantic v2`.
-- [ ] Tests GREEN passants et reproductibles.
-- [ ] Critères d'acceptation tous satisfaits.
-- [ ] `ruff check ai_trading/ tests/` passe sans erreur.
-- [ ] Fichier de tâche mis à jour (statut DONE, critères cochés).
-- [ ] **Commit GREEN** : `[WS-1] #002 GREEN: config loader Pydantic v2`.
-- [ ] **Pull Request ouverte** vers `main` : `[WS-1] #002 — Config loader Pydantic v2`.
+- [x] Branche `task/002-config-loader` créée depuis `main`.
+- [x] Tests RED écrits avant implémentation.
+- [x] **Commit RED** : `[WS-1] #002 RED: tests config loader Pydantic v2`.
+- [x] Tests GREEN passants et reproductibles.
+- [x] Critères d'acceptation tous satisfaits.
+- [x] `ruff check ai_trading/ tests/` passe sans erreur.
+- [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
+- [x] **Commit GREEN** : `[WS-1] #002 GREEN: config loader Pydantic v2`.
+- [x] **Pull Request ouverte** vers `main` : `[WS-1] #002 — Config loader Pydantic v2`.

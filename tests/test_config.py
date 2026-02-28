@@ -8,8 +8,9 @@ validation, invalid dot path), and edge cases.
 
 import pytest
 import yaml
-from ai_trading.config import PipelineConfig, load_config  # noqa: I001
 from pydantic import ValidationError
+
+from ai_trading.config import PipelineConfig, load_config
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -75,7 +76,7 @@ class TestAttributeAccess:
         cfg = load_config(str(default_config_path))
         assert cfg.label.horizon_H_bars == 4
 
-    def test_window_length(self, default_config_path):  # noqa: N802
+    def test_window_length(self, default_config_path):
         cfg = load_config(str(default_config_path))
         assert cfg.window.L == 128
 
