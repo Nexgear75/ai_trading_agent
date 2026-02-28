@@ -524,6 +524,20 @@ Toute option doit être déclarée dans `config_snapshot` et loggée dans le man
 
 ## 9.3 Rolling z-score (non MVP, à versionner)
 
+### Rappel: qu'est-ce qu'un z-score ?
+
+Le terme z-score (ou *standard score*) désigne une valeur centrée-réduite: elle exprime de combien d'écarts-types une observation s'écarte de la moyenne. La notation $z$ vient de la convention statistique où la variable standardisée suit une loi normale $Z \sim \mathcal{N}(0,1)$. Le mot "score" n'implique pas de classement; il signifie simplement "valeur transformée sur une échelle commune". Un z-score est donc un changement d'unité: la valeur brute est exprimée en nombre d'écarts-types.
+
+### Pourquoi un z-score *rolling* plutôt que global ?
+
+La standardisation globale (§9.1) utilise une moyenne et un écart-type fixes calculés sur tout le train. Or les séries financières sont non-stationnaires: la distribution des prix et des volumes change dans le temps. Un z-score global peut donc mal représenter les conditions récentes.
+
+Le rolling z-score résout ce problème en calculant la moyenne et l'écart-type sur une fenêtre glissante passée de taille $W$, ce qui produit une normalisation locale adaptée au régime de marché courant.
+
+**Exemple concret:** si le volume moyen des 720 dernières bougies est 500 BTC avec un écart-type de 100, et que le volume actuel est 800, alors $z_t = (800-500)/100 = 3.0$ — le volume est 3 écarts-types au-dessus de sa moyenne récente. Cette information est plus pertinente qu'un z-score calculé sur 3 ans de données.
+
+### Formule
+
 Une alternative plus réaliste en présence de non-stationnarité est le rolling z-score causal:
 
 $$
