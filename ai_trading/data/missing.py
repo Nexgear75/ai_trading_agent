@@ -14,23 +14,7 @@ Reference: spec §4.3, §6.6.
 import numpy as np
 import pandas as pd
 
-# Mapping from timeframe strings to pandas Timedelta (shared with qa.py).
-_TIMEFRAME_DELTA: dict[str, pd.Timedelta] = {
-    "1m": pd.Timedelta(minutes=1),
-    "3m": pd.Timedelta(minutes=3),
-    "5m": pd.Timedelta(minutes=5),
-    "15m": pd.Timedelta(minutes=15),
-    "30m": pd.Timedelta(minutes=30),
-    "1h": pd.Timedelta(hours=1),
-    "2h": pd.Timedelta(hours=2),
-    "4h": pd.Timedelta(hours=4),
-    "6h": pd.Timedelta(hours=6),
-    "8h": pd.Timedelta(hours=8),
-    "12h": pd.Timedelta(hours=12),
-    "1d": pd.Timedelta(days=1),
-    "3d": pd.Timedelta(days=3),
-    "1w": pd.Timedelta(weeks=1),
-}
+from ai_trading.data.timeframes import TIMEFRAME_DELTA as _TIMEFRAME_DELTA
 
 
 def compute_valid_mask(
@@ -81,7 +65,7 @@ def compute_valid_mask(
         mask[: seq_len - 1] = False
     # Need indices [t+1 .. t+H] → t+H <= N-1 → t <= N-1-H
     if horizon > 0:
-        mask[n - horizon :] = False
+        mask[max(0, n - horizon) :] = False
 
     # --- Gap detection ------------------------------------------------------
     # diff()[i] = timestamps[i] - timestamps[i-1]; index 0 has NaT.

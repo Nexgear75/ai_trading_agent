@@ -32,7 +32,7 @@ Implémenter la politique MVP de traitement des bougies manquantes : pas d'inter
 - Retourner un masque booléen `valid_mask` de shape `(N,)` où `N` est le nombre total de bougies.
 
 ## Critères d'acceptation
-- [x] Un trou à l'indice `k` invalide tous les samples dans la zone `[k-H, k+L-1]` (fenêtre d'entrée + fenêtre de sortie)
+- [x] Un trou après l'indice `k` (transition `k → k+1`) invalide tous les samples dans la zone `[k-H+1, k+L-1]` (fenêtre d'entrée + fenêtre de sortie)
 - [x] Masque booléen `valid_mask` de shape `(N,)` retourné correctement
 - [x] Données sans trou → masque tout à `True` (sauf les bords qui ne peuvent pas former un sample complet)
 - [x] Plusieurs trous → masque correctement combiné

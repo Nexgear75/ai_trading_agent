@@ -12,6 +12,7 @@ touches a gap.
 import numpy as np
 import pandas as pd
 import pytest
+
 from ai_trading.data.missing import compute_valid_mask
 
 # ---------------------------------------------------------------------------
@@ -287,6 +288,13 @@ class TestEdgeCases:
         mask = compute_valid_mask(ts, "1h", 3, 2)
         assert mask.shape == (4,)
         # N=4, need L+H=5 to have at least one valid sample
+        assert mask.sum() == 0
+
+    def test_horizon_larger_than_n(self):
+        """H > N → all positions must be invalid (no room for output window)."""
+        ts = _make_timestamps(4)
+        mask = compute_valid_mask(ts, "1h", 1, 5)
+        assert mask.shape == (4,)
         assert mask.sum() == 0
 
     def test_l_equals_1(self):
