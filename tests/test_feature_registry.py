@@ -5,6 +5,7 @@ Task #007: Registre de features et classe de base (BaseFeature).
 
 import pandas as pd
 import pytest
+
 from ai_trading.features.registry import (
     FEATURE_REGISTRY,
     BaseFeature,
@@ -90,7 +91,7 @@ class TestRegisterFeature:
     def test_register_adds_to_registry(self):
         @register_feature("test_feat")
         class TestFeat(_ConcreteFeature):
-            pass
+            required_params: list[str] = []
 
         assert "test_feat" in FEATURE_REGISTRY
         assert FEATURE_REGISTRY["test_feat"] is TestFeat
@@ -98,11 +99,11 @@ class TestRegisterFeature:
     def test_register_multiple_features(self):
         @register_feature("feat_a")
         class FeatA(_ConcreteFeature):
-            pass
+            required_params: list[str] = []
 
         @register_feature("feat_b")
         class FeatB(_ConcreteFeature):
-            pass
+            required_params: list[str] = []
 
         assert "feat_a" in FEATURE_REGISTRY
         assert "feat_b" in FEATURE_REGISTRY
@@ -112,7 +113,7 @@ class TestRegisterFeature:
     def test_register_returns_class_unchanged(self):
         @register_feature("unchanged")
         class Unchanged(_ConcreteFeature):
-            pass
+            required_params: list[str] = []
 
         assert isinstance(Unchanged(), _ConcreteFeature)
 
@@ -128,24 +129,24 @@ class TestRegisterDuplicate:
     def test_duplicate_raises_valueerror(self):
         @register_feature("dup_name")
         class First(_ConcreteFeature):
-            pass
+            required_params: list[str] = []
 
         with pytest.raises(ValueError, match="dup_name"):
 
             @register_feature("dup_name")
             class Second(_ConcreteFeature):
-                pass
+                required_params: list[str] = []
 
     def test_duplicate_does_not_overwrite(self):
         @register_feature("keep_first")
         class First(_ConcreteFeature):
-            pass
+            required_params: list[str] = []
 
         with pytest.raises(ValueError):
 
             @register_feature("keep_first")
             class Second(_ConcreteFeature):
-                pass
+                required_params: list[str] = []
 
         assert FEATURE_REGISTRY["keep_first"] is First
 
@@ -222,6 +223,18 @@ class TestRequiredParams:
 
         assert NoParams.required_params == []
 
+    def test_required_params_missing_raises_typeerror(self):
+        """Subclass that omits required_params raises TypeError at class creation."""
+        with pytest.raises(TypeError, match="required_params"):
+
+            class MissingParams(BaseFeature):
+                @property
+                def min_periods(self) -> int:
+                    return 1
+
+                def compute(self, ohlcv: pd.DataFrame, params: dict) -> pd.Series:
+                    return ohlcv["close"]
+
 
 # ---------------------------------------------------------------------------
 # Edge cases & additional coverage
@@ -247,7 +260,7 @@ class TestEdgeCases:
         """Empty string is technically a valid name (no validation on name)."""
         @register_feature("")
         class EmptyNameFeat(_ConcreteFeature):
-            pass
+            required_params: list[str] = []
 
         assert "" in FEATURE_REGISTRY
 
@@ -261,7 +274,20 @@ class TestEdgeCases:
         """Registry stores the class, not an instance."""
         @register_feature("type_check")
         class TypeCheckFeat(_ConcreteFeature):
-            pass
+            required_params: list[str] = []
 
         assert isinstance(FEATURE_REGISTRY["type_check"], type)
         assert issubclass(FEATURE_REGISTRY["type_check"], BaseFeature)
+
+    def test_register_non_basefeature_raises_typeerror(self):
+        """Decorating a class that is not a BaseFeature subclass raises TypeError."""
+        with pytest.raises(TypeError, match="not a BaseFeature subclass"):
+
+            @register_feature("bad_class")
+            class NotAFeature:  # noqa: B903 — intentionally not a BaseFeature
+                pass
+
+    def test_register_plain_function_raises_typeerror(self):
+        """Decorating a function (not a class) raises TypeError."""
+        with pytest.raises(TypeError, match="not a BaseFeature subclass"):
+            register_feature("func")(lambda: None)
