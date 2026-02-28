@@ -10,11 +10,12 @@ Task #002 — WS-1.
 
 from __future__ import annotations
 
+import warnings
 from pathlib import Path
 from typing import Any
 
 import yaml
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 # ---------------------------------------------------------------------------
 # Strict base — every sub-model inherits extra="forbid"
@@ -47,13 +48,13 @@ class DatasetConfig(_StrictBase):
 
 
 class LabelConfig(_StrictBase):
-    horizon_H_bars: int  # noqa: N815
+    horizon_H_bars: int = Field(ge=1)  # noqa: N815
     target_type: str
 
 
 class WindowConfig(_StrictBase):
-    L: int  # noqa: N815
-    min_warmup: int
+    L: int = Field(ge=2)  # noqa: N815
+    min_warmup: int = Field(ge=1)
 
 
 class FeaturesParamsConfig(_StrictBase):
@@ -74,13 +75,13 @@ class FeaturesConfig(_StrictBase):
 
 class SplitsConfig(_StrictBase):
     scheme: str
-    train_days: int
-    test_days: int
-    step_days: int
-    val_frac_in_train: float
-    embargo_bars: int
-    min_samples_train: int
-    min_samples_test: int
+    train_days: int = Field(ge=1)
+    test_days: int = Field(ge=1)
+    step_days: int = Field(ge=1)
+    val_frac_in_train: float = Field(gt=0, le=0.5)
+    embargo_bars: int = Field(ge=0)
+    min_samples_train: int = Field(ge=1)
+    min_samples_test: int = Field(ge=1)
 
 
 class ScalingConfig(_StrictBase):
@@ -88,7 +89,7 @@ class ScalingConfig(_StrictBase):
     epsilon: float
     robust_quantile_low: float
     robust_quantile_high: float
-    rolling_window: int
+    rolling_window: int = Field(ge=1)
 
 
 class StrategyConfig(_StrictBase):
@@ -101,26 +102,38 @@ class ThresholdingConfig(_StrictBase):
     method: str
     q_grid: list[float]
     objective: str
-    mdd_cap: float
-    min_trades: int
+    mdd_cap: float = Field(gt=0, le=1)
+    min_trades: int = Field(ge=0)
+
+    @field_validator("q_grid")
+    @classmethod
+    def validate_q_grid(cls, value: list[float]) -> list[float]:
+        if value != sorted(value):
+            raise ValueError("thresholding.q_grid must be sorted in ascending order")
+        for idx, quantile in enumerate(value):
+            if quantile < 0 or quantile > 1:
+                raise ValueError(
+                    f"thresholding.q_grid[{idx}] must be within [0, 1], got {quantile}"
+                )
+        return value
 
 
 class CostsConfig(_StrictBase):
     cost_model: str
-    fee_rate_per_side: float
-    slippage_rate_per_side: float
+    fee_rate_per_side: float = Field(ge=0)
+    slippage_rate_per_side: float = Field(ge=0)
 
 
 class BacktestConfig(_StrictBase):
     mode: str
     direction: str
-    initial_equity: float
-    position_fraction: float
+    initial_equity: float = Field(gt=0)
+    position_fraction: float = Field(gt=0, le=1)
 
 
 class SmaConfig(_StrictBase):
-    fast: int
-    slow: int
+    fast: int = Field(ge=2)
+    slow: int = Field(ge=2)
 
 
 class BaselinesConfig(_StrictBase):
@@ -131,7 +144,7 @@ class TrainingConfig(_StrictBase):
     loss: str
     optimizer: str
     learning_rate: float
-    batch_size: int
+    batch_size: int = Field(ge=1)
     max_epochs: int
     early_stopping_patience: int
 
@@ -153,22 +166,22 @@ class CNN1DModelConfig(_StrictBase):
     n_conv_layers: int
     filters: int
     kernel_size: int
-    dropout: float
+    dropout: float = Field(ge=0, lt=1)
     pool: str
 
 
 class GRUModelConfig(_StrictBase):
     hidden_size: int
-    num_layers: int
+    num_layers: int = Field(ge=1)
     bidirectional: bool
-    dropout: float
+    dropout: float = Field(ge=0, lt=1)
 
 
 class LSTMModelConfig(_StrictBase):
     hidden_size: int
-    num_layers: int
+    num_layers: int = Field(ge=1)
     bidirectional: bool
-    dropout: float
+    dropout: float = Field(ge=0, lt=1)
 
 
 class PatchTSTModelConfig(_StrictBase):
@@ -176,9 +189,9 @@ class PatchTSTModelConfig(_StrictBase):
     stride: int
     d_model: int
     n_heads: int
-    n_layers: int
+    n_layers: int = Field(ge=1)
     ff_dim: int
-    dropout: float
+    dropout: float = Field(ge=0, lt=1)
 
 
 class RLPPOModelConfig(_StrictBase):
@@ -206,19 +219,32 @@ class ModelsConfig(_StrictBase):
 
 class MetricsConfig(_StrictBase):
     sharpe_annualized: bool
-    sharpe_epsilon: float
+    sharpe_epsilon: float = Field(gt=0)
 
 
 class ReproducibilityConfig(_StrictBase):
-    global_seed: int
+    global_seed: int = Field(ge=0)
     deterministic_torch: bool
 
 
 class ArtifactsConfig(_StrictBase):
-    output_dir: str
+    output_dir: str = Field(min_length=1)
     save_model: bool
     save_equity_curve: bool
     save_predictions: bool
+
+
+VALID_STRATEGIES: dict[str, str] = {
+    "xgboost_reg": "model",
+    "cnn1d_reg": "model",
+    "gru_reg": "model",
+    "lstm_reg": "model",
+    "patchtst_reg": "model",
+    "rl_ppo": "model",
+    "no_trade": "baseline",
+    "buy_hold": "baseline",
+    "sma_rule": "baseline",
+}
 
 
 # ---------------------------------------------------------------------------
@@ -244,6 +270,81 @@ class PipelineConfig(_StrictBase):
     metrics: MetricsConfig
     reproducibility: ReproducibilityConfig
     artifacts: ArtifactsConfig
+
+    @model_validator(mode="after")
+    def validate_mvp_and_cross_constraints(self) -> PipelineConfig:
+        required_warmup = max(
+            self.features.params.rsi_period,
+            self.features.params.ema_slow,
+            max(self.features.params.vol_windows),
+        )
+        if self.window.min_warmup < required_warmup:
+            raise ValueError(
+                "window.min_warmup must be >= max(features.params.rsi_period, "
+                "features.params.ema_slow, max(features.params.vol_windows))"
+            )
+
+        if self.window.min_warmup < self.window.L:
+            raise ValueError("window.min_warmup must be >= window.L")
+
+        if self.splits.embargo_bars < self.label.horizon_H_bars:
+            raise ValueError("splits.embargo_bars must be >= label.horizon_H_bars")
+
+        if self.splits.step_days < self.splits.test_days:
+            raise ValueError("splits.step_days must be >= splits.test_days")
+
+        if self.backtest.mode != "one_at_a_time":
+            raise ValueError("backtest.mode must be 'one_at_a_time' in MVP")
+
+        if self.backtest.direction != "long_only":
+            raise ValueError("backtest.direction must be 'long_only' in MVP")
+
+        if len(self.dataset.symbols) != 1:
+            raise ValueError("dataset.symbols must contain exactly one symbol in MVP")
+
+        if self.scaling.method == "rolling_zscore":
+            if self.scaling.rolling_window < 2:
+                raise ValueError("scaling.rolling_window must be >= 2 for rolling_zscore")
+            raise ValueError("scaling.method='rolling_zscore' is not implemented in MVP")
+
+        expected_strategy_type = VALID_STRATEGIES.get(self.strategy.name)
+        if expected_strategy_type is None:
+            raise ValueError(
+                f"strategy.name '{self.strategy.name}' is invalid; expected one of "
+                f"{sorted(VALID_STRATEGIES.keys())}"
+            )
+        if self.strategy.strategy_type != expected_strategy_type:
+            raise ValueError(
+                "strategy_type mismatch for strategy.name; expected "
+                f"'{expected_strategy_type}' for '{self.strategy.name}'"
+            )
+
+        if self.strategy.name == "sma_rule":
+            sma_fast = self.baselines.sma.fast
+            sma_slow = self.baselines.sma.slow
+            if not sma_fast < sma_slow:
+                raise ValueError("baselines.sma.fast must be < baselines.sma.slow")
+            if sma_slow > self.window.min_warmup:
+                raise ValueError("baselines.sma.slow must be <= window.min_warmup")
+
+        if self.models.patchtst.n_heads <= 0:
+            raise ValueError("models.patchtst.n_heads must be >= 1")
+        if self.models.patchtst.d_model <= 0:
+            raise ValueError("models.patchtst.d_model must be >= 1")
+        if self.models.patchtst.d_model % self.models.patchtst.n_heads != 0:
+            raise ValueError("models.patchtst.n_heads must divide models.patchtst.d_model")
+        if self.models.patchtst.stride > self.models.patchtst.patch_size:
+            raise ValueError("models.patchtst.stride must be <= models.patchtst.patch_size")
+
+        val_days = int(self.splits.train_days * self.splits.val_frac_in_train)
+        if val_days < 7:
+            warnings.warn(
+                f"val_days={val_days} is below recommended minimum 7",
+                UserWarning,
+                stacklevel=2,
+            )
+
+        return self
 
 
 # ---------------------------------------------------------------------------
