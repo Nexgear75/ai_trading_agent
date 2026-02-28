@@ -8,7 +8,14 @@ volume, irregular delta, and structured QAReport.
 
 import pandas as pd
 import pytest
+
 from ai_trading.data.qa import QAReport, run_qa_checks
+
+# ---------------------------------------------------------------------------
+# Constants
+# ---------------------------------------------------------------------------
+
+_DEFAULT_STREAK = 2  # Matches configs/default.yaml qa.zero_volume_min_streak
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -51,17 +58,16 @@ class TestCleanDataPass:
     def test_clean_data_returns_pass(self):
         """Clean OHLCV data should produce a QAReport with passed=True."""
         df = _make_ohlcv(n=20, timeframe="1h")
-        report = run_qa_checks(df, timeframe="1h")
+        report = run_qa_checks(df, timeframe="1h", zero_volume_min_streak=_DEFAULT_STREAK)
         assert isinstance(report, QAReport)
         assert report.passed is True
 
     def test_clean_data_no_anomalies(self):
         """Clean data should report no anomalies in any check."""
         df = _make_ohlcv(n=20, timeframe="1h")
-        report = run_qa_checks(df, timeframe="1h")
+        report = run_qa_checks(df, timeframe="1h", zero_volume_min_streak=_DEFAULT_STREAK)
         assert report.duplicate_count == 0
         assert len(report.missing_timestamps) == 0
-        assert report.negative_price_count == 0
         assert report.ohlc_inconsistency_count == 0
         assert report.zero_volume_streak_count == 0
         assert report.irregular_delta_count == 0
@@ -70,7 +76,7 @@ class TestCleanDataPass:
         """Clean data with different timeframes should all pass."""
         for tf in ("1m", "5m", "15m", "1h", "4h", "1d"):
             df = _make_ohlcv(n=10, timeframe=tf)
-            report = run_qa_checks(df, timeframe=tf)
+            report = run_qa_checks(df, timeframe=tf, zero_volume_min_streak=_DEFAULT_STREAK)
             assert report.passed is True, f"Failed for timeframe {tf}"
 
 
@@ -86,7 +92,7 @@ class TestDuplicateTimestamps:
         df = _make_ohlcv(n=10, timeframe="1h")
         # Duplicate the second row's timestamp
         df.loc[2, "timestamp"] = df.loc[1, "timestamp"]
-        report = run_qa_checks(df, timeframe="1h")
+        report = run_qa_checks(df, timeframe="1h", zero_volume_min_streak=_DEFAULT_STREAK)
         assert report.duplicate_count >= 1
         assert report.passed is False
 
@@ -95,7 +101,7 @@ class TestDuplicateTimestamps:
         df = _make_ohlcv(n=10, timeframe="1h")
         df.loc[2, "timestamp"] = df.loc[1, "timestamp"]
         df.loc[4, "timestamp"] = df.loc[3, "timestamp"]
-        report = run_qa_checks(df, timeframe="1h")
+        report = run_qa_checks(df, timeframe="1h", zero_volume_min_streak=_DEFAULT_STREAK)
         assert report.duplicate_count >= 2
 
 
@@ -112,7 +118,7 @@ class TestMissingCandles:
         df = _make_ohlcv(n=10, timeframe="1h")
         # Remove row at index 5 to create a gap
         df = df.drop(index=5).reset_index(drop=True)
-        report = run_qa_checks(df, timeframe="1h")
+        report = run_qa_checks(df, timeframe="1h", zero_volume_min_streak=_DEFAULT_STREAK)
         assert len(report.missing_timestamps) == 1
         assert report.passed is False
 
@@ -121,7 +127,7 @@ class TestMissingCandles:
         df = _make_ohlcv(n=20, timeframe="1h")
         # Remove rows 5 and 10 to create two gaps
         df = df.drop(index=[5, 10]).reset_index(drop=True)
-        report = run_qa_checks(df, timeframe="1h")
+        report = run_qa_checks(df, timeframe="1h", zero_volume_min_streak=_DEFAULT_STREAK)
         assert len(report.missing_timestamps) == 2
 
     def test_consecutive_gaps(self):
@@ -129,7 +135,7 @@ class TestMissingCandles:
         df = _make_ohlcv(n=20, timeframe="1h")
         # Remove 3 consecutive rows (5, 6, 7)
         df = df.drop(index=[5, 6, 7]).reset_index(drop=True)
-        report = run_qa_checks(df, timeframe="1h")
+        report = run_qa_checks(df, timeframe="1h", zero_volume_min_streak=_DEFAULT_STREAK)
         assert len(report.missing_timestamps) == 3
 
     def test_missing_timestamps_are_correct(self):
@@ -137,7 +143,7 @@ class TestMissingCandles:
         df = _make_ohlcv(n=10, timeframe="1h")
         expected_missing = df.loc[5, "timestamp"]
         df = df.drop(index=5).reset_index(drop=True)
-        report = run_qa_checks(df, timeframe="1h")
+        report = run_qa_checks(df, timeframe="1h", zero_volume_min_streak=_DEFAULT_STREAK)
         assert expected_missing in report.missing_timestamps
 
 
@@ -153,28 +159,28 @@ class TestNegativePrices:
         df = _make_ohlcv(n=10, timeframe="1h")
         df.loc[3, "open"] = -1.0
         with pytest.raises(ValueError, match="[Nn]egative.*price"):
-            run_qa_checks(df, timeframe="1h")
+            run_qa_checks(df, timeframe="1h", zero_volume_min_streak=_DEFAULT_STREAK)
 
     def test_negative_high_raises(self):
         """Negative high price raises ValueError."""
         df = _make_ohlcv(n=10, timeframe="1h")
         df.loc[3, "high"] = -5.0
         with pytest.raises(ValueError, match="[Nn]egative.*price"):
-            run_qa_checks(df, timeframe="1h")
+            run_qa_checks(df, timeframe="1h", zero_volume_min_streak=_DEFAULT_STREAK)
 
     def test_negative_low_raises(self):
         """Negative low price raises ValueError."""
         df = _make_ohlcv(n=10, timeframe="1h")
         df.loc[3, "low"] = -10.0
         with pytest.raises(ValueError, match="[Nn]egative.*price"):
-            run_qa_checks(df, timeframe="1h")
+            run_qa_checks(df, timeframe="1h", zero_volume_min_streak=_DEFAULT_STREAK)
 
     def test_negative_close_raises(self):
         """Negative close price raises ValueError."""
         df = _make_ohlcv(n=10, timeframe="1h")
         df.loc[3, "close"] = -0.01
         with pytest.raises(ValueError, match="[Nn]egative.*price"):
-            run_qa_checks(df, timeframe="1h")
+            run_qa_checks(df, timeframe="1h", zero_volume_min_streak=_DEFAULT_STREAK)
 
     def test_negative_price_count_in_error(self):
         """Error message for negative prices includes count info."""
@@ -182,7 +188,7 @@ class TestNegativePrices:
         df.loc[2, "open"] = -1.0
         df.loc[5, "close"] = -2.0
         with pytest.raises(ValueError, match="2 row"):
-            run_qa_checks(df, timeframe="1h")
+            run_qa_checks(df, timeframe="1h", zero_volume_min_streak=_DEFAULT_STREAK)
 
 
 # ===========================================================================
@@ -198,7 +204,7 @@ class TestOHLCInconsistency:
         df = _make_ohlcv(n=10, timeframe="1h")
         # open=103, high should be >= 103, set it lower
         df.loc[3, "high"] = 90.0
-        report = run_qa_checks(df, timeframe="1h")
+        report = run_qa_checks(df, timeframe="1h", zero_volume_min_streak=_DEFAULT_STREAK)
         assert report.ohlc_inconsistency_count >= 1
         assert report.passed is False
 
@@ -208,7 +214,7 @@ class TestOHLCInconsistency:
         # close=105, set high=100 which is < close
         df.loc[3, "high"] = 100.0
         df.loc[3, "close"] = 110.0
-        report = run_qa_checks(df, timeframe="1h")
+        report = run_qa_checks(df, timeframe="1h", zero_volume_min_streak=_DEFAULT_STREAK)
         assert report.ohlc_inconsistency_count >= 1
         assert report.passed is False
 
@@ -217,7 +223,7 @@ class TestOHLCInconsistency:
         df = _make_ohlcv(n=10, timeframe="1h")
         # open=103, set low=110
         df.loc[3, "low"] = 110.0
-        report = run_qa_checks(df, timeframe="1h")
+        report = run_qa_checks(df, timeframe="1h", zero_volume_min_streak=_DEFAULT_STREAK)
         assert report.ohlc_inconsistency_count >= 1
         assert report.passed is False
 
@@ -227,7 +233,7 @@ class TestOHLCInconsistency:
         # close=105, set low=110
         df.loc[3, "close"] = 100.0
         df.loc[3, "low"] = 110.0
-        report = run_qa_checks(df, timeframe="1h")
+        report = run_qa_checks(df, timeframe="1h", zero_volume_min_streak=_DEFAULT_STREAK)
         assert report.ohlc_inconsistency_count >= 1
 
     def test_multiple_inconsistencies_counted(self):
@@ -236,7 +242,7 @@ class TestOHLCInconsistency:
         # Two rows with high < open
         df.loc[2, "high"] = 90.0
         df.loc[5, "high"] = 90.0
-        report = run_qa_checks(df, timeframe="1h")
+        report = run_qa_checks(df, timeframe="1h", zero_volume_min_streak=_DEFAULT_STREAK)
         assert report.ohlc_inconsistency_count >= 2
 
 
@@ -251,7 +257,7 @@ class TestZeroVolume:
         """A single zero-volume bar should not be flagged as prolonged."""
         df = _make_ohlcv(n=10, timeframe="1h")
         df.loc[5, "volume"] = 0.0
-        report = run_qa_checks(df, timeframe="1h")
+        report = run_qa_checks(df, timeframe="1h", zero_volume_min_streak=_DEFAULT_STREAK)
         assert report.zero_volume_streak_count == 0
 
     def test_prolonged_zero_volume_detected(self):
@@ -260,7 +266,7 @@ class TestZeroVolume:
         # Set 3 consecutive bars to zero volume
         for i in range(5, 8):
             df.loc[i, "volume"] = 0.0
-        report = run_qa_checks(df, timeframe="1h")
+        report = run_qa_checks(df, timeframe="1h", zero_volume_min_streak=_DEFAULT_STREAK)
         assert report.zero_volume_streak_count >= 1
         assert report.passed is False
 
@@ -269,7 +275,7 @@ class TestZeroVolume:
         df = _make_ohlcv(n=10, timeframe="1h")
         df.loc[3, "volume"] = 0.0
         df.loc[4, "volume"] = 0.0
-        report = run_qa_checks(df, timeframe="1h")
+        report = run_qa_checks(df, timeframe="1h", zero_volume_min_streak=_DEFAULT_STREAK)
         assert report.zero_volume_streak_count >= 1
 
     def test_multiple_streaks_counted(self):
@@ -281,7 +287,7 @@ class TestZeroVolume:
         # Second streak: bars 10-11
         df.loc[10, "volume"] = 0.0
         df.loc[11, "volume"] = 0.0
-        report = run_qa_checks(df, timeframe="1h")
+        report = run_qa_checks(df, timeframe="1h", zero_volume_min_streak=_DEFAULT_STREAK)
         assert report.zero_volume_streak_count >= 2
 
 
@@ -297,7 +303,7 @@ class TestIrregularDelta:
         df = _make_ohlcv(n=10, timeframe="1h")
         # Shift one timestamp by 30 minutes (half of 1h)
         df.loc[5, "timestamp"] = df.loc[5, "timestamp"] + pd.Timedelta(minutes=30)
-        report = run_qa_checks(df, timeframe="1h")
+        report = run_qa_checks(df, timeframe="1h", zero_volume_min_streak=_DEFAULT_STREAK)
         # Should detect irregular spacing
         assert report.irregular_delta_count >= 1
         assert report.passed is False
@@ -318,11 +324,10 @@ class TestQAReportStructure:
     def test_report_has_required_fields(self):
         """QAReport must have all required fields."""
         df = _make_ohlcv(n=10, timeframe="1h")
-        report = run_qa_checks(df, timeframe="1h")
+        report = run_qa_checks(df, timeframe="1h", zero_volume_min_streak=_DEFAULT_STREAK)
         assert hasattr(report, "passed")
         assert hasattr(report, "duplicate_count")
         assert hasattr(report, "missing_timestamps")
-        assert hasattr(report, "negative_price_count")
         assert hasattr(report, "ohlc_inconsistency_count")
         assert hasattr(report, "zero_volume_streak_count")
         assert hasattr(report, "irregular_delta_count")
@@ -330,11 +335,10 @@ class TestQAReportStructure:
     def test_report_types(self):
         """Fields have the correct types."""
         df = _make_ohlcv(n=10, timeframe="1h")
-        report = run_qa_checks(df, timeframe="1h")
+        report = run_qa_checks(df, timeframe="1h", zero_volume_min_streak=_DEFAULT_STREAK)
         assert isinstance(report.passed, bool)
         assert isinstance(report.duplicate_count, int)
         assert isinstance(report.missing_timestamps, list)
-        assert isinstance(report.negative_price_count, int)
         assert isinstance(report.ohlc_inconsistency_count, int)
         assert isinstance(report.zero_volume_streak_count, int)
         assert isinstance(report.irregular_delta_count, int)
@@ -351,34 +355,34 @@ class TestEdgeCases:
         """An empty DataFrame raises ValueError."""
         df = pd.DataFrame(columns=["timestamp", "open", "high", "low", "close", "volume"])
         with pytest.raises(ValueError, match="[Ee]mpty"):
-            run_qa_checks(df, timeframe="1h")
+            run_qa_checks(df, timeframe="1h", zero_volume_min_streak=_DEFAULT_STREAK)
 
     def test_missing_columns_raises(self):
         """DataFrame missing required columns raises ValueError."""
         df = pd.DataFrame({"timestamp": [1, 2], "open": [1.0, 2.0]})
         with pytest.raises(ValueError, match="[Cc]olumn"):
-            run_qa_checks(df, timeframe="1h")
+            run_qa_checks(df, timeframe="1h", zero_volume_min_streak=_DEFAULT_STREAK)
 
     def test_unsupported_timeframe_raises(self):
         """Unsupported timeframe string raises ValueError."""
         df = _make_ohlcv(n=10, timeframe="1h")
         with pytest.raises(ValueError, match="[Tt]imeframe"):
-            run_qa_checks(df, timeframe="2min")
+            run_qa_checks(df, timeframe="2min", zero_volume_min_streak=_DEFAULT_STREAK)
 
     def test_single_row_passes(self):
         """Single-row DataFrame passes (no gaps or irregularity possible)."""
         df = _make_ohlcv(n=1, timeframe="1h")
-        report = run_qa_checks(df, timeframe="1h")
+        report = run_qa_checks(df, timeframe="1h", zero_volume_min_streak=_DEFAULT_STREAK)
         assert report.passed is True
 
-    def test_all_zero_prices_raises(self):
-        """All-zero prices (open=0) do not raise but zero is not negative."""
+    def test_all_zero_prices_no_raise(self):
+        """All-zero prices (open=0) do not raise because zero is not negative."""
         df = _make_ohlcv(n=5, timeframe="1h")
         df["open"] = 0.0
         df["high"] = 0.0
         df["low"] = 0.0
         df["close"] = 0.0
-        # Zero is not negative, so should not raise; but OHLC consistency
+        # Zero is not negative, so should not raise; OHLC consistency
         # should still hold (0 >= max(0,0) and 0 <= min(0,0))
-        report = run_qa_checks(df, timeframe="1h")
-        assert report.negative_price_count == 0
+        report = run_qa_checks(df, timeframe="1h", zero_volume_min_streak=_DEFAULT_STREAK)
+        assert report.ohlc_inconsistency_count == 0

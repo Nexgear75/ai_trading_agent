@@ -32,9 +32,6 @@ _TIMEFRAME_DELTA: dict[str, pd.Timedelta] = {
 _REQUIRED_COLUMNS = {"timestamp", "open", "high", "low", "close", "volume"}
 _PRICE_COLUMNS = ["open", "high", "low", "close"]
 
-# Minimum consecutive zero-volume bars to count as a "prolonged" streak
-_ZERO_VOLUME_MIN_STREAK = 2
-
 
 @dataclass
 class QAReport:
@@ -48,13 +45,11 @@ class QAReport:
         Number of duplicate timestamps found.
     missing_timestamps : list[pd.Timestamp]
         List of expected timestamps that are absent from the data.
-    negative_price_count : int
-        Number of rows with at least one negative price column.
     ohlc_inconsistency_count : int
         Number of rows violating H >= max(O,C) and L <= min(O,C).
     zero_volume_streak_count : int
-        Number of separate streaks of >= _ZERO_VOLUME_MIN_STREAK consecutive
-        zero-volume bars.
+        Number of separate streaks of consecutive zero-volume bars
+        exceeding the configured threshold.
     irregular_delta_count : int
         Number of timestamp pairs whose delta does not match the expected Δ
         and is not a multiple of Δ (i.e. not a simple gap).
@@ -63,7 +58,6 @@ class QAReport:
     passed: bool
     duplicate_count: int
     missing_timestamps: list = field(default_factory=list)
-    negative_price_count: int = 0
     ohlc_inconsistency_count: int = 0
     zero_volume_streak_count: int = 0
     irregular_delta_count: int = 0
@@ -98,7 +92,7 @@ def _validate_inputs(df: pd.DataFrame, timeframe: str) -> pd.Timedelta:
     return expected_delta
 
 
-def _check_negative_prices(df: pd.DataFrame) -> int:
+def _check_negative_prices(df: pd.DataFrame) -> None:
     """Check for negative prices and raise if any found.
 
     Raises
@@ -113,7 +107,6 @@ def _check_negative_prices(df: pd.DataFrame) -> int:
             f"Negative price detected in {count} row(s). "
             "All price columns (open, high, low, close) must be >= 0."
         )
-    return 0
 
 
 def _check_duplicates(timestamps: pd.Series) -> int:
@@ -154,8 +147,15 @@ def _check_ohlc_consistency(df: pd.DataFrame) -> int:
     return int(violated.sum())
 
 
-def _check_zero_volume_streaks(df: pd.DataFrame) -> int:
-    """Count streaks of consecutive zero-volume bars >= _ZERO_VOLUME_MIN_STREAK.
+def _check_zero_volume_streaks(df: pd.DataFrame, min_streak: int) -> int:
+    """Count streaks of consecutive zero-volume bars >= *min_streak*.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        OHLCV DataFrame.
+    min_streak : int
+        Minimum consecutive zero-volume bars to count as prolonged.
 
     Returns the number of separate prolonged zero-volume streaks.
     """
@@ -165,7 +165,7 @@ def _check_zero_volume_streaks(df: pd.DataFrame) -> int:
     # Group by streak and filter zero-volume streaks with sufficient length
     streak_count = 0
     for _sid, group in is_zero.groupby(streak_id):
-        if group.iloc[0] == 1 and len(group) >= _ZERO_VOLUME_MIN_STREAK:
+        if group.iloc[0] == 1 and len(group) >= min_streak:
             streak_count += 1
     return streak_count
 
@@ -197,7 +197,11 @@ def _check_irregular_delta(
     return int((positive & irregular).sum())
 
 
-def run_qa_checks(df: pd.DataFrame, timeframe: str) -> QAReport:
+def run_qa_checks(
+    df: pd.DataFrame,
+    timeframe: str,
+    zero_volume_min_streak: int,
+) -> QAReport:
     """Run all mandatory QA checks on an OHLCV DataFrame.
 
     Parameters
@@ -206,6 +210,9 @@ def run_qa_checks(df: pd.DataFrame, timeframe: str) -> QAReport:
         OHLCV DataFrame with columns: timestamp, open, high, low, close, volume.
     timeframe : str
         Expected candle interval (e.g. "1h", "4h", "1d").
+    zero_volume_min_streak : int
+        Minimum consecutive zero-volume bars to count as prolonged.
+        Read from ``qa.zero_volume_min_streak`` in config.
 
     Returns
     -------
@@ -218,10 +225,15 @@ def run_qa_checks(df: pd.DataFrame, timeframe: str) -> QAReport:
         If the DataFrame is empty, missing required columns, timeframe is
         unsupported, or negative prices are detected.
     """
+    if zero_volume_min_streak < 1:
+        raise ValueError(
+            f"zero_volume_min_streak must be >= 1, got {zero_volume_min_streak}"
+        )
+
     expected_delta = _validate_inputs(df, timeframe)
 
     # Check 1: Negative prices — raises immediately
-    negative_price_count = _check_negative_prices(df)
+    _check_negative_prices(df)
 
     # Check 2: Duplicate timestamps
     duplicate_count = _check_duplicates(df["timestamp"])
@@ -235,7 +247,7 @@ def run_qa_checks(df: pd.DataFrame, timeframe: str) -> QAReport:
     ohlc_inconsistency_count = _check_ohlc_consistency(df)
 
     # Check 5: Zero volume streaks
-    zero_volume_streak_count = _check_zero_volume_streaks(df)
+    zero_volume_streak_count = _check_zero_volume_streaks(df, zero_volume_min_streak)
 
     # Check 6: Irregular delta
     irregular_delta_count = _check_irregular_delta(df["timestamp"], expected_delta)
@@ -244,7 +256,6 @@ def run_qa_checks(df: pd.DataFrame, timeframe: str) -> QAReport:
     passed = (
         duplicate_count == 0
         and len(missing_timestamps) == 0
-        and negative_price_count == 0
         and ohlc_inconsistency_count == 0
         and zero_volume_streak_count == 0
         and irregular_delta_count == 0
@@ -254,7 +265,6 @@ def run_qa_checks(df: pd.DataFrame, timeframe: str) -> QAReport:
         passed=passed,
         duplicate_count=duplicate_count,
         missing_timestamps=missing_timestamps,
-        negative_price_count=negative_price_count,
         ohlc_inconsistency_count=ohlc_inconsistency_count,
         zero_volume_streak_count=zero_volume_streak_count,
         irregular_delta_count=irregular_delta_count,
