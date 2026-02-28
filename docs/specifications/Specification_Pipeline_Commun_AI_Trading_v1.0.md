@@ -24,7 +24,7 @@ But : imposer un pipeline unique (données, splits, coûts, backtest, métriques
   - 4.1 Source et format
   - 4.2 Contrôles qualité (QA) obligatoires
   - 4.3 Politique de traitement des trous (missing candles)
-- 5. Définition de la cible y_t et alignement avec l'exécution
+- 5. Définition de la cible $y_t$ et alignement avec l'exécution
   - 5.1 Conventions temporelles
   - 5.2 Cible par défaut: log-return du trade
   - 5.3 Alternative optionnelle (si justifiée): log-return close-to-close
@@ -131,30 +131,30 @@ Le but premier est une comparaison méthodologiquement robuste (éviter les fuit
 ## 1.3 Hypothèses et choix imposés (MVP)
 
 - Données: OHLCV Binance, timeframe fixe (ex: 1h), période fixe (ex: 2 ans).
-- Cible: rendement futur à horizon H (ex: 4h) traité en régression.
+- Cible: rendement futur à horizon $H$ (ex: 4h) traité en régression.
 - Décision: long-only Go/No-Go.
-- Exécution: entrée à l'ouverture de la bougie t+1, sortie à la clôture de t+H.
+- Exécution: entrée à l'ouverture de la bougie $t+1$, sortie à la clôture de $t+H$.
 - Backtest: coûts fixés et appliqués partout (frais + slippage).
 - Évaluation: protocole walk-forward (rolling window) + agrégation inter-fold.
 
 # 2. Glossaire et notations
 
-On indexe les bougies par un temps discret t correspondant à la clôture de la bougie. Les prix OHLCV sont notés O_t, H_t, L_t, C_t et V_t (Open, High, Low, Close, Volume). Le timeframe Δ est l'intervalle entre deux bougies (ex: 1h).
+On indexe les bougies par un temps discret $t$ correspondant à la clôture de la bougie. Les prix OHLCV sont notés $O_t$, $H_t$, $L_t$, $C_t$ et $V_t$ (Open, High, Low, Close, Volume). Le timeframe $\Delta$ est l'intervalle entre deux bougies (ex: 1h).
 
 
 ## 2.1 Notations principales
 
 | Symbole | Définition |
 | --- | --- |
-| t | Indice temporel discret (bougie). Les features à t n'utilisent que l'information <= t. |
-| Δ | Timeframe (ex: 1h). |
-| H | Horizon de prédiction/exécution en nombre de bougies (ex: 4). |
-| L | Longueur de la fenêtre d'entrée pour les modèles séquentiels (ex: 128). |
-| F | Nombre de features par pas de temps. |
-| X_t | Entrée modèle à l'instant t. Format séquentiel: X_t ∈ R^{L×F}. |
-| y_t | Cible (rendement futur à horizon H). |
-| ŷ_t | Prédiction du modèle pour y_t. |
-| θ | Seuil Go/No-Go calibré sur validation. |
+| $t$ | Indice temporel discret (bougie). Les features à $t$ n'utilisent que l'information $\leq t$. |
+| $\Delta$ | Timeframe (ex: 1h). |
+| $H$ | Horizon de prédiction/exécution en nombre de bougies (ex: 4). |
+| $L$ | Longueur de la fenêtre d'entrée pour les modèles séquentiels (ex: 128). |
+| $F$ | Nombre de features par pas de temps. |
+| $X_t$ | Entrée modèle à l'instant $t$. Format séquentiel: $X_t \in \mathbb{R}^{L \times F}$. |
+| $y_t$ | Cible (rendement futur à horizon $H$). |
+| $\hat{y}_t$ | Prédiction du modèle pour $y_t$. |
+| $\theta$ | Seuil Go/No-Go calibré sur validation. |
 
 
 # 3. Vue d'ensemble du pipeline
@@ -172,23 +172,23 @@ Figure 1 - Dataflow du pipeline commun (vue fonctionnelle).
 
 ```mermaid
 flowchart TD
-  A[Ingestion OHLCV Binance\n(raw Parquet/CSV)] --> B[QA & Cleaning\n(timestamps, trous, outliers)]
-  B --> C[Feature Engineering\n(causal, past-only)]
-  C --> D[Build Samples\nX_seq(N,L,F), y_t, meta]
-  D --> E[Walk-Forward Splitter\n(train/val/test + embargo)]
-  E -->|Fold i| F[Scaler fit sur TRAIN\ntransform val/test]
-  F --> G[Entraînement modèle\n(XGBoost/CNN/GRU/LSTM/PatchTST/RL-PPO)]
-  G --> H[Prédictions sur VALIDATION]
-  H --> I[Calibration seuil θ\nobjectif trading\n(biais anti faux positifs)]
-  I --> J[Prédictions sur TEST]
-  J --> K[Backtest commun\nentry Open[t+1], exit Close[t+H]\ncoûts (fees+slippage)]
-  K --> L[Métriques\nML + Trading]
-  L --> M[Artefacts fold\n(preds, trades, metrics, model)]
-  M --> N[Agrégation inter-fold\n+ rapport final]
+  A["Ingestion OHLCV Binance\n(raw Parquet/CSV)"] --> B["QA & Cleaning\n(timestamps, trous, outliers)"]
+  B --> C["Feature Engineering\n(causal, past-only)"]
+  C --> D["Build Samples\nX_seq(N,L,F), y_t, meta"]
+  D --> E["Walk-Forward Splitter\n(train/val/test + embargo)"]
+  E -->|Fold i| F["Scaler fit sur TRAIN\ntransform val/test"]
+  F --> G["Entraînement modèle\n(XGBoost/CNN/GRU/LSTM/PatchTST/RL-PPO)"]
+  G --> H["Prédictions sur VALIDATION"]
+  H --> I["Calibration seuil θ\nobjectif trading\n(biais anti faux positifs)"]
+  I --> J["Prédictions sur TEST"]
+  J --> K["Backtest commun\nentry Open t+1, exit Close t+H\ncoûts (fees+slippage)"]
+  K --> L["Métriques\nML + Trading"]
+  L --> M["Artefacts fold\n(preds, trades, metrics, model)"]
+  M --> N["Agrégation inter-fold\n+ rapport final"]
   subgraph Baselines
-    B0[no-trade] --> K
-    B1[buy&hold] --> K
-    B2[règle SMA] --> K
+    B0["no-trade"] --> K
+    B1["buy&hold"] --> K
+    B2["règle SMA"] --> K
   end
 ```
 
@@ -206,17 +206,17 @@ Les données sources sont des séries OHLCV (Open, High, Low, Close, Volume) ré
 ### Format canonique (raw) attendu par le pipeline:
 
 - Fichier Parquet par symbole (ou fichier multi-symboles avec colonne symbol).
-- Colonnes minimales: timestamp_utc, open, high, low, close, volume, symbol.
-- Tri strict par timestamp_utc croissant (et par symbol puis timestamp si multi-symboles).
+- Colonnes minimales: `timestamp_utc`, `open`, `high`, `low`, `close`, `volume`, `symbol`.
+- Tri strict par `timestamp_utc` croissant (et par `symbol` puis `timestamp` si multi-symboles).
 
 ## 4.2 Contrôles qualité (QA) obligatoires
 
 Avant tout calcul de features, le pipeline exécute des contrôles QA qui doivent échouer explicitement (erreur) en cas d'anomalie non gérée.
 
-- Régularité temporelle: la grille de timestamps doit être uniforme au pas Δ (pas de doublons).
+- Régularité temporelle: la grille de timestamps doit être uniforme au pas $\Delta$ (pas de doublons).
 - Gestion des trous: une bougie manquante doit être explicitement détectée (missing candle).
 - Gestion des outliers: les valeurs aberrantes extrêmes doivent être détectées (ex: prix négatif, volume nul prolongé).
-- Cohérence intra-bougie OHLC: vérifier que `H >= max(O, C)` et `L <= min(O, C)` pour chaque bougie. Toute violation est signalée comme anomalie.
+- Cohérence intra-bougie OHLC: vérifier que $H \geq \max(O, C)$ et $L \leq \min(O, C)$ pour chaque bougie. Toute violation est signalée comme anomalie.
 - Alignement multi-symboles (si applicable): toutes les séries sont réindexées sur la même grille temporelle.
 
 ## 4.3 Politique de traitement des trous (missing candles)
@@ -227,26 +227,26 @@ Pour éviter d'introduire des artefacts, la règle par défaut du MVP est la sui
 Cette politique est conservative mais robuste.
 
 
-# 5. Définition de la cible y_t et alignement avec l'exécution
+# 5. Définition de la cible $y_t$ et alignement avec l'exécution
 
-Le pipeline traite la prédiction comme une régression: on prédit un rendement futur à horizon H puis on convertit cette prédiction en décision Go/No-Go via un seuil θ calibré sur validation. La définition du label doit être cohérente avec la règle d'exécution.
+Le pipeline traite la prédiction comme une régression: on prédit un rendement futur à horizon $H$ puis on convertit cette prédiction en décision Go/No-Go via un seuil $\theta$ calibré sur validation. La définition du label doit être cohérente avec la règle d'exécution.
 
 
 ## 5.1 Conventions temporelles
 
-À la fin de la bougie t (clôture), toutes les valeurs OHLCV de cette bougie sont connues. La décision est prise à ce moment. L'entrée se fait à l'ouverture de la bougie suivante (t+1). La sortie se fait à la clôture de la bougie t+H.
+À la fin de la bougie $t$ (clôture), toutes les valeurs OHLCV de cette bougie sont connues. La décision est prise à ce moment. L'entrée se fait à l'ouverture de la bougie suivante ($t+1$). La sortie se fait à la clôture de la bougie $t+H$.
 
 
 ## 5.2 Cible par défaut: log-return du trade
 
-Pour coller exactement au P&L du trade (entrée Open[t+1], sortie Close[t+H]), la cible par défaut est:
+Pour coller exactement au P&L du trade (entrée $O_{t+1}$, sortie $C_{t+H}$), la cible par défaut est:
 
 
 $$
 y_t = \log( Close_{t+H} / Open_{t+1} )
 $$
 
-Cette cible est réaliste: elle incorpore l'incertitude sur le prix d'entrée Open[t+1] (inconnu à t). Elle évite une incohérence fréquente où l'on prédit un rendement Close-to-Close mais on exécute à l'Open.
+Cette cible est réaliste: elle incorpore l'incertitude sur le prix d'entrée $O_{t+1}$ (inconnu à $t$). Elle évite une incohérence fréquente où l'on prédit un rendement Close-to-Close mais on exécute à l'Open.
 
 
 ## 5.3 Alternative optionnelle (si justifiée): log-return close-to-close
@@ -258,95 +258,124 @@ $$
 y_t = \log( Close_{t+H} / Close_t )
 $$
 
-Si cette alternative est utilisée, le rapport doit indiquer explicitement la divergence entre prix d'entrée réel (Open[t+1]) et définition du label.
+Si cette alternative est utilisée, le rapport doit indiquer explicitement la divergence entre prix d'entrée réel ($O_{t+1}$) et définition du label.
 
 
 # 6. Feature engineering: définitions mathématiques
 
-Les features sont calculées de manière strictement causale: la feature au temps t ne dépend que de valeurs observées à des temps <= t. Toute implémentation doit être explicitement auditée pour éviter les rollings centrés ou les lags négatifs.
+Les features sont calculées de manière strictement causale: la feature au temps $t$ ne dépend que de valeurs observées à des temps $\leq t$. Toute implémentation doit être explicitement auditée pour éviter les rollings centrés ou les lags négatifs.
 
 
 ## 6.1 Série de base et conventions
 
-On définit pour chaque bougie t (timezone UTC):
-- O_t = Open_t, H_t = High_t, L_t = Low_t, C_t = Close_t, V_t = Volume_t.
-Les indicateurs ci-dessous utilisent par défaut la série des clôtures C_t.
+On définit pour chaque bougie $t$ (timezone UTC):
+- $O_t = \text{Open}_t$, $H_t = \text{High}_t$, $L_t = \text{Low}_t$, $C_t = \text{Close}_t$, $V_t = \text{Volume}_t$.
+
+Les indicateurs ci-dessous utilisent par défaut la série des clôtures $C_t$.
 
 
 ## 6.2 Liste canonique des features (MVP)
 
-La liste ci-dessous est le jeu de features minimal commun (MVP). Tout ajout de feature doit être approuvé collectivement et versionné (feature_version) afin de conserver la comparabilité.
+La liste ci-dessous est le jeu de features minimal commun (MVP). Tout ajout de feature doit être approuvé collectivement et versionné (`feature_version`) afin de conserver la comparabilité.
 
 | Feature | Définition (math) | Paramètres / notes |
 | --- | --- | --- |
-| logret_1 | logret_1(t) = log(C_t / C_{t-1}) | Return log à 1 pas. |
-| logret_2 | logret_2(t) = log(C_t / C_{t-2}) | Return log à 2 pas. |
-| logret_4 | logret_4(t) = log(C_t / C_{t-4}) | Return log à 4 pas (ex: 4h si Δ=1h). |
-| vol_24 | vol_24(t) = std( logret_1(t-i) )_{i=0..23} | Écart-type sur 24 pas (ddof=0). |
-| vol_72 | vol_72(t) = std( logret_1(t-i) )_{i=0..71} | Écart-type sur 72 pas (ddof=0). |
-| logvol | logvol(t) = log(V_t + ε) | ε = 1e-8 (évite log(0)). |
-| dlogvol | dlogvol(t) = logvol(t) - logvol(t-1) | Différence première du log-volume. |
-| rsi_14 | RSI_14(t) = 100 - 100/(1 + RS_t) | RS_t défini via lissage de Wilder (voir §6.3). |
-| ema_ratio_12_26 | ema_ratio(t) = EMA_12(t) / EMA_26(t) - 1 | EMA définie en §6.4, α = 2/(n+1). |
+| `logret_1` | $\text{logret\_1}(t) = \log(C_t / C_{t-1})$ | Return log à 1 pas. |
+| `logret_2` | $\text{logret\_2}(t) = \log(C_t / C_{t-2})$ | Return log à 2 pas. |
+| `logret_4` | $\text{logret\_4}(t) = \log(C_t / C_{t-4})$ | Return log à 4 pas (ex: 4h si $\Delta$=1h). |
+| `vol_24` | $\text{vol\_24}(t) = \text{std}( \text{logret\_1}(t-i) )_{i=0..23}$ | Écart-type sur 24 pas (ddof=0). |
+| `vol_72` | $\text{vol\_72}(t) = \text{std}( \text{logret\_1}(t-i) )_{i=0..71}$ | Écart-type sur 72 pas (ddof=0). |
+| `logvol` | $\text{logvol}(t) = \log(V_t + \varepsilon)$ | $\varepsilon = 10^{-8}$ (évite log(0)). |
+| `dlogvol` | $\text{dlogvol}(t) = \text{logvol}(t) - \text{logvol}(t-1)$ | Différence première du log-volume. |
+| `rsi_14` | $\text{RSI}_{14}(t) = 100 - 100/(1 + RS_t)$ | $RS_t$ défini via lissage de Wilder (voir §6.3). |
+| `ema_ratio_12_26` | $\text{ema\_ratio}(t) = \text{EMA}_{12}(t) / \text{EMA}_{26}(t) - 1$ | EMA définie en §6.4, $\alpha = 2/(n+1)$. |
 
 
 ## 6.3 RSI (Relative Strength Index) - lissage de Wilder
 
-On note n = 14 (par défaut). On définit la variation de clôture:
-Δ_t = C_t - C_{t-1}
-Gain_t = max(Δ_t, 0)
-Loss_t = max(-Δ_t, 0)
+On note $n = 14$ (par défaut). On définit la variation de clôture:
+
+$$
+\Delta_t = C_t - C_{t-1}
+$$
+$$
+\text{Gain}_t = \max(\Delta_t, 0)
+$$
+$$
+\text{Loss}_t = \max(-\Delta_t, 0)
+$$
 
 On définit ensuite les moyennes lissées (Wilder):
-AG_t = (AG_{t-1}*(n-1) + Gain_t) / n
-AL_t = (AL_{t-1}*(n-1) + Loss_t) / n
+
+$$
+AG_t = \frac{AG_{t-1} \cdot (n-1) + \text{Gain}_t}{n}
+$$
+$$
+AL_t = \frac{AL_{t-1} \cdot (n-1) + \text{Loss}_t}{n}
+$$
 
 Puis:
-RS_t = AG_t / (AL_t + ε)
-RSI_t = 100 - 100/(1 + RS_t)
 
-Initialisation (t = n): AG_n et AL_n peuvent être initialisés comme les moyennes simples sur les n premières valeurs.
+$$
+RS_t = \frac{AG_t}{AL_t + \varepsilon}
+$$
+$$
+RSI_t = 100 - \frac{100}{1 + RS_t}
+$$
+
+Initialisation ($t = n$): $AG_n$ et $AL_n$ peuvent être initialisés comme les moyennes simples sur les $n$ premières valeurs.
 
 
 **Paramètres RSI :**
-- n = 14
-- ε = 1e-12 (évite division par zéro)
+- $n = 14$
+- $\varepsilon = 10^{-12}$ (évite division par zéro)
 
 **Conventions :**
-- Si AL_t ≈ 0 et AG_t > 0 → RSI_t → 100.
-- Si AG_t ≈ 0 et AL_t > 0 → RSI_t → 0.
-- Si AG_t = AL_t = 0 → RSI_t = 50.
+- Si $AL_t \approx 0$ et $AG_t > 0$ → $RSI_t \to 100$.
+- Si $AG_t \approx 0$ et $AL_t > 0$ → $RSI_t \to 0$.
+- Si $AG_t = AL_t = 0$ → $RSI_t = 50$.
 
 
 ## 6.4 EMA (Exponential Moving Average)
 
-Pour une période n (ex: 12 ou 26), on définit le coefficient de lissage:
-α_n = 2 / (n + 1)
+Pour une période $n$ (ex: 12 ou 26), on définit le coefficient de lissage:
+
+$$
+\alpha_n = \frac{2}{n + 1}
+$$
 
 Puis la moyenne mobile exponentielle:
-EMA_n(t) = α_n * C_t + (1 - α_n) * EMA_n(t-1)
 
-Initialisation: EMA_n(t0) = moyenne simple des n premières clôtures disponibles.
-La feature ema_ratio_12_26 est définie comme EMA_12(t)/EMA_26(t) - 1 (ratio sans dimension).
+$$
+\text{EMA}_n(t) = \alpha_n \cdot C_t + (1 - \alpha_n) \cdot \text{EMA}_n(t-1)
+$$
+
+Initialisation: $\text{EMA}_n(t_0)$ = moyenne simple des $n$ premières clôtures disponibles.
+La feature `ema_ratio_12_26` est définie comme $\text{EMA}_{12}(t) / \text{EMA}_{26}(t) - 1$ (ratio sans dimension).
 
 
 ## 6.5 Volatilité rolling (écart-type) - convention ddof
 
-Pour une fenêtre n, la volatilité réalisée est définie comme l'écart-type population (ddof=0) des returns logret_1 sur n pas:
-μ_t^{(n)} = (1/n) * Σ_{i=0..n-1} logret_1(t-i)
-vol_n(t) = sqrt( (1/n) * Σ_{i=0..n-1} (logret_1(t-i) - μ_t^{(n)})^2 )
+Pour une fenêtre $n$, la volatilité réalisée est définie comme l'écart-type population (ddof=0) des returns `logret_1` sur $n$ pas:
 
-Dans le MVP, n ∈ {24, 72}. Toute annualisation est exclue (non nécessaire pour comparer des modèles).
+$$
+\mu_t^{(n)} = \frac{1}{n} \sum_{i=0}^{n-1} \text{logret\_1}(t-i)
+$$
+$$
+\text{vol}_n(t) = \sqrt{ \frac{1}{n} \sum_{i=0}^{n-1} \bigl(\text{logret\_1}(t-i) - \mu_t^{(n)}\bigr)^2 }
+$$
+
+Dans le MVP, $n \in \{24, 72\}$. Toute annualisation est exclue (non nécessaire pour comparer des modèles).
 
 
 ## 6.6 Warm-up et invalidation des samples
 
-Un sample à l'instant t est considéré valide uniquement si:
-- toutes les features à t-L+1..t sont définies (pas de NaN),
-- la cible y_t est définie (donc t+1 et t+H existent),
+Un sample à l'instant $t$ est considéré valide uniquement si:
+- toutes les features à $t-L+1 \ldots t$ sont définies (pas de NaN),
+- la cible $y_t$ est définie (donc $t+1$ et $t+H$ existent),
 - aucune bougie manquante n'est présente dans la fenêtre d'entrée ou dans la fenêtre d'exécution.
 
-On définit un paramètre min_warmup en configuration (ex: >= 200 bougies) afin d'éliminer les zones d'initialisation instables.
+On définit un paramètre `min_warmup` en configuration (ex: $\geq 200$ bougies) afin d'éliminer les zones d'initialisation instables.
 
 
 # 7. Construction des datasets et formats de données
@@ -356,7 +385,7 @@ Le pipeline produit une représentation unique des entrées pour garantir la com
 
 ## 7.1 Format séquentiel canonique (N, L, F)
 
-Pour chaque timestamp de décision t, on construit une matrice X_t ∈ R^{L×F} en empilant les vecteurs de features sur la fenêtre [t-L+1, ..., t]. L'ensemble forme un tenseur X ∈ R^{N×L×F}.
+Pour chaque timestamp de décision $t$, on construit une matrice $X_t \in \mathbb{R}^{L \times F}$ en empilant les vecteurs de features sur la fenêtre $[t-L+1, \ldots, t]$. L'ensemble forme un tenseur $X \in \mathbb{R}^{N \times L \times F}$.
 
 
 **Shapes :**
@@ -367,7 +396,7 @@ Pour chaque timestamp de décision t, on construit une matrice X_t ∈ R^{L×F} 
 
 ## 7.2 Adapter tabulaire pour XGBoost
 
-XGBoost consomme une matrice tabulaire 2D. Pour préserver l'équité (même information d'entrée), le pipeline impose un adapter standard qui aplatisse X_seq par concaténation temporelle:
+XGBoost consomme une matrice tabulaire 2D. Pour préserver l'équité (même information d'entrée), le pipeline impose un adapter standard qui aplatisse `X_seq` par concaténation temporelle:
 
 
 $$
@@ -382,12 +411,13 @@ Aucune feature supplémentaire spécifique à XGBoost ne doit être ajoutée san
 
 ## 7.3 Métadonnées d'exécution (meta)
 
-Pour chaque décision t, le pipeline stocke les métadonnées nécessaires au backtest, indépendamment du modèle:
-- decision_time = close_time(t)
-- entry_time = open_time(t+1)
-- exit_time = close_time(t+H)
-- entry_price = Open_{t+1}
-- exit_price = Close_{t+H}
+Pour chaque décision $t$, le pipeline stocke les métadonnées nécessaires au backtest, indépendamment du modèle:
+- `decision_time` = $\text{close\_time}(t)$
+- `entry_time` = $\text{open\_time}(t+1)$
+- `exit_time` = $\text{close\_time}(t+H)$
+- `entry_price` = $O_{t+1}$
+- `exit_price` = $C_{t+H}$
+
 Ces valeurs déterminent la cible par défaut et le calcul du P&L net.
 
 
@@ -424,12 +454,12 @@ Le découpage temporel est un composant critique. Il doit empêcher toute fuite 
 - Test: 30 jours.
 - Step: 30 jours (glissement d'un mois).
 - Validation: derniers 20% de la période train (sub-split temporel).
-- Embargo: suppression d'un intervalle de embargo_bars bougies entre fin de train/val et début de test (par défaut embargo_bars = H).
+- Embargo: suppression d'un intervalle de `embargo_bars` bougies entre fin de train/val et début de test (par défaut `embargo_bars` = $H$).
 
 ## 8.2 Purge liée à l'horizon H (éviter le chevauchement des labels)
 
-La cible y_t dépend de prix futurs jusqu'à t+H. Un split naïf qui coupe uniquement sur t peut fuiter: des labels du train peuvent dépendre de prix situés dans la zone test. Le pipeline applique donc une règle stricte de validité:
-Un index t peut appartenir au train/val si et seulement si t+H <= train_end (après application de l'embargo).
+La cible $y_t$ dépend de prix futurs jusqu'à $t+H$. Un split naïf qui coupe uniquement sur $t$ peut fuiter: des labels du train peuvent dépendre de prix situés dans la zone test. Le pipeline applique donc une règle stricte de validité:
+Un index $t$ peut appartenir au train/val si et seulement si $t+H \leq \text{train\_end}$ (après application de l'embargo).
 
 
 **Règle de purge :** Soit `test_start` le début du test (indice de décision). On définit :
@@ -447,19 +477,20 @@ $$
 
 ## 8.3 Définition formelle des périodes par fold
 
-Pour chaque fold k, le splitter doit produire des périodes disjointes (train/val/test) en timestamps UTC:
-- train_k = [T_train_start, T_train_end]
-- val_k = sous-intervalle terminal de train_k (val_frac_in_train)
-- test_k = [T_test_start, T_test_end]
-Le manifest.json doit enregistrer précisément ces bornes pour audit.
+Pour chaque fold $k$, le splitter doit produire des périodes disjointes (train/val/test) en timestamps UTC:
+- $\text{train}_k = [T_{\text{train\_start}}, T_{\text{train\_end}}]$
+- $\text{val}_k$ = sous-intervalle terminal de $\text{train}_k$ (`val_frac_in_train`)
+- $\text{test}_k = [T_{\text{test\_start}}, T_{\text{test\_end}}]$
+
+Le `manifest.json` doit enregistrer précisément ces bornes pour audit.
 
 
 ## 8.4 Contraintes d'implémentation (tests)
 
-- Disjonction: aucun timestamp de décision t commun entre train/val/test.
+- Disjonction: aucun timestamp de décision $t$ commun entre train/val/test.
 - Purge: aucun label train/val ne dépend d'un prix dans la zone test.
-- Causalité: toutes les features à t sont calculées sans utiliser de données > t.
-- Traçabilité: sauvegarder pour chaque fold les bornes temporelles + le nombre de samples (N_train, N_val, N_test).
+- Causalité: toutes les features à $t$ sont calculées sans utiliser de données $> t$.
+- Traçabilité: sauvegarder pour chaque fold les bornes temporelles + le nombre de samples ($N_{\text{train}}$, $N_{\text{val}}$, $N_{\text{test}}$).
 
 # 9. Normalisation / scaling (fit sur train uniquement)
 
@@ -468,11 +499,19 @@ La normalisation doit être appliquée sans fuite d'information. Toute statistiq
 
 ## 9.1 Méthode par défaut (MVP): standardisation par feature
 
-Pour chaque feature j ∈ {1..F}, on estime sur train:
-μ_j = moyenne(X_train[..., j]) et σ_j = écart-type(X_train[..., j])
+Pour chaque feature $j \in \{1 \ldots F\}$, on estime sur train:
+
+$$
+\mu_j = \text{moyenne}(X_{\text{train}}[\ldots, j]) \quad \text{et} \quad \sigma_j = \text{écart-type}(X_{\text{train}}[\ldots, j])
+$$
+
 Puis on transforme:
-X'[..., j] = (X[..., j] - μ_j) / (σ_j + ε)
-avec ε = 1e-12. L'estimation est faite sur la concaténation de toutes les fenêtres train (N_train*L lignes).
+
+$$
+X'[\ldots, j] = \frac{X[\ldots, j] - \mu_j}{\sigma_j + \varepsilon}
+$$
+
+avec $\varepsilon = 10^{-12}$. L'estimation est faite sur la concaténation de toutes les fenêtres train ($N_{\text{train}} \times L$ lignes).
 
 
 ## 9.2 Option avancée (si activée): scaling robuste ou clipping
@@ -480,14 +519,18 @@ avec ε = 1e-12. L'estimation est faite sur la concaténation de toutes les fen�
 Si les outliers perturbent fortement l'entraînement, une option robuste peut être activée, mais doit rester commune à tous:
 - Robust scaling: centrer par médiane et échelle par IQR (fit sur train),
 - Clipping/winsorization: clipper chaque feature à des quantiles (ex: 0.5% et 99.5%) estimés sur train.
-Toute option doit être déclarée dans config_snapshot et loggée dans le manifest.
+Toute option doit être déclarée dans `config_snapshot` et loggée dans le manifest.
 
 
 ## 9.3 Rolling z-score (non MVP, à versionner)
 
 Une alternative plus réaliste en présence de non-stationnarité est le rolling z-score causal:
-z_t = (x_t - mean_{t-W..t-1}) / (std_{t-W..t-1} + ε)
-où W est une fenêtre passée. Cette méthode est autorisée uniquement si:
+
+$$
+z_t = \frac{x_t - \text{mean}_{t-W \ldots t-1}}{\text{std}_{t-W \ldots t-1} + \varepsilon}
+$$
+
+où $W$ est une fenêtre passée. Cette méthode est autorisée uniquement si:
 - elle est appliquée de manière identique à tous les modèles,
 - l'estimation est strictement causale (pas de fenêtres centrées),
 - les frontières train/val/test sont traitées séquentiellement sans regarder le futur.
@@ -513,10 +556,10 @@ save(path) / load(path)    # optionnel mais recommandé
 
 ## 10.2 Conventions d'entrée/sortie
 
-- Entrée canonique: X_seq de shape (N, L, F) et y de shape (N,).
-- Sortie: y_hat de shape (N,), en float (prédiction de log-return).
-- XGBoost utilise l'adapter tabulaire standard X_tab = vec(X_seq).
-- Le modèle RL (PPO) ne prédit pas de log-return : il émet directement une action Go (1) ou No-Go (0). Sa sortie `predict()` retourne un vecteur d'actions binaires de shape (N,). Le pipeline bypass la calibration de θ pour ce modèle (voir §11.5).
+- Entrée canonique: `X_seq` de shape $(N, L, F)$ et `y` de shape $(N,)$.
+- Sortie: `y_hat` de shape $(N,)$, en float (prédiction de log-return).
+- XGBoost utilise l'adapter tabulaire standard $X_{\text{tab}} = \text{vec}(X_{\text{seq}})$.
+- Le modèle RL (PPO) ne prédit pas de log-return : il émet directement une action Go (1) ou No-Go (0). Sa sortie `predict()` retourne un vecteur d'actions binaires de shape $(N,)$. Le pipeline bypass la calibration de $\theta$ pour ce modèle (voir §11.5).
 - Aucune fuite: le modèle ne doit pas accéder au test pendant fit, ni recalculer des scalers sur val/test.
 
 ## 10.3 Entraînement et early stopping
@@ -535,9 +578,9 @@ La reproductibilité impose de fixer les seeds (numpy, torch, etc.) et, si possi
 
 # 11. Décision Go/No-Go et calibration du seuil θ
 
-Le modèle prédit un rendement futur ŷ_t. La décision est une règle simple afin de comparer proprement les modèles:
-Go (ouvrir une position long) si ŷ_t > θ, sinon No-Go.
-Le seuil θ n'est jamais calibré sur le test; il est calibré sur la validation temporelle du fold.
+Le modèle prédit un rendement futur $\hat{y}_t$. La décision est une règle simple afin de comparer proprement les modèles:
+Go (ouvrir une position long) si $\hat{y}_t > \theta$, sinon No-Go.
+Le seuil $\theta$ n'est jamais calibré sur le test; il est calibré sur la validation temporelle du fold.
 
 
 ## 11.1 Politique de calibration (MVP)
@@ -547,32 +590,32 @@ On considère le faux positif (Go mais trade perdant) plus grave que le faux né
 
 ## 11.2 Méthode par défaut: grille de quantiles
 
-Soit ŷ_val l'ensemble des prédictions sur la validation. On définit une grille de quantiles Q = {q1, q2, ...}.
-Pour chaque q ∈ Q:
-- θ(q) = quantile_q(ŷ_val)
+Soit $\hat{y}_{\text{val}}$ l'ensemble des prédictions sur la validation. On définit une grille de quantiles $Q = \{q_1, q_2, \ldots\}$.
+Pour chaque $q \in Q$:
+- $\theta(q) = \text{quantile}_q(\hat{y}_{\text{val}})$
 - on génère des signaux Go/No-Go sur la validation
 - on backteste (règles + coûts identiques)
 - on calcule les métriques trading sur validation
-On retient le θ qui maximise un objectif sous contraintes.
+On retient le $\theta$ qui maximise un objectif sous contraintes.
 
 
 ## 11.3 Objectif de sélection du seuil
 
 Objectif recommandé (simple et interprétable):
 Maximiser P&L net sur validation sous contraintes de risque et de liquidité statistique:
-- max_drawdown <= mdd_cap (ex: 25%)
-- n_trades >= min_trades (ex: 20)
+- `max_drawdown` $\leq$ `mdd_cap` (ex: 25%)
+- `n_trades` $\geq$ `min_trades` (ex: 20)
 En cas d'ex-aequo, préférer le seuil le plus conservateur (plus haut quantile) pour réduire les faux positifs.
 
 
 ## 11.4 Cas des baselines
 
-Les baselines produisent directement des signaux ou des positions. Elles ne calibrent pas de seuil θ, sauf si explicitement défini (ex: SMA rule paramétrée).
+Les baselines produisent directement des signaux ou des positions. Elles ne calibrent pas de seuil $\theta$, sauf si explicitement défini (ex: SMA rule paramétrée).
 
 
 ## 11.5 Cas du modèle RL (PPO)
 
-Le modèle RL produit directement une décision (action) Go/No-Go à chaque pas de temps, sans passer par une prédiction de rendement suivie d'un seuil θ. L'agent apprend une politique π(a|s) qui maximise le rendement cumulé net de coûts.
+Le modèle RL produit directement une décision (action) Go/No-Go à chaque pas de temps, sans passer par une prédiction de rendement suivie d'un seuil $\theta$. L'agent apprend une politique $\pi(a \mid s)$ qui maximise le rendement cumulé net de coûts.
 
 **Conséquences sur le pipeline :**
 - La calibration du seuil θ (§11.1–11.3) est **bypassée** pour le modèle RL.
@@ -589,31 +632,41 @@ Le backtest est unique et mutualisé: il prend des signaux (Go/No-Go) ou une pos
 
 ## 12.1 Règles d'exécution (stratégies Go/No-Go)
 
-- Décision à la clôture de t.
-- Si Go à t et aucune position n'est ouverte: entrée long à Open_{t+1}.
-- Sortie automatique à Close_{t+H}.
+- Décision à la clôture de $t$.
+- Si Go à $t$ et aucune position n'est ouverte: entrée long à $O_{t+1}$.
+- Sortie automatique à $C_{t+H}$.
 - Long-only (pas de short).
-- Mode position par défaut: one_at_a_time (un seul trade actif à la fois).
+- Mode position par défaut: `one_at_a_time` (un seul trade actif à la fois).
 
 ## 12.2 Conventions de coûts - représentation canonique
 
 Pour éviter toute ambiguïté, les coûts sont paramétrés et stockés en 'per side' (par côté) puis appliqués de façon multiplicative. Deux paramètres suffisent:
-- fee_rate_per_side = f (ex: 0.0005 pour 0.05%)
-- slippage_rate_per_side = s (ex: 0.00025 pour 0.025%)
+- `fee_rate_per_side` = $f$ (ex: 0.0005 pour 0.05%)
+- `slippage_rate_per_side` = $s$ (ex: 0.00025 pour 0.025%)
 
-Les valeurs 'par trade' round-trip se déduisent par: fee_rt ≈ 2f et slippage_rt ≈ 2s.
+Les valeurs 'par trade' round-trip se déduisent par: $f_{\text{rt}} \approx 2f$ et $s_{\text{rt}} \approx 2s$.
 
 
 ## 12.3 Calcul du rendement net d'un trade (long-only)
 
-Soit p_entry = Open_{t+1} et p_exit = Close_{t+H}. On modélise un slippage proportionnel (worst-case):
-p_entry_eff = p_entry * (1 + s)
-p_exit_eff = p_exit * (1 - s)
+Soit $p_{\text{entry}} = O_{t+1}$ et $p_{\text{exit}} = C_{t+H}$. On modélise un slippage proportionnel (worst-case):
+
+$$
+p_{\text{entry\_eff}} = p_{\text{entry}} \cdot (1 + s)
+$$
+$$
+p_{\text{exit\_eff}} = p_{\text{exit}} \cdot (1 - s)
+$$
 
 On applique ensuite les frais sur les deux côtés (achat puis vente). Le multiplicateur net du trade est:
-M_net = (1 - f)^2 * (p_exit_eff / p_entry_eff)
-Return net (simple): r_net = M_net - 1
-Log-return net: lr_net = log(M_net)
+
+$$
+M_{\text{net}} = (1 - f)^2 \cdot \frac{p_{\text{exit\_eff}}}{p_{\text{entry\_eff}}}
+$$
+
+Return net (simple): $r_{\text{net}} = M_{\text{net}} - 1$
+
+Log-return net: $\text{lr}_{\text{net}} = \log(M_{\text{net}})$
 
 
 **Formule finale :**
@@ -629,11 +682,15 @@ $$
 
 ## 12.4 Mise à jour de la courbe d'équité
 
-On considère une équité initiale E0 = 1.0 (normalisée). En mode one_at_a_time, à chaque trade:
-E_{exit} = E_{entry} * (1 + r_net)
+On considère une équité initiale $E_0 = 1.0$ (normalisée). En mode `one_at_a_time`, à chaque trade:
+
+$$
+E_{\text{exit}} = E_{\text{entry}} \cdot (1 + r_{\text{net}})
+$$
+
 En dehors des trades (No-Go), l'équité reste constante.
 
-Optionnel (si activé): une fraction d'exposition w ∈ (0,1] peut être introduite: E_{exit} = E_{entry} * (1 + w*r_net). Dans le MVP, w = 1 (all-in, sans levier).
+Optionnel (si activé): une fraction d'exposition $w \in (0,1]$ peut être introduite: $E_{\text{exit}} = E_{\text{entry}} \cdot (1 + w \cdot r_{\text{net}})$. Dans le MVP, $w = 1$ (all-in, sans levier).
 
 
 ## 12.5 Cas buy & hold (baseline continue)
@@ -641,17 +698,18 @@ Optionnel (si activé): une fraction d'exposition w ∈ (0,1] peut être introdu
 La baseline buy & hold est définie comme une position long ouverte au début de la période test et fermée à la fin:
 - entrée: Open du premier timestamp test disponible
 - sortie: Close du dernier timestamp test
-Les coûts (f, s) s'appliquent une fois à l'entrée et une fois à la sortie selon la même formule.
+Les coûts ($f$, $s$) s'appliquent une fois à l'entrée et une fois à la sortie selon la même formule.
 
 
 ## 12.6 Journal de trades et audit
 
-Le backtest produit un fichier trades.csv. Chaque trade contient au minimum:
-- entry_time_utc, exit_time_utc
-- entry_price, exit_price, entry_price_eff, exit_price_eff
-- f, s, fees_paid, slippage_paid (ou équivalent)
-- y_true, y_hat (si applicable)
-- gross_return, net_return
+Le backtest produit un fichier `trades.csv`. Chaque trade contient au minimum:
+- `entry_time_utc`, `exit_time_utc`
+- `entry_price`, `exit_price`, `entry_price_eff`, `exit_price_eff`
+- `f`, `s`, `fees_paid`, `slippage_paid` (ou équivalent)
+- `y_true`, `y_hat` (si applicable)
+- `gross_return`, `net_return`
+
 Ce log permet de vérifier la cohérence des coûts et de diagnostiquer les performances.
 
 
@@ -662,7 +720,7 @@ Les baselines servent de points de référence obligatoires. Elles sont impléme
 
 ## 13.1 Baseline no-trade
 
-Définition: aucun trade n'est jamais ouvert. L'équité est constante (E_t = 1). Cette baseline quantifie la performance nulle et sert de borne inférieure.
+Définition: aucun trade n'est jamais ouvert. L'équité est constante ($E_t = 1$). Cette baseline quantifie la performance nulle et sert de borne inférieure.
 
 
 ## 13.2 Baseline buy & hold (continue)
@@ -673,18 +731,22 @@ Définition: achat au début de la période test, conservation jusqu'à la fin. 
 ## 13.3 Baseline règle SMA (Go/No-Go)
 
 Définition: on calcule deux moyennes mobiles simples sur les clôtures:
-SMA_n(t) = (1/n) * Σ_{i=0..n-1} C_{t-i}
-Signal à t:
-Go si SMA_fast(t) > SMA_slow(t), sinon No-Go.
 
-La règle SMA est ensuite backtestée avec les mêmes règles d'exécution que les modèles (entrée Open[t+1], sortie Close[t+H]) afin de rester comparable.
+$$
+\text{SMA}_n(t) = \frac{1}{n} \sum_{i=0}^{n-1} C_{t-i}
+$$
+
+Signal à $t$:
+Go si $\text{SMA}_{\text{fast}}(t) > \text{SMA}_{\text{slow}}(t)$, sinon No-Go.
+
+La règle SMA est ensuite backtestée avec les mêmes règles d'exécution que les modèles (entrée $O_{t+1}$, sortie $C_{t+H}$) afin de rester comparable.
 
 
 **Paramètres recommandés (MVP) :**
 - fast = 20
 - slow = 50
 
-**Contraintes :** fast < slow et slow ≤ min_warmup.
+**Contraintes :** `fast` < `slow` et `slow` ≤ `min_warmup`.
 
 
 ## 13.4 Remarques comparatives
@@ -701,7 +763,7 @@ On rapporte deux familles de métriques: (i) qualité de prédiction (régressio
 
 ## 14.1 Métriques de prédiction (sur test de chaque fold)
 
-Soit y et ŷ les vecteurs sur la période test du fold.
+Soit $y$ et $\hat{y}$ les vecteurs sur la période test du fold.
 
 
 $$
@@ -720,12 +782,12 @@ $$
 
 ## 14.2 Métriques trading (sur test de chaque fold)
 
-À partir de la courbe d'équité E_t et de la liste de trades (net_return par trade), on calcule:
+À partir de la courbe d'équité $E_t$ et de la liste de trades (`net_return` par trade), on calcule:
 
 
 **Distinction `net_pnl` / `net_return` :**
-- `net_pnl` = variation absolue de l'équité sur le fold test : `E_T - E_0` (avec E_0 = 1.0, c'est aussi `E_T - 1`). Sans dimension monétaire (équité normalisée).
-- `net_return` = rendement relatif du fold test : `(E_T - E_0) / E_0 = E_T - 1`. En mode all-in (w = 1) et équité initiale 1.0, `net_pnl == net_return` numériquement. La distinction devient significative si l'on introduit une fraction d'exposition w < 1 ou un capital initial différent.
+- `net_pnl` = variation absolue de l'équité sur le fold test : $E_T - E_0$ (avec $E_0 = 1.0$, c'est aussi $E_T - 1$). Sans dimension monétaire (équité normalisée).
+- `net_return` = rendement relatif du fold test : $(E_T - E_0) / E_0 = E_T - 1$. En mode all-in ($w = 1$) et équité initiale 1.0, `net_pnl == net_return` numériquement. La distinction devient significative si l'on introduit une fraction d'exposition $w < 1$ ou un capital initial différent.
 
 
 $$
@@ -738,32 +800,38 @@ $$
 \text{Profit factor} = \frac{\sum \text{gains bruts}}{\sum \text{pertes brutes}}
 $$
 $$
-\text{Hit rate} = \frac{\#\{\text{trades} : r_{net} > 0\}}{\#\text{trades}}
+\text{Hit rate} = \frac{\lvert\{\text{trades} : r_{net} > 0\}\rvert}{\lvert\text{trades}\rvert}
 $$
 
 
 ### Sharpe ratio (indicatif)
 
 Le Sharpe est rapporté à titre indicatif. Par défaut, on utilise les rendements par pas de temps sur la grille test:
-r_t = E_t / E_{t-1} - 1
-Sharpe = mean(r_t) / (std(r_t) + ε)
-Une annualisation peut être appliquée via un facteur sqrt(K) où K est le nombre de pas par an (ex: K = 24*365 pour 1h). Dans le MVP, le rapport doit expliciter si la valeur est annualisée ou non.
+
+$$
+r_t = \frac{E_t}{E_{t-1}} - 1
+$$
+$$
+\text{Sharpe} = \frac{\text{mean}(r_t)}{\text{std}(r_t) + \varepsilon}
+$$
+
+Une annualisation peut être appliquée via un facteur $\sqrt{K}$ où $K$ est le nombre de pas par an (ex: $K = 24 \times 365$ pour 1h). Dans le MVP, le rapport doit expliciter si la valeur est annualisée ou non.
 
 
 ## 14.3 Agrégation inter-fold
 
-Pour chaque métrique m, on rapporte:
-- m_mean = moyenne sur les folds test
-- m_std = écart-type sur les folds test (stabilité)
+Pour chaque métrique $m$, on rapporte:
+- $m_{\text{mean}}$ = moyenne sur les folds test
+- $m_{\text{std}}$ = écart-type sur les folds test (stabilité)
 Le pipeline peut également produire une courbe d'équité 'stitchée' en concaténant chronologiquement les périodes test.
 
 
 ## 14.4 Critères d'acceptation (rappel)
 
-- Reproductibilité: même dataset + mêmes splits + même seed -> mêmes résultats.
+- Reproductibilité: même dataset + mêmes splits + même seed → mêmes résultats.
 - Backtest réaliste: coûts fixés et appliqués partout.
-- Performance minimale: P&L net total > 0 ET profit factor > 1.0 (sur l'ensemble des folds).
-- Risque borné: MDD < 25% (ou analyse détaillée si dépassé).
+- Performance minimale: P&L net total $> 0$ ET profit factor $> 1.0$ (sur l'ensemble des folds).
+- Risque borné: MDD $< 25\%$ (ou analyse détaillée si dépassé).
 - Comparaison: le meilleur modèle bat au moins une baseline (no-trade et/ou buy & hold) en P&L net ou MDD.
 
 # 15. Artefacts, structure de sortie et schémas JSON
@@ -876,7 +944,7 @@ Le seed global est fixé en configuration. Il doit être appliqué à:
 
 ## 16.3 Convention de versionning des features
 
-Toute modification de la liste de features, de leur définition ou de leurs paramètres doit incrémenter feature_version et être décrite dans l'historique. Sans cela, des résultats issus de pipelines différents deviennent incomparables.
+Toute modification de la liste de features, de leur définition ou de leurs paramètres doit incrémenter `feature_version` et être décrite dans l'historique. Sans cela, des résultats issus de pipelines différents deviennent incomparables.
 
 
 # Annexes
@@ -1996,30 +2064,30 @@ Les choix ci-dessous sont des **règles de conception** qui ne sont pas paramét
 - `val` = la portion temporelle finale du train (20% par défaut).
 - `test` = la période suivante après embargo.
 
-Le modèle reçoit `train_only` pour `fit()` et `val` pour early stopping et calibration de θ.
+Le modèle reçoit `train_only` pour `fit()` et `val` pour early stopping et calibration de $\theta$.
 Le manifest enregistre les trois périodes (`train`, `val`, `test`) ; la période `train` dans le manifest correspond à `train_only` (sans val).
 
 **Justification** : disjonction stricte (López de Prado, 2018). La validation temporelle ne doit jamais fuiter dans l'entraînement.
 
-#### E.2.2 — Fallback θ quand aucun quantile ne satisfait les contraintes
+#### E.2.2 — Fallback $\theta$ quand aucun quantile ne satisfait les contraintes
 
-**Décision** : Si aucun θ de la grille ne respecte simultanément `MDD <= mdd_cap` ET `n_trades >= min_trades` :
-1. Relâcher `min_trades` à `0` et retenir le θ avec `MDD <= mdd_cap` le plus conservateur (quantile le plus haut).
-2. Si aucun θ ne respecte même `MDD <= mdd_cap` : `θ = +∞` (no-trade pour ce fold).
+**Décision** : Si aucun $\theta$ de la grille ne respecte simultanément `MDD <= mdd_cap` ET `n_trades >= min_trades` :
+1. Relâcher `min_trades` à `0` et retenir le $\theta$ avec `MDD <= mdd_cap` le plus conservateur (quantile le plus haut).
+2. Si aucun $\theta$ ne respecte même `MDD <= mdd_cap` : $\theta = +\infty$ (no-trade pour ce fold).
 3. Un **warning** est émis dans le log avec les détails.
-4. Le fold est conservé dans les métriques (n_trades = 0, PnL = 0).
+4. Le fold est conservé dans les métriques (`n_trades` = 0, PnL = 0).
 
 **Justification** : ne pas crasher le pipeline ; le fold no-trade est informatif (le modèle n'a pas trouvé de signal fiable).
 
 #### E.2.3 — Chevauchement des trades : nouveau Go ignoré si trade actif
 
-**Décision** : En mode `one_at_a_time`, si un signal Go arrive pendant qu'un trade est encore ouvert (t' < t_exit du trade en cours), le nouveau Go est **ignoré**. Le trade en cours se ferme normalement à `Close[t+H]`.
+**Décision** : En mode `one_at_a_time`, si un signal Go arrive pendant qu'un trade est encore ouvert ($t' < t_{\text{exit}}$ du trade en cours), le nouveau Go est **ignoré**. Le trade en cours se ferme normalement à $C_{t+H}$.
 
-**Justification** : simplicité, reproductibilité, cohérence avec l'horizon fixe H.
+**Justification** : simplicité, reproductibilité, cohérence avec l'horizon fixe $H$.
 
 #### E.2.4 — SMA baseline : calcul causal sur tout l'historique disponible
 
-**Décision** : Les SMA de la baseline sont calculées sur **toutes les clôtures disponibles causalement** au moment de la décision (y compris les données antérieures au début du train). Les premières décisions où `SMA_slow` n'est pas encore définie sont marquées No-Go.
+**Décision** : Les SMA de la baseline sont calculées sur **toutes les clôtures disponibles causalement** au moment de la décision (y compris les données antérieures au début du train). Les premières décisions où $\text{SMA}_{\text{slow}}$ n'est pas encore définie sont marquées No-Go.
 
 **Justification** : la SMA est un filtre causal. Limiter son historique au train serait artificiel et non représentatif de l'usage réel.
 
@@ -2032,7 +2100,7 @@ Le manifest enregistre les trois périodes (`train`, `val`, `test`) ; la périod
 | 0 trades | `null` |
 | Que des trades gagnants (pertes = 0) | `null` (infini non représentable ; le hit_rate = 1.0 est suffisant) |
 | Que des trades perdants (gains = 0) | `0.0` |
-| Cas normal | `Σ gains / Σ pertes` (en valeur absolue des net_return) |
+| Cas normal | $\sum \text{gains} / \sum \text{pertes}$ (en valeur absolue des `net_return`) |
 
 **Justification** : `null` dans le JSON signifie « non applicable ». Conforme au schéma metrics.schema.json qui autorise `"type": ["number", "null"]`.
 
@@ -2044,7 +2112,7 @@ Le support multi-symboles (concaténation des samples, ou pipeline par symbole a
 
 #### E.2.7 — Scaler : un seul scaler global par feature
 
-**Décision** : Un seul μ_j et σ_j par feature j, estimés sur l'ensemble des `N_train * L` valeurs du train. **Pas** de scaler par pas temporel dans la fenêtre.
+**Décision** : Un seul $\mu_j$ et $\sigma_j$ par feature $j$, estimés sur l'ensemble des $N_{\text{train}} \times L$ valeurs du train. **Pas** de scaler par pas temporel dans la fenêtre.
 
 **Justification** : simplicité, interprétabilité. Un scaler par pas temporel (position dans la fenêtre) n'a pas de justification théorique pour des features stationnaires.
 
@@ -2063,7 +2131,7 @@ Le support multi-symboles (concaténation des samples, ou pipeline par symbole a
 | Colonne | Type | Description |
 |---|---|---|
 | `time_utc` | datetime | Timestamp (résolution = 1 bougie). |
-| `equity` | float | Valeur de l'équité normalisée (E_0 = 1.0). |
+| `equity` | float | Valeur de l'équité normalisée ($E_0 = 1.0$). |
 | `in_trade` | bool | `true` si une position est ouverte à ce pas. |
 
 La résolution est **par bougie** (pas par trade). L'équité est constante entre les trades.
@@ -2088,10 +2156,10 @@ Les architectures ci-dessous sont les defaults MVP. Tous les hyperparamètres so
 
 | Composante | Définition |
 |---|---|
-| **État** s_t | Fenêtre X_t ∈ R^{L×F} (aplatie en vecteur R^{L·F}) après scaling. |
-| **Action** a_t | Discrète : 0 = No-Go, 1 = Go (long). |
-| **Reward** r_t | Si a_t = 1 (Go) : r_net du trade (entrée Open[t+1], sortie Close[t+H], coûts inclus). Si a_t = 0 (No-Go) : 0. |
-| **Transition** | Déterministe : passage à la bougie suivante disponible (après t+H si trade ouvert, mode one_at_a_time). |
+| **État** $s_t$ | Fenêtre $X_t \in \mathbb{R}^{L \times F}$ (aplatie en vecteur $\mathbb{R}^{L \cdot F}$) après scaling. |
+| **Action** $a_t$ | Discrète : 0 = No-Go, 1 = Go (long). |
+| **Reward** $r_t$ | Si $a_t = 1$ (Go) : $r_{\text{net}}$ du trade (entrée $O_{t+1}$, sortie $C_{t+H}$, coûts inclus). Si $a_t = 0$ (No-Go) : 0. |
+| **Transition** | Déterministe : passage à la bougie suivante disponible (après $t+H$ si trade ouvert, mode `one_at_a_time`). |
 | **Épisode** | Un fold walk-forward complet (train ou val ou test). |
 
 **Entraînement :**
@@ -2100,7 +2168,7 @@ Les architectures ci-dessous sont les defaults MVP. Tous les hyperparamètres so
 - La politique est gelée après entraînement ; elle est évaluée en mode déterministe (argmax) sur le test.
 - L'entraînement se fait en épisodes (rollouts) sur la période train, avec `max_episodes` contrôlé par config.
 
-**Anti-fuite :** l'agent n'a accès qu'à l'état courant s_t (fenêtre passée). Les rewards ne sont observés qu'après exécution du trade. L'agent ne voit jamais les prix du test pendant l'entraînement.
+**Anti-fuite :** l'agent n'a accès qu'à l'état courant $s_t$ (fenêtre passée). Les rewards ne sont observés qu'après exécution du trade. L'agent ne voit jamais les prix du test pendant l'entraînement.
 
 **Comparabilité :** l'agent RL utilise les mêmes données, features, coûts et moteur de backtest que les autres modèles. Seul le mécanisme de décision diffère (politique apprise vs prédiction + seuil).
 
@@ -2131,7 +2199,7 @@ Glossaire pédagogique des termes de Machine Learning (ML), Deep Learning (DL) e
 | **Batch (lot)** | Sous-ensemble de samples traité en une seule itération avant mise à jour des paramètres. Le batch size est sa taille (ex : 64 samples). |
 | **Loss function (fonction de perte)** | Fonction mathématique qui mesure l'écart entre les prédictions du modèle et les labels réels. L'entraînement cherche à minimiser cette valeur. Exemple : MSE (Mean Squared Error). |
 | **MSE (Mean Squared Error)** | Moyenne des carrés des erreurs de prédiction : $\text{MSE} = \frac{1}{N}\sum(y - \hat{y})^2$. Pénalise fortement les grosses erreurs. |
-| **MAE (Mean Absolute Error)** | Moyenne des valeurs absolues des erreurs : $\text{MAE} = \frac{1}{N}\sum|y - \hat{y}|$. Plus robuste aux outliers que le MSE. |
+| **MAE (Mean Absolute Error)** | Moyenne des valeurs absolues des erreurs : $\text{MAE} = \frac{1}{N}\sum\lvert y - \hat{y}\rvert$. Plus robuste aux outliers que le MSE. |
 | **RMSE (Root Mean Squared Error)** | Racine carrée du MSE : $\text{RMSE} = \sqrt{\text{MSE}}$. S'exprime dans la même unité que la cible. |
 | **Directional accuracy** | Proportion des prédictions dont le signe (direction : hausse ou baisse) correspond au signe réel du rendement. Métrique simple mais informative pour le trading. |
 | **Spearman IC (Information Coefficient)** | Corrélation de rang de Spearman entre les prédictions et les valeurs réelles. Mesure la capacité du modèle à ordonner correctement les rendements, indépendamment de leur amplitude. |
@@ -2165,7 +2233,7 @@ Glossaire pédagogique des termes de Machine Learning (ML), Deep Learning (DL) e
 | **Attention (Self-Attention)** | Mécanisme qui permet à chaque position de la séquence de « regarder » toutes les autres positions pour pondérer leur importance. Le modèle apprend quelles parties de la séquence sont pertinentes pour chaque prédiction. |
 | **Multi-Head Attention** | Extension de l'attention où plusieurs « têtes » d'attention fonctionnent en parallèle, chacune apprenant à se concentrer sur des aspects différents de la séquence. |
 | **PPO (Proximal Policy Optimization)** | Algorithme de RL de type policy gradient qui optimise la politique de l'agent tout en limitant l'amplitude des mises à jour (clipping) pour stabiliser l'entraînement. |
-| **Politique (Policy) π** | Fonction apprise par l'agent RL qui associe à chaque état une distribution de probabilité sur les actions. Dans notre cas : $\pi(a|s)$ donne la probabilité de Go ou No-Go étant donné l'état du marché. |
+| **Politique (Policy) π** | Fonction apprise par l'agent RL qui associe à chaque état une distribution de probabilité sur les actions. Dans notre cas : $\pi(a \mid s)$ donne la probabilité de Go ou No-Go étant donné l'état du marché. |
 | **Récompense (Reward)** | Signal numérique reçu par l'agent RL après chaque action. Ici : le rendement net du trade si Go, 0 si No-Go. L'agent cherche à maximiser la somme cumulée des rewards. |
 | **Discount factor (γ, gamma)** | Facteur de pondération (0 < γ ≤ 1) qui réduit l'importance des rewards futurs par rapport aux rewards immédiats. γ = 0.99 signifie que l'agent accorde une grande importance au long terme. |
 | **GAE (Generalized Advantage Estimation)** | Technique qui estime l'avantage (advantage) d'une action par rapport à la moyenne, en combinant des estimations à différents horizons via un paramètre λ (gae_lambda). Réduit la variance des gradients en RL. |
@@ -2234,7 +2302,7 @@ Glossaire pédagogique des termes financiers, boursiers et de trading algorithmi
 | **Calibration du seuil** | Processus d'optimisation de θ sur les données de validation, en testant plusieurs valeurs candidates et en retenant celle qui maximise le P&L net sous contraintes de risque. |
 | **Faux positif (en trading)** | Trade déclenché par un signal Go alors que le rendement réel est négatif (trade perdant). La calibration de θ vise à réduire les faux positifs. |
 | **Faux négatif (en trading)** | Opportunité rentable manquée parce que le modèle a émis un signal No-Go. Considéré comme moins grave qu'un faux positif dans ce pipeline. |
-| **Profit factor** | Ratio entre la somme des gains bruts et la somme des pertes brutes sur l'ensemble des trades : $\text{PF} = \frac{\sum \text{gains}}{\sum |\text{pertes}|}$. Un PF > 1 indique une stratégie globalement rentable. |
+| **Profit factor** | Ratio entre la somme des gains bruts et la somme des pertes brutes sur l'ensemble des trades : $\text{PF} = \frac{\sum \text{gains}}{\sum \lvert\text{pertes}\rvert}$. Un PF > 1 indique une stratégie globalement rentable. |
 | **Hit rate (taux de réussite)** | Pourcentage de trades dont le rendement net est positif. Un hit rate de 54% signifie que 54 trades sur 100 sont gagnants. |
 | **Sharpe ratio** | Ratio rendement/risque : $\text{Sharpe} = \frac{\text{mean}(r)}{\text{std}(r)}$. Mesure la performance ajustée au risque. Un Sharpe élevé signifie un bon rendement pour un niveau de volatilité donné. |
 | **Volatilité (Volatility)** | Mesure de la dispersion des rendements (écart-type). Une volatilité élevée signifie des variations de prix importantes. Peut être calculée sur une fenêtre glissante (rolling volatility). |
