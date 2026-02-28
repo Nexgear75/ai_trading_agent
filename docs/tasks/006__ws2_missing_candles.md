@@ -1,6 +1,6 @@
 # Tâche — Politique de traitement des trous (missing candles)
 
-Statut : TODO
+Statut : DONE
 Ordre : 006
 Workstream : WS-2
 Milestone : M1
@@ -32,28 +32,28 @@ Implémenter la politique MVP de traitement des bougies manquantes : pas d'inter
 - Retourner un masque booléen `valid_mask` de shape `(N,)` où `N` est le nombre total de bougies.
 
 ## Critères d'acceptation
-- [ ] Un trou à l'indice `k` invalide tous les samples dans la zone `[k-H, k+L-1]` (fenêtre d'entrée + fenêtre de sortie)
-- [ ] Masque booléen `valid_mask` de shape `(N,)` retourné correctement
-- [ ] Données sans trou → masque tout à `True` (sauf les bords qui ne peuvent pas former un sample complet)
-- [ ] Plusieurs trous → masque correctement combiné
-- [ ] Pas d'interpolation : aucune valeur n'est modifiée dans les données
-- [ ] Compatible avec les paramètres `L` et `H` de la configuration
-- [ ] Tests avec données synthétiques contenant des trous à positions connues
-- [ ] Tests couvrent les scénarios nominaux + erreurs + bords
-- [ ] Suite de tests verte après implémentation
-- [ ] `ruff check` passe sans erreur
+- [x] Un trou à l'indice `k` invalide tous les samples dans la zone `[k-H, k+L-1]` (fenêtre d'entrée + fenêtre de sortie)
+- [x] Masque booléen `valid_mask` de shape `(N,)` retourné correctement
+- [x] Données sans trou → masque tout à `True` (sauf les bords qui ne peuvent pas former un sample complet)
+- [x] Plusieurs trous → masque correctement combiné
+- [x] Pas d'interpolation : aucune valeur n'est modifiée dans les données
+- [x] Compatible avec les paramètres `L` et `H` de la configuration
+- [x] Tests avec données synthétiques contenant des trous à positions connues
+- [x] Tests couvrent les scénarios nominaux + erreurs + bords
+- [x] Suite de tests verte après implémentation
+- [x] `ruff check` passe sans erreur
 
 ## Pré-condition de démarrage
 - **Tous les tests existants sont GREEN** avant de commencer.
 - **Créer une branche dédiée** `task/006-missing-candles` depuis `Max6000i1`.
 
 ## Checklist de fin de tâche
-- [ ] Branche `task/006-missing-candles` créée depuis `Max6000i1`.
-- [ ] Tests RED écrits avant implémentation.
-- [ ] **Commit RED** : `[WS-2] #006 RED: tests politique missing candles`.
-- [ ] Tests GREEN passants et reproductibles.
-- [ ] Critères d'acceptation tous satisfaits.
-- [ ] `ruff check ai_trading/ tests/` passe sans erreur.
-- [ ] Fichier de tâche mis à jour (statut DONE, critères cochés).
-- [ ] **Commit GREEN** : `[WS-2] #006 GREEN: politique missing candles`.
-- [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-2] #006 — Politique missing candles`.
+- [x] Branche `task/006-missing-candles` créée depuis `Max6000i1`.
+- [x] Tests RED écrits avant implémentation.
+- [x] **Commit RED** : `[WS-2] #006 RED: tests politique missing candles`.
+- [x] Tests GREEN passants et reproductibles.
+- [x] Critères d'acceptation tous satisfaits.
+- [x] `ruff check ai_trading/ tests/` passe sans erreur.
+- [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
+- [x] **Commit GREEN** : `[WS-2] #006 GREEN: politique missing candles`.
+- [x] **Pull Request ouverte** vers `Max6000i1` : `[WS-2] #006 — Politique missing candles`.
