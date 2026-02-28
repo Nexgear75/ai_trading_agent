@@ -255,14 +255,37 @@ graph TD
 | **Critères d'acceptation** | Tests : volume nul → logvol ≈ log(ε). dlogvol NaN à t=0. |
 | **Dépendances** | WS-2.3 |
 
-### WS-3.6 — Feature pipeline (assemblage)
+### WS-3.6 — Feature pipeline (assemblage) — architecture pluggable
 
 | Champ | Valeur |
 |---|---|
-| **Description** | Module `features/pipeline.py` qui orchestre le calcul de toutes les features dans l'ordre canonique de `feature_list` configuré. Retourne un DataFrame avec colonnes = features, index = timestamps. Vérifie que toutes les features demandées sont implémentées (erreur sinon). |
+| **Description** | Architecture pluggable basée sur un **registre de features** (`features/registry.py`). Chaque feature est une classe héritant de `BaseFeature` et auto-enregistrée via le décorateur `@register_feature("nom")`. Le pipeline (`features/pipeline.py`) itère sur `config.features.feature_list`, résout chaque nom dans le registre, appelle `compute()`, et assemble le DataFrame résultat. Erreur explicite si une feature demandée n'est pas enregistrée. |
 | **Réf. spec** | §6.2, Annexe E.1 (`features.feature_list`) |
-| **Critères d'acceptation** | Le pipeline produit un DataFrame (N_total, F=9) avec les bonnes colonnes. Feature_version tracée. |
+| **Critères d'acceptation** | Le pipeline produit un DataFrame (N_total, F=9) avec les bonnes colonnes. Feature_version tracée. Test : une feature inconnue dans `feature_list` → `ValueError`. Test : le registre contient exactement les 9 features MVP après import. |
 | **Dépendances** | WS-3.1 → WS-3.5 |
+
+**Détails d'architecture (registre pluggable) :**
+
+1. **`features/registry.py`** — Registre global et classe de base :
+   - `FEATURE_REGISTRY: dict[str, type[BaseFeature]]` — dictionnaire nom → classe.
+   - `@register_feature(name: str)` — décorateur qui enregistre la classe. Lève `ValueError` si doublon.
+   - `BaseFeature(ABC)` — interface minimale :
+     - `compute(self, ohlcv: pd.DataFrame, params: dict) -> pd.Series` — calcul causal, retourne une Series indexée par timestamp.
+     - `min_periods -> int` (property) — nombre minimum de bougies avant première valeur valide.
+
+2. **Chaque module feature** (`log_returns.py`, `volatility.py`, etc.) :
+   - Importe `@register_feature` et `BaseFeature`.
+   - Déclare une ou plusieurs classes annotées `@register_feature("logret_1")`, etc.
+   - Aucune logique d'orchestration — uniquement le calcul.
+
+3. **`features/pipeline.py`** — Orchestrateur :
+   - Importe `FEATURE_REGISTRY` (les imports des modules feature peuplent le registre).
+   - `compute_features(ohlcv, config) -> pd.DataFrame` : itère sur `feature_list`, résout dans le registre, appelle `compute()`, assemble.
+   - Validation : erreur explicite si feature manquante ou si le registre est vide.
+
+4. **Ajout d'une feature future** : créer un fichier, implémenter `BaseFeature`, annoter `@register_feature("ma_feature")`, ajouter le nom dans `config.features.feature_list`. Aucun autre fichier à modifier.
+
+> **Note** : cette architecture est un choix engineering (comment assembler). Les formules et contraintes des features restent définies dans la spec §6.
 
 ### WS-3.7 — Warmup et validation de causalité
 
@@ -704,12 +727,13 @@ ai_trading_agent/
 │   │   └── scaler.py                   # WS-5.1, WS-5.2, WS-5.3
 │   ├── features/
 │   │   ├── __init__.py
-│   │   ├── log_returns.py              # WS-3.1
-│   │   ├── volatility.py               # WS-3.2
-│   │   ├── rsi.py                      # WS-3.3
-│   │   ├── ema.py                      # WS-3.4
-│   │   ├── volume.py                   # WS-3.5
-│   │   └── pipeline.py                 # WS-3.6, WS-3.7
+│   │   ├── registry.py                 # WS-3.6 — BaseFeature ABC + FEATURE_REGISTRY + @register_feature
+│   │   ├── log_returns.py              # WS-3.1 — @register logret_1, logret_2, logret_4
+│   │   ├── volatility.py               # WS-3.2 — @register vol_24, vol_72
+│   │   ├── rsi.py                      # WS-3.3 — @register rsi_14
+│   │   ├── ema.py                      # WS-3.4 — @register ema_ratio_12_26
+│   │   ├── volume.py                   # WS-3.5 — @register logvol, dlogvol
+│   │   └── pipeline.py                 # WS-3.6, WS-3.7 — orchestrateur via FEATURE_REGISTRY
 │   ├── models/
 │   │   ├── __init__.py
 │   │   ├── base.py                     # WS-6.1
