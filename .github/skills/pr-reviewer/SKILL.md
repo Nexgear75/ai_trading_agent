@@ -61,6 +61,7 @@ Tu dois :
 - [ ] Les tests dans `tests/` suivent la convention du plan (`test_config.py`, `test_features.py`, `test_splitter.py`, etc.). L'ID tâche `#NNN` dans les docstrings, pas les noms de fichiers.
 - [ ] Chaque critère d'acceptation est couvert par au moins un test.
 - [ ] Les tests couvrent : cas nominaux, cas d'erreur, cas de bords.
+- [ ] **Boundary fuzzing mental** : pour chaque paramètre numérique d'entrée (`n`, `L`, `H`, taille, etc.), vérifier qu'il existe un test pour chacune de ces situations : `param = 0`, `param = 1`, `param > n` (dépassement), `param = n` (limite exacte). Si une combinaison critique manque, la signaler comme bloquante.
 - [ ] Exécuter `pytest` → **tous les tests GREEN**, 0 échec, 0 erreur.
 - [ ] Exécuter `ruff check ai_trading/ tests/` → 0 erreur.
 - [ ] Pas de test désactivé (`@pytest.mark.skip`, `xfail`) sans justification explicite.
@@ -75,6 +76,11 @@ Tu dois :
 - [ ] Aucun paramètre optionnel avec default implicite masquant une erreur.
 - [ ] Validation explicite aux frontières (entrées utilisateur, données externes).
 - [ ] Erreur explicite (`raise`) en cas d'entrée invalide ou manquante.
+
+#### 5a-bis. Revue défensive indexing / slicing
+- [ ] Pour tout `array[expr:]` ou `array[:expr]` : vérifier manuellement le comportement quand `expr` est **négatif**, **zéro**, ou **> len(array)**. En Python/NumPy, `array[-k:]` ne fait **pas** `array[0:]` — c'est un piège silencieux.
+- [ ] Pour tout `range(a, b)` ou `mask[lo : hi + 1]` : vérifier que `lo` et `hi` sont clampés (`max(0, ...)`, `min(n-1, ...)`) pour toutes les valeurs extrêmes des paramètres d'entrée.
+- [ ] Si un paramètre numérique peut dépasser la taille des données (ex. `H > N`), vérifier que le code produit un résultat correct (tout False, raise, etc.) et non un comportement silencieusement faux.
 
 #### 5b. Config-driven (pas de hardcoding)
 - [ ] Tout paramètre modifiable est lu depuis `configs/default.yaml` via l'objet config Pydantic v2.
@@ -108,12 +114,14 @@ Tu dois :
 - [ ] Imports propres (pas d'imports inutilisés, pas d'imports `*`).
 - [ ] Pas de fichiers générés ou temporaires inclus dans la PR.
 - [ ] `.gitignore` couvre les artefacts générés.
+- [ ] **DRY — pas de duplication de constantes/mappings** entre modules du même package. Si un dict, une constante ou un mapping est identique dans 2+ fichiers, exiger l'extraction vers un module partagé. Classer comme **bloquant** (risque de drift silencieux).
 
 ### 7. Cohérence avec les specs
 
 - [ ] Le code est conforme à la spec v1.0 (sections référencées dans la tâche).
 - [ ] Le code est conforme au plan d'implémentation.
 - [ ] Pas d'exigence inventée hors des documents source.
+- [ ] **Formules doc vs code** : si la tâche ou un critère d'acceptation contient une formule mathématique (intervalles, bornes, indices), vérifier qu'elle correspond **exactement** à l'implémentation et aux tests. Un off-by-one entre la doc et le code est **bloquant** (ambiguïté potentiellement masquant un bug).
 
 ## Format du rapport de revue
 
@@ -199,3 +207,4 @@ Date : YYYY-MM-DD
 3. **Constructif** : chaque blocage accompagné d'une action corrective claire.
 4. **Proportionné** : ne pas bloquer pour du cosmétique. Bloquer pour les violations de fond.
 5. **Exécuter les tests** : toujours lancer `pytest` et `ruff check` soi-même.
+6. **Adversarial** : ne pas se limiter aux tests existants. Pour chaque fonction modifiée, imaginer mentalement 2-3 inputs extrêmes (param > taille données, param = 0, tableaux vides) et vérifier que le code ou les tests les couvrent. Si non → bloquant.
