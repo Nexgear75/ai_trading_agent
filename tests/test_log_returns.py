@@ -384,7 +384,7 @@ class TestEdgeCases:
         assert result.isna().all()
 
     def test_logret_4_with_exactly_4_bars_all_nan(self) -> None:
-        """#008: logret_4 with exactly 4 bars → all NaN (shift(4) needs index >= 4)."""
+        """#008: logret_4 with exactly 4 bars → all NaN (shift(4) needs at least 5 rows for first non-NaN)."""
         close = np.array([100.0, 110.0, 105.0, 120.0])
         ohlcv = pd.DataFrame({
             "open": close,
