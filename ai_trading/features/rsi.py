@@ -34,8 +34,14 @@ class RSI14(BaseFeature):
 
     @property
     def min_periods(self) -> int:
-        """Minimum bars needed: rsi_period + 1 (n+1 closes for n deltas)."""
-        return 15  # 14 + 1 per spec default
+        """Minimum bars needed for spec-default rsi_period=14: 14 + 1 = 15.
+
+        This property returns the fixed warmup based on the spec default (§6.3)
+        and does not change with runtime params.  ``compute()`` reads
+        ``rsi_period`` directly from *params* so all configured periods work
+        correctly; ``min_periods`` is a static upper bound for pipeline warmup.
+        """
+        return 15  # rsi_period (14) + 1, per spec §6.3
 
     def compute(self, ohlcv: pd.DataFrame, params: dict) -> pd.Series:
         """Compute RSI with Wilder smoothing.
@@ -54,6 +60,13 @@ class RSI14(BaseFeature):
         """
         n: int = params["rsi_period"]
         epsilon: float = params["rsi_epsilon"]
+
+        if n < 1:
+            msg = f"rsi_period must be >= 1, got {n}"
+            raise ValueError(msg)
+        if epsilon <= 0.0:
+            msg = f"rsi_epsilon must be > 0, got {epsilon}"
+            raise ValueError(msg)
 
         close = ohlcv["close"].to_numpy(dtype=np.float64)
         length = len(close)
