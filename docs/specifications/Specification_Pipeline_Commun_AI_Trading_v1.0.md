@@ -390,6 +390,16 @@ On définit un paramètre `min_warmup` en configuration (ex: $\geq 200$ bougies)
 
 Le pipeline produit une représentation unique des entrées pour garantir la comparabilité. Toutes les stratégies (modèles et baselines) utilisent la même timeline et les mêmes conventions d'exécution.
 
+L'étape "Build Samples" transforme la série temporelle issue du feature engineering (un tableau 2D: une ligne par bougie, une colonne par feature) en échantillons individuels prêts pour les modèles, par découpage en fenêtres glissantes. Elle produit trois structures alignées:
+
+| Structure | Shape | Contenu |
+|-----------|-------|---------|
+| `X_seq` | $(N, L, F)$ | $N$ échantillons, chacun = une fenêtre de $L$ bougies consécutives $\times$ $F$ features |
+| `y` | $(N,)$ | Le label (log-return futur) associé à chaque échantillon |
+| `meta` | $(N,)$ | Métadonnées d'exécution (timestamps, prix d'entrée/sortie) pour le backtest |
+
+**Exemple concret** avec $L=128$, $F=9$, $H=4$: pour la bougie de décision $t=500$, `X` contient les features des bougies 373 à 500 (matrice $128 \times 9$), `y` vaut $\log(C_{504} / O_{501})$ (le rendement du trade), et `meta` contient le timestamp de décision, le prix d'entrée $O_{501}$ et le prix de sortie $C_{504}$. On décale ensuite d'un pas ($t=501$, fenêtre 374–501, etc.) pour produire les $N$ échantillons.
+
 
 ## 7.1 Format séquentiel canonique (N, L, F)
 
