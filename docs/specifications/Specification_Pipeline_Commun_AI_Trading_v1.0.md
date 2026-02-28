@@ -280,15 +280,15 @@ La liste ci-dessous est le jeu de features minimal commun (MVP). Tout ajout de f
 
 | Feature | Définition (math) | Paramètres / notes |
 | --- | --- | --- |
-| `logret_1` | $\text{logret\_1}(t) = \log(C_t / C_{t-1})$ | Return log à 1 pas. |
-| `logret_2` | $\text{logret\_2}(t) = \log(C_t / C_{t-2})$ | Return log à 2 pas. |
-| `logret_4` | $\text{logret\_4}(t) = \log(C_t / C_{t-4})$ | Return log à 4 pas (ex: 4h si $\Delta$=1h). |
-| `vol_24` | $\text{vol\_24}(t) = \text{std}( \text{logret\_1}(t-i) , i{=}0..23 )$ | Écart-type sur 24 pas (ddof=0). |
-| `vol_72` | $\text{vol\_72}(t) = \text{std}( \text{logret\_1}(t-i) , i{=}0..71 )$ | Écart-type sur 72 pas (ddof=0). |
+| `logret_1` | $\text{logret\\\_1}(t) = \log(C_t / C_{t-1})$ | Return log à 1 pas. |
+| `logret_2` | $\text{logret\\\_2}(t) = \log(C_t / C_{t-2})$ | Return log à 2 pas. |
+| `logret_4` | $\text{logret\\\_4}(t) = \log(C_t / C_{t-4})$ | Return log à 4 pas (ex: 4h si $\Delta$=1h). |
+| `vol_24` | $\text{vol\\\_24}(t) = \text{std}( \text{logret\\\_1}(t-i) , i{=}0..23 )$ | Écart-type sur 24 pas (ddof=0). |
+| `vol_72` | $\text{vol\\\_72}(t) = \text{std}( \text{logret\\\_1}(t-i) , i{=}0..71 )$ | Écart-type sur 72 pas (ddof=0). |
 | `logvol` | $\text{logvol}(t) = \log(V_t + \varepsilon)$ | $\varepsilon = 10^{-8}$ (évite log(0)). |
 | `dlogvol` | $\text{dlogvol}(t) = \text{logvol}(t) - \text{logvol}(t-1)$ | Différence première du log-volume. |
-| `rsi_14` | $\text{RSI\_14}(t) = 100 - 100/(1 + RS_t)$ | $RS_t$ défini via lissage de Wilder (voir §6.3). |
-| `ema_ratio_12_26` | $\text{ema\_ratio}(t) = \text{EMA\_12}(t) / \text{EMA\_26}(t) - 1$ | EMA définie en §6.4, $\alpha = 2/(n+1)$. |
+| `rsi_14` | $\text{RSI\\\_14}(t) = 100 - 100/(1 + RS_t)$ | $RS_t$ défini via lissage de Wilder (voir §6.3). |
+| `ema_ratio_12_26` | $\text{ema\\\_ratio}(t) = \text{EMA\\\_12}(t) / \text{EMA\\\_26}(t) - 1$ | EMA définie en §6.4, $\alpha = 2/(n+1)$. |
 
 
 ## 6.3 RSI (Relative Strength Index) - lissage de Wilder
@@ -351,7 +351,7 @@ $$
 $$
 
 Initialisation: $\text{EMA}_n(t_0)$ = moyenne simple des $n$ premières clôtures disponibles.
-La feature `ema_ratio_12_26` est définie comme $\text{EMA\_12}(t) / \text{EMA\_26}(t) - 1$ (ratio sans dimension).
+La feature `ema_ratio_12_26` est définie comme $\text{EMA\\\_12}(t) / \text{EMA\\\_26}(t) - 1$ (ratio sans dimension).
 
 
 ## 6.5 Volatilité rolling (écart-type) - convention ddof
@@ -412,9 +412,9 @@ Aucune feature supplémentaire spécifique à XGBoost ne doit être ajoutée san
 ## 7.3 Métadonnées d'exécution (meta)
 
 Pour chaque décision $t$, le pipeline stocke les métadonnées nécessaires au backtest, indépendamment du modèle:
-- `decision_time` = $\text{close\_time}(t)$
-- `entry_time` = $\text{open\_time}(t+1)$
-- `exit_time` = $\text{close\_time}(t+H)$
+- `decision_time` = $\text{close\\\_time}(t)$
+- `entry_time` = $\text{open\\\_time}(t+1)$
+- `exit_time` = $\text{close\\\_time}(t+H)$
 - `entry_price` = $O_{t+1}$
 - `exit_price` = $C_{t+H}$
 
@@ -459,28 +459,28 @@ Le découpage temporel est un composant critique. Il doit empêcher toute fuite 
 ## 8.2 Purge liée à l'horizon H (éviter le chevauchement des labels)
 
 La cible $y_t$ dépend de prix futurs jusqu'à $t+H$. Un split naïf qui coupe uniquement sur $t$ peut fuiter: des labels du train peuvent dépendre de prix situés dans la zone test. Le pipeline applique donc une règle stricte de validité:
-Un index $t$ peut appartenir au train/val si et seulement si $t+H \leq \text{train\_end}$ (après application de l'embargo).
+Un index $t$ peut appartenir au train/val si et seulement si $t+H \leq \text{train\\\_end}$ (après application de l'embargo).
 
 
 **Règle de purge :** Soit `test_start` le début du test (indice de décision). On définit :
 
 $$
-\text{train\_end} = \text{test\_start} - \text{embargo\_bars}
+\text{train\\\_end} = \text{test\\\_start} - \text{embargo\\\_bars}
 $$
 
 Un sample t est autorisé dans train/val si :
 
 $$
-t + H \leq \text{train\_end}
+t + H \leq \text{train\\\_end}
 $$
 
 
 ## 8.3 Définition formelle des périodes par fold
 
 Pour chaque fold $k$, le splitter doit produire des périodes disjointes (train/val/test) en timestamps UTC:
-- $\text{train\_k} = [T_{\text{train\_start}}, T_{\text{train\_end}}]$
-- $\text{val\_k}$ = sous-intervalle terminal de $\text{train\_k}$ (`val_frac_in_train`)
-- $\text{test\_k} = [T_{\text{test\_start}}, T_{\text{test\_end}}]$
+- $\text{train\\\_k} = [T_{\text{train\\\_start}}, T_{\text{train\\\_end}}]$
+- $\text{val\\\_k}$ = sous-intervalle terminal de $\text{train\\\_k}$ (`val_frac_in_train`)
+- $\text{test\\\_k} = [T_{\text{test\\\_start}}, T_{\text{test\\\_end}}]$
 
 Le `manifest.json` doit enregistrer précisément ces bornes pour audit.
 
@@ -652,21 +652,21 @@ Les valeurs 'par trade' round-trip se déduisent par: $f_{\text{rt}} \approx 2f$
 Soit $p_{\text{entry}} = O_{t+1}$ et $p_{\text{exit}} = C_{t+H}$. On modélise un slippage proportionnel (worst-case):
 
 $$
-p_{\text{entry\_eff}} = p_{\text{entry}} \cdot (1 + s)
+p_{\text{entry\\\_eff}} = p_{\text{entry}} \cdot (1 + s)
 $$
 $$
-p_{\text{exit\_eff}} = p_{\text{exit}} \cdot (1 - s)
+p_{\text{exit\\\_eff}} = p_{\text{exit}} \cdot (1 - s)
 $$
 
 On applique ensuite les frais sur les deux côtés (achat puis vente). Le multiplicateur net du trade est:
 
 $$
-M_{\text{net}} = (1 - f)^2 \cdot \frac{p_{\text{exit\_eff}}}{p_{\text{entry\_eff}}}
+M_{\text{net}} = (1 - f)^2 \cdot \frac{p_{\text{exit\\\_eff}}}{p_{\text{entry\\\_eff}}}
 $$
 
 Return net (simple): $r_{\text{net}} = M_{\text{net}} - 1$
 
-Log-return net: $\text{lr\_net} = \log(M_\text{net})$
+Log-return net: $\text{lr\\\_net} = \log(M_\text{net})$
 
 
 **Formule finale :**
@@ -737,7 +737,7 @@ $$
 $$
 
 Signal à $t$:
-Go si $\text{SMA\_fast}(t) > \text{SMA\_slow}(t)$, sinon No-Go.
+Go si $\text{SMA\\\_fast}(t) > \text{SMA\\\_slow}(t)$, sinon No-Go.
 
 La règle SMA est ensuite backtestée avec les mêmes règles d'exécution que les modèles (entrée $O_{t+1}$, sortie $C_{t+H}$) afin de rester comparable.
 
@@ -2087,7 +2087,7 @@ Le manifest enregistre les trois périodes (`train`, `val`, `test`) ; la périod
 
 #### E.2.4 — SMA baseline : calcul causal sur tout l'historique disponible
 
-**Décision** : Les SMA de la baseline sont calculées sur **toutes les clôtures disponibles causalement** au moment de la décision (y compris les données antérieures au début du train). Les premières décisions où $\text{SMA\_slow}$ n'est pas encore définie sont marquées No-Go.
+**Décision** : Les SMA de la baseline sont calculées sur **toutes les clôtures disponibles causalement** au moment de la décision (y compris les données antérieures au début du train). Les premières décisions où $\text{SMA\\\_slow}$ n'est pas encore définie sont marquées No-Go.
 
 **Justification** : la SMA est un filtre causal. Limiter son historique au train serait artificiel et non représentatif de l'usage réel.
 
@@ -2289,7 +2289,7 @@ Glossaire pédagogique des termes financiers, boursiers et de trading algorithmi
 | **Équité (Equity)** | Valeur du portefeuille au cours du temps. Initialisée à 1.0 (normalisée), elle évolue via les rendements nets des trades. La courbe d'équité visualise la performance cumulée. |
 | **Courbe d'équité (Equity curve)** | Graphique montrant l'évolution de l'équité dans le temps. Permet de visualiser les périodes de gains, de pertes et les drawdowns. |
 | **Drawdown** | Baisse de l'équité depuis un sommet (peak) précédent. Mesure la perte subie avant de retrouver le niveau antérieur. |
-| **Max Drawdown (MDD)** | Plus grande baisse relative de l'équité observée sur une période : $\text{MDD} = \max_t \left(\frac{\text{peak\_t} - E_t}{\text{peak\_t}}\right)$. Indicateur clé du risque. Un MDD de 25% signifie que le portefeuille a perdu au maximum 25% depuis son plus haut. |
+| **Max Drawdown (MDD)** | Plus grande baisse relative de l'équité observée sur une période : $\text{MDD} = \max_t \left(\frac{\text{peak\\\_t} - E_t}{\text{peak\\\_t}}\right)$. Indicateur clé du risque. Un MDD de 25% signifie que le portefeuille a perdu au maximum 25% depuis son plus haut. |
 | **Frais de transaction (Fees)** | Commission prélevée par l'exchange à chaque opération d'achat ou de vente. Exprimée en pourcentage du montant échangé (ex : 0.05% par côté chez Binance en mode taker). |
 | **Slippage (glissement de prix)** | Différence entre le prix théorique d'exécution et le prix réellement obtenu, due à la liquidité limitée du marché. Modélisé ici comme un coût proportionnel au prix. |
 | **Per side (par côté)** | Convention de coût : le taux est appliqué séparément à l'entrée (achat) et à la sortie (vente). Le coût total round-trip est approximativement le double du coût par côté. |
@@ -2306,7 +2306,7 @@ Glossaire pédagogique des termes financiers, boursiers et de trading algorithmi
 | **Hit rate (taux de réussite)** | Pourcentage de trades dont le rendement net est positif. Un hit rate de 54% signifie que 54 trades sur 100 sont gagnants. |
 | **Sharpe ratio** | Ratio rendement/risque : $\text{Sharpe} = \frac{\text{mean}(r)}{\text{std}(r)}$. Mesure la performance ajustée au risque. Un Sharpe élevé signifie un bon rendement pour un niveau de volatilité donné. |
 | **Volatilité (Volatility)** | Mesure de la dispersion des rendements (écart-type). Une volatilité élevée signifie des variations de prix importantes. Peut être calculée sur une fenêtre glissante (rolling volatility). |
-| **SMA (Simple Moving Average)** | Moyenne arithmétique des $n$ dernières clôtures : $\text{SMA\_n}(t) = \frac{1}{n}\sum_{i=0}^{n-1} C_{t-i}$. Lisse le prix pour identifier la tendance. |
+| **SMA (Simple Moving Average)** | Moyenne arithmétique des $n$ dernières clôtures : $\text{SMA\\\_n}(t) = \frac{1}{n}\sum_{i=0}^{n-1} C_{t-i}$. Lisse le prix pour identifier la tendance. |
 | **EMA (Exponential Moving Average)** | Moyenne mobile qui accorde un poids décroissant exponentiellement aux observations passées. Plus réactive aux changements récents que la SMA. Le coefficient de lissage est $\alpha = 2/(n+1)$. |
 | **RSI (Relative Strength Index)** | Oscillateur borné entre 0 et 100 qui mesure la vitesse et l'amplitude des mouvements de prix. Un RSI > 70 est traditionnellement considéré comme suracheté, < 30 comme survendu. |
 | **Lissage de Wilder** | Méthode de calcul de la moyenne mobile utilisée par J. W. Wilder pour le RSI. C'est une EMA avec un coefficient spécifique : $\alpha = 1/n$ (au lieu de $2/(n+1)$). |
