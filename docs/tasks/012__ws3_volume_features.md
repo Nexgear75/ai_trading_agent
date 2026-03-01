@@ -1,6 +1,6 @@
 # Tâche — Features de volume (logvol, dlogvol)
 
-Statut : TODO
+Statut : DONE
 Ordre : 012
 Workstream : WS-3
 Milestone : M2
@@ -37,27 +37,27 @@ Implémenter les deux features de volume :
 - `DLogVolume.compute()` calcule `logvol` en interne puis différencie (indépendance du registre).
 
 ## Critères d'acceptation
-- [ ] 2 classes enregistrées : `logvol`, `dlogvol` dans `FEATURE_REGISTRY`.
-- [ ] Volume nul → `logvol ≈ log(ε)` ≈ -18.42 (avec ε=1e-8).
-- [ ] `dlogvol` NaN à t=0.
-- [ ] `logvol_epsilon` lu depuis params (pas hardcodé).
-- [ ] Causalité vérifiée : modifier `volume[t > T]` ne modifie pas les features `[t <= T]`.
-- [ ] Tests numériques avec valeurs calculées à la main.
-- [ ] Tests couvrent les scénarios nominaux + erreurs + bords.
-- [ ] Suite de tests verte après implémentation.
-- [ ] `ruff check` passe sans erreur.
+- [x] 2 classes enregistrées : `logvol`, `dlogvol` dans `FEATURE_REGISTRY`.
+- [x] Volume nul → `logvol ≈ log(ε)` ≈ -18.42 (avec ε=1e-8).
+- [x] `dlogvol` NaN à t=0.
+- [x] `logvol_epsilon` lu depuis params (pas hardcodé).
+- [x] Causalité vérifiée : modifier `volume[t > T]` ne modifie pas les features `[t <= T]`.
+- [x] Tests numériques avec valeurs calculées à la main.
+- [x] Tests couvrent les scénarios nominaux + erreurs + bords.
+- [x] Suite de tests verte après implémentation.
+- [x] `ruff check` passe sans erreur.
 
 ## Pré-condition de démarrage
 - **Tous les tests existants sont GREEN** avant de commencer.
 - **Créer une branche dédiée** `task/012-volume-features` depuis `Max6000i1`.
 
 ## Checklist de fin de tâche
-- [ ] Branche `task/012-volume-features` créée depuis `Max6000i1`.
-- [ ] Tests RED écrits avant implémentation.
-- [ ] **Commit RED** : `[WS-3] #012 RED: tests features volume`.
-- [ ] Tests GREEN passants et reproductibles.
-- [ ] Critères d'acceptation tous satisfaits.
-- [ ] `ruff check ai_trading/ tests/` passe sans erreur.
-- [ ] Fichier de tâche mis à jour (statut DONE, critères cochés).
-- [ ] **Commit GREEN** : `[WS-3] #012 GREEN: features volume`.
-- [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-3] #012 — Features de volume`.
+- [x] Branche `task/012-volume-features` créée depuis `Max6000i1`.
+- [x] Tests RED écrits avant implémentation.
+- [x] **Commit RED** : `[WS-3] #012 RED: tests features volume`.
+- [x] Tests GREEN passants et reproductibles.
+- [x] Critères d'acceptation tous satisfaits.
+- [x] `ruff check ai_trading/ tests/` passe sans erreur.
+- [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
+- [x] **Commit GREEN** : `[WS-3] #012 GREEN: features volume`.
+- [x] **Pull Request ouverte** vers `Max6000i1` : `[WS-3] #012 — Features de volume`.
