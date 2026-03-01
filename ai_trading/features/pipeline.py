@@ -123,12 +123,19 @@ def compute_features(ohlcv: pd.DataFrame, config: object) -> pd.DataFrame:
 
     instances = resolve_features(config)
 
+    feature_list: list[str] = config.features.feature_list
     params_dict = _to_params_dict(config.features.params)
 
     columns: list[pd.Series] = []
-    for instance in instances:
+    for name, instance in zip(feature_list, instances, strict=True):
         series = instance.compute(ohlcv, params_dict)
+        if len(series) != len(ohlcv):
+            raise ValueError(
+                f"Feature '{name}' returned {len(series)} rows, "
+                f"expected {len(ohlcv)} (same as OHLCV input)."
+            )
+        series = series.rename(name)
         columns.append(series)
 
-    result = pd.concat(columns, axis=1)
+    result = pd.DataFrame({s.name: s for s in columns}, index=ohlcv.index)
     return result

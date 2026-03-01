@@ -3,14 +3,18 @@
 Task #013 — WS-3: Feature pipeline.
 """
 
-import importlib
 from types import SimpleNamespace
 
 import pandas as pd
 import pytest
 
+import ai_trading.features.ema as _ema_module
+import ai_trading.features.log_returns as _lr_module
+import ai_trading.features.rsi as _rsi_module
+import ai_trading.features.volatility as _vol_module
+import ai_trading.features.volume as _volume_module
 from ai_trading.features.registry import FEATURE_REGISTRY, BaseFeature
-from tests.conftest import make_ohlcv_random
+from tests.conftest import clean_registry_with_reload, make_ohlcv_random
 
 # ---------------------------------------------------------------------------
 # All 9 MVP feature names in canonical order
@@ -55,26 +59,9 @@ def _make_config(
     return SimpleNamespace(features=features_ns)
 
 
-@pytest.fixture(autouse=True)
-def _reload_registry():
-    """Ensure the registry is fully populated before each test."""
-    saved = dict(FEATURE_REGISTRY)
-    FEATURE_REGISTRY.clear()
-    # Re-import all feature modules to re-register
-    import ai_trading.features.ema as _ema
-    import ai_trading.features.log_returns as _lr
-    import ai_trading.features.rsi as _rsi
-    import ai_trading.features.volatility as _vol
-    import ai_trading.features.volume as _volume
-
-    importlib.reload(_lr)
-    importlib.reload(_vol)
-    importlib.reload(_rsi)
-    importlib.reload(_ema)
-    importlib.reload(_volume)
-    yield
-    FEATURE_REGISTRY.clear()
-    FEATURE_REGISTRY.update(saved)
+_clean_registry = clean_registry_with_reload(
+    _lr_module, _vol_module, _rsi_module, _ema_module, _volume_module,
+)
 
 
 # ===========================================================================
