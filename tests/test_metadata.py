@@ -52,7 +52,7 @@ class TestNominalShapeAndColumns:
         n_bars = 20
         h = 4
         ohlcv = _make_ohlcv(n_bars)
-        timestamps = ohlcv.index[5 : n_bars - h]
+        timestamps = pd.DatetimeIndex(ohlcv.index[5 : n_bars - h])
         config = _make_label_config(h=h)
 
         meta = build_meta(ohlcv, timestamps, config)
@@ -66,7 +66,7 @@ class TestNominalShapeAndColumns:
         n_bars = 20
         h = 4
         ohlcv = _make_ohlcv(n_bars)
-        timestamps = ohlcv.index[5 : n_bars - h]
+        timestamps = pd.DatetimeIndex(ohlcv.index[5 : n_bars - h])
         config = _make_label_config(h=h)
 
         meta = build_meta(ohlcv, timestamps, config)
@@ -194,7 +194,7 @@ class TestCorrectTimestamps:
         n_bars = 20
         h = 4
         ohlcv = _make_ohlcv(n_bars)
-        timestamps = ohlcv.index[5 : n_bars - h]
+        timestamps = pd.DatetimeIndex(ohlcv.index[5 : n_bars - h])
         config = _make_label_config(h=h)
 
         meta = build_meta(ohlcv, timestamps, config)
@@ -246,7 +246,7 @@ class TestCoherenceLogReturnTrade:
         y, label_mask = compute_labels(ohlcv, config, candle_mask)
 
         valid_indices = np.where(label_mask)[0]
-        timestamps = ohlcv.index[valid_indices]
+        timestamps = pd.DatetimeIndex(ohlcv.index[valid_indices])
 
         meta = build_meta(ohlcv, timestamps, config)
 
@@ -274,7 +274,7 @@ class TestCoherenceLogReturnCloseToClose:
         y, label_mask = compute_labels(ohlcv, config, candle_mask)
 
         valid_indices = np.where(label_mask)[0]
-        timestamps = ohlcv.index[valid_indices]
+        timestamps = pd.DatetimeIndex(ohlcv.index[valid_indices])
 
         meta = build_meta(ohlcv, timestamps, config)
 
