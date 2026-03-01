@@ -1,6 +1,6 @@
 # Tâche — Adapter tabulaire pour XGBoost
 
-Statut : TODO
+Statut : DONE
 Ordre : 017
 Workstream : WS-4
 Milestone : M2
@@ -35,27 +35,27 @@ Implémenter `flatten_seq_to_tab(X_seq, feature_names) -> (X_tab, column_names)`
 - Retourner `(X_tab: np.ndarray, column_names: list[str])`.
 
 ## Critères d'acceptation
-- [ ] Shape `(N, L*F)` correcte (ex : L=128, F=9 → 1152 colonnes).
-- [ ] Nommage des colonnes : `{feature}_{lag}` conforme.
-- [ ] Valeurs identiques à `X_seq` réarrangé (`np.reshape` C-order).
-- [ ] dtype préservé (float32).
-- [ ] X_seq non-3D → `ValueError`.
-- [ ] `feature_names` de taille ≠ F → `ValueError`.
-- [ ] Tests couvrent les scénarios nominaux + erreurs + bords.
-- [ ] Suite de tests verte après implémentation.
-- [ ] `ruff check` passe sans erreur.
+- [x] Shape `(N, L*F)` correcte (ex : L=128, F=9 → 1152 colonnes).
+- [x] Nommage des colonnes : `{feature}_{lag}` conforme.
+- [x] Valeurs identiques à `X_seq` réarrangé (`np.reshape` C-order).
+- [x] dtype préservé (float32).
+- [x] X_seq non-3D → `ValueError`.
+- [x] `feature_names` de taille ≠ F → `ValueError`.
+- [x] Tests couvrent les scénarios nominaux + erreurs + bords.
+- [x] Suite de tests verte après implémentation.
+- [x] `ruff check` passe sans erreur.
 
 ## Pré-condition de démarrage
 - **Tous les tests existants sont GREEN** avant de commencer.
 - **Créer une branche dédiée** `task/017-adapter-xgboost` depuis `Max6000i1`.
 
 ## Checklist de fin de tâche
-- [ ] Branche `task/017-adapter-xgboost` créée depuis `Max6000i1`.
-- [ ] Tests RED écrits avant implémentation.
-- [ ] **Commit RED** : `[WS-4] #017 RED: tests adapter tabulaire XGBoost`.
-- [ ] Tests GREEN passants et reproductibles.
-- [ ] Critères d'acceptation tous satisfaits.
-- [ ] `ruff check ai_trading/ tests/` passe sans erreur.
-- [ ] Fichier de tâche mis à jour (statut DONE, critères cochés).
-- [ ] **Commit GREEN** : `[WS-4] #017 GREEN: adapter tabulaire XGBoost`.
+- [x] Branche `task/017-adapter-xgboost` créée depuis `Max6000i1`.
+- [x] Tests RED écrits avant implémentation.
+- [x] **Commit RED** : `[WS-4] #017 RED: tests adapter tabulaire XGBoost`.
+- [x] Tests GREEN passants et reproductibles.
+- [x] Critères d'acceptation tous satisfaits.
+- [x] `ruff check ai_trading/ tests/` passe sans erreur.
+- [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
+- [x] **Commit GREEN** : `[WS-4] #017 GREEN: adapter tabulaire XGBoost`.
 - [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-4] #017 — Adapter tabulaire XGBoost`.
