@@ -7,11 +7,11 @@ NaN positions, config-driven epsilon, causality, edge cases.
 
 import math
 
-import ai_trading.features.volume as _volume_module
 import numpy as np
 import pandas as pd
 import pytest
 
+import ai_trading.features.volume as _volume_module
 from ai_trading.features.registry import FEATURE_REGISTRY, BaseFeature
 from tests.conftest import clean_registry_with_reload
 
@@ -394,3 +394,24 @@ class TestEdgeCases:
         result = feature.compute(ohlcv, _PARAMS)
         assert np.isfinite(result.iloc[0])
         assert result.iloc[0] == pytest.approx(math.log(1e18 + _EPSILON), rel=1e-12)
+
+    def test_logvol_zero_epsilon_raises(self):
+        """epsilon=0 must raise ValueError."""
+        ohlcv = _make_ohlcv_with_volume([100.0])
+        feature = FEATURE_REGISTRY["logvol"]()
+        with pytest.raises(ValueError, match="logvol_epsilon must be > 0"):
+            feature.compute(ohlcv, {"logvol_epsilon": 0.0})
+
+    def test_logvol_negative_epsilon_raises(self):
+        """Negative epsilon must raise ValueError."""
+        ohlcv = _make_ohlcv_with_volume([100.0])
+        feature = FEATURE_REGISTRY["logvol"]()
+        with pytest.raises(ValueError, match="logvol_epsilon must be > 0"):
+            feature.compute(ohlcv, {"logvol_epsilon": -1e-8})
+
+    def test_dlogvol_zero_epsilon_raises(self):
+        """epsilon=0 must raise ValueError for dlogvol too."""
+        ohlcv = _make_ohlcv_with_volume([100.0, 200.0])
+        feature = FEATURE_REGISTRY["dlogvol"]()
+        with pytest.raises(ValueError, match="logvol_epsilon must be > 0"):
+            feature.compute(ohlcv, {"logvol_epsilon": 0.0})

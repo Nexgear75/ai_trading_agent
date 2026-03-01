@@ -18,6 +18,13 @@ import pandas as pd
 from ai_trading.features.registry import BaseFeature, register_feature
 
 
+def _validated_logvol(volume: pd.Series, epsilon: float) -> pd.Series:
+    """Compute log(V + ε) with explicit epsilon validation."""
+    if epsilon <= 0.0:
+        raise ValueError(f"logvol_epsilon must be > 0, got {epsilon}")
+    return np.log(volume + epsilon)
+
+
 @register_feature("logvol")
 class LogVolume(BaseFeature):
     """Log-volume: ``log(V_t + ε)``."""
@@ -30,8 +37,7 @@ class LogVolume(BaseFeature):
     def compute(self, ohlcv: pd.DataFrame, params: dict) -> pd.Series:
         """Compute log-volume from OHLCV volume column."""
         epsilon: float = params["logvol_epsilon"]
-        volume = ohlcv["volume"]
-        result = np.log(volume + epsilon)
+        result = _validated_logvol(ohlcv["volume"], epsilon)
         return result.rename("logvol")
 
 
@@ -47,7 +53,6 @@ class DLogVolume(BaseFeature):
     def compute(self, ohlcv: pd.DataFrame, params: dict) -> pd.Series:
         """Compute differential log-volume from OHLCV volume column."""
         epsilon: float = params["logvol_epsilon"]
-        volume = ohlcv["volume"]
-        logvol = np.log(volume + epsilon)
+        logvol = _validated_logvol(ohlcv["volume"], epsilon)
         result = logvol - logvol.shift(1)
         return result.rename("dlogvol")
