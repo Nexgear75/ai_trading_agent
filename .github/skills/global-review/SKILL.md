@@ -162,8 +162,32 @@ C'est le cœur de la revue globale. Pour chaque paire de modules qui interagisse
 
 ## Format du rapport
 
+### Convention de nommage
+
+Fichiers : `NNNN_slug.md` dans `docs/request_changes/`
+
+- `NNNN` : numéro séquentiel sur 4 chiffres (0001, 0002, ...)
+- `_` : séparateur fixe
+- `slug` : minuscule, underscores, orienté contenu
+
+Exemples :
+- `0001_revue_globale_max6000i1.md`
+- `0002_revue_globale_post_rc0001.md`
+- `0003_audit_pre_gate_m2.md`
+
+### Valeurs de statut
+
+- `TODO` — rapport émis, corrections non commencées
+- `IN_PROGRESS` — corrections en cours (au moins un item traité)
+- `DONE` — tous les items traités (résolus ou explicitement différés)
+
+### Template
+
 ```markdown
 # Request Changes — <titre de la revue>
+
+Statut : TODO
+Ordre : NNNN
 
 **Date** : YYYY-MM-DD
 **Périmètre** : <description du périmètre audité>

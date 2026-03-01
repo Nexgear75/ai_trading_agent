@@ -1,6 +1,6 @@
 # Request Changes — Revue globale post-RC-0001
 
-Statut : TODO
+Statut : DONE
 Ordre : 0002
 
 **Date** : 2025-07-25

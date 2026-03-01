@@ -46,6 +46,7 @@ Si RED : corriger d'abord les régressions avant de commencer les request change
 
 ### 1. Lire le document request_changes
 Ouvrir `docs/request_changes/NNNN_slug.md` et extraire :
+- Le **statut** du document (`TODO`, `IN_PROGRESS`, `DONE`). Si `DONE`, confirmer avec l'utilisateur avant de retravailler.
 - La liste des items avec leur sévérité (BLOQUANT `B-N`, WARNING `W-N`, MINEUR `M-N`).
 - Pour chaque item : fichiers impactés, description du problème, action demandée.
 - Le scope demandé par l'utilisateur (all, bloquants uniquement, items spécifiques).
@@ -160,6 +161,12 @@ git commit -m "[RC-NNNN] FIX B-1: <résumé de la correction>"
 
 Après correction de chaque item, mettre à jour le document `docs/request_changes/NNNN_slug.md` :
 
+#### 8a. Transition de statut
+- Au **premier item corrigé** : passer `Statut : TODO` → `Statut : IN_PROGRESS`.
+- Quand **tous les items** du scope sont traités : passer `Statut : IN_PROGRESS` → `Statut : DONE`.
+- Si le verdict initial était `⚠️ REQUEST CHANGES` et que tout est résolu : mettre à jour le verdict en `✅ CLEAN (après corrections)`.
+
+#### 8b. Marquage des items
 - Ajouter un indicateur de résolution en tête de chaque item traité :
   ```markdown
   ### B-1. ~~Mismatch colonne `timestamp` vs `timestamp_utc`~~ ✅ RÉSOLU
