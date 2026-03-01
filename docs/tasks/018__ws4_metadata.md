@@ -1,6 +1,6 @@
 # Tâche — Métadonnées d'exécution (meta)
 
-Statut : TODO
+Statut : DONE
 Ordre : 018
 Workstream : WS-4
 Milestone : M2
@@ -36,27 +36,27 @@ Pour chaque sample t valide, construire un DataFrame `meta` avec les colonnes :
 - `meta` a N lignes (une par sample valide) et 5+ colonnes.
 
 ## Critères d'acceptation
-- [ ] `meta` de shape `(N, 5+)` avec les colonnes attendues.
-- [ ] Les prix correspondent aux bonnes bougies (vérification manuelle sur données synthétiques).
-- [ ] Cohérence `log_return_trade` : `y_t ≈ log(exit_price / entry_price)` pour les samples de ce type (tolérance `atol=1e-10`).
-- [ ] Cohérence `log_return_close_to_close` : `y_t ≈ log(Close[t+H] / Close[t])` (indépendant de `entry_price`).
-- [ ] `decision_time`, `entry_time`, `exit_time` sont des timestamps UTC valides.
-- [ ] `horizon_H_bars` lu depuis la config (pas hardcodé).
-- [ ] Tests couvrent les scénarios nominaux + erreurs + bords.
-- [ ] Suite de tests verte après implémentation.
-- [ ] `ruff check` passe sans erreur.
+- [x] `meta` de shape `(N, 5+)` avec les colonnes attendues.
+- [x] Les prix correspondent aux bonnes bougies (vérification manuelle sur données synthétiques).
+- [x] Cohérence `log_return_trade` : `y_t ≈ log(exit_price / entry_price)` pour les samples de ce type (tolérance `atol=1e-10`).
+- [x] Cohérence `log_return_close_to_close` : `y_t ≈ log(Close[t+H] / Close[t])` (indépendant de `entry_price`).
+- [x] `decision_time`, `entry_time`, `exit_time` sont des timestamps UTC valides.
+- [x] `horizon_H_bars` lu depuis la config (pas hardcodé).
+- [x] Tests couvrent les scénarios nominaux + erreurs + bords.
+- [x] Suite de tests verte après implémentation.
+- [x] `ruff check` passe sans erreur.
 
 ## Pré-condition de démarrage
 - **Tous les tests existants sont GREEN** avant de commencer.
 - **Créer une branche dédiée** `task/018-metadata` depuis `Max6000i1`.
 
 ## Checklist de fin de tâche
-- [ ] Branche `task/018-metadata` créée depuis `Max6000i1`.
-- [ ] Tests RED écrits avant implémentation.
-- [ ] **Commit RED** : `[WS-4] #018 RED: tests métadonnées d'exécution`.
-- [ ] Tests GREEN passants et reproductibles.
-- [ ] Critères d'acceptation tous satisfaits.
-- [ ] `ruff check ai_trading/ tests/` passe sans erreur.
-- [ ] Fichier de tâche mis à jour (statut DONE, critères cochés).
-- [ ] **Commit GREEN** : `[WS-4] #018 GREEN: métadonnées d'exécution`.
+- [x] Branche `task/018-metadata` créée depuis `Max6000i1`.
+- [x] Tests RED écrits avant implémentation.
+- [x] **Commit RED** : `[WS-4] #018 RED: tests métadonnées d'exécution`.
+- [x] Tests GREEN passants et reproductibles.
+- [x] Critères d'acceptation tous satisfaits.
+- [x] `ruff check ai_trading/ tests/` passe sans erreur.
+- [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
+- [x] **Commit GREEN** : `[WS-4] #018 GREEN: métadonnées d'exécution`.
 - [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-4] #018 — Métadonnées d'exécution`.
