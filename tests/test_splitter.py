@@ -19,6 +19,7 @@ from datetime import timedelta
 
 import pandas as pd
 import pytest
+
 from ai_trading.data.splitter import WalkForwardSplitter, parse_timeframe
 
 # ---------------------------------------------------------------------------
@@ -307,7 +308,7 @@ class TestMinSamplesFiltering:
 
         ts = _make_timestamps("2024-01-01", days=730, freq="1h")
         splitter = WalkForwardSplitter(splits_config=_Cfg(), timeframe="1h")
-        with pytest.raises(ValueError, match="No valid folds"):
+        with pytest.raises(ValueError, match="excluded"):
             splitter.split(ts)
 
     def test_min_samples_test_excludes_fold(self):
@@ -324,7 +325,7 @@ class TestMinSamplesFiltering:
 
         ts = _make_timestamps("2024-01-01", days=730, freq="1h")
         splitter = WalkForwardSplitter(splits_config=_Cfg(), timeframe="1h")
-        with pytest.raises(ValueError, match="No valid folds"):
+        with pytest.raises(ValueError, match="excluded"):
             splitter.split(ts)
 
     def test_partial_exclusion_with_warning(self, caplog):
@@ -355,9 +356,12 @@ class TestMinSamplesFiltering:
         splitter = WalkForwardSplitter(splits_config=_Cfg(), timeframe="1h")
         with caplog.at_level(logging.WARNING):
             folds = splitter.split(ts_sparse)
-        # Some folds should have been excluded (the early ones with gap)
-        # At least one fold should remain valid (later ones)
+        # At least one fold should remain valid (later ones with data)
         assert len(folds) >= 1
+        # Verify that exclusion warnings were actually emitted
+        warning_msgs = [r.message for r in caplog.records if r.levelno == logging.WARNING]
+        assert len(warning_msgs) > 0, "Expected at least one exclusion warning"
+        assert any("excluded" in str(m) for m in warning_msgs)
 
 
 # ---------------------------------------------------------------------------
@@ -377,8 +381,52 @@ class TestZeroValidFolds:
         )
         with pytest.raises(
             ValueError,
-            match="No valid folds: dataset too short for the given split parameters",
+            match="No valid folds: dataset too short",
         ):
+            splitter.split(ts)
+
+    def test_all_folds_filtered_out(self):
+        """All folds excluded by min_samples → error mentions filtering."""
+
+        class _Cfg:
+            train_days = 180
+            test_days = 30
+            step_days = 30
+            val_frac_in_train = 0.2
+            embargo_bars = 4
+            min_samples_train = 999999
+            min_samples_test = 1
+
+        ts = _make_timestamps("2024-01-01", days=730, freq="1h")
+        splitter = WalkForwardSplitter(splits_config=_Cfg(), timeframe="1h")
+        with pytest.raises(ValueError, match="excluded"):
+            splitter.split(ts)
+
+    def test_empty_timestamps(self):
+        """Empty DatetimeIndex → ValueError."""
+        ts = pd.DatetimeIndex([], dtype="datetime64[ns, UTC]")
+        splitter = WalkForwardSplitter(
+            splits_config=_make_mvp_splits_config(),
+            timeframe="1h",
+        )
+        with pytest.raises(ValueError, match="timestamps must not be empty"):
+            splitter.split(ts)
+
+    def test_val_days_zero_raises(self):
+        """train_days too small for val_frac → ValueError."""
+
+        class _Cfg:
+            train_days = 1
+            test_days = 1
+            step_days = 1
+            val_frac_in_train = 0.2  # floor(1 * 0.2) = 0
+            embargo_bars = 0
+            min_samples_train = 1
+            min_samples_test = 1
+
+        ts = _make_timestamps("2024-01-01", days=10, freq="1h")
+        splitter = WalkForwardSplitter(splits_config=_Cfg(), timeframe="1h")
+        with pytest.raises(ValueError, match="validation window is empty"):
             splitter.split(ts)
 
 

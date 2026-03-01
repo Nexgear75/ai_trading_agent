@@ -73,10 +73,19 @@ class WalkForwardSplitter:
         cfg = self._cfg
         delta = self._delta
 
+        if len(timestamps) == 0:
+            raise ValueError("timestamps must not be empty")
+
         dataset_start = timestamps[0]
         dataset_end = timestamps[-1]
 
         val_days = math.floor(cfg.train_days * cfg.val_frac_in_train)
+        if val_days < 1:
+            raise ValueError(
+                f"val_days={val_days} (floor({cfg.train_days} * "
+                f"{cfg.val_frac_in_train})): validation window is empty. "
+                f"Increase train_days or val_frac_in_train."
+            )
 
         # Theoretical upper bound on fold count
         total_days = (dataset_end - dataset_start).days + 1
@@ -160,8 +169,14 @@ class WalkForwardSplitter:
         )
 
         if n_valid == 0:
+            if n_folds_theoretical == 0:
+                raise ValueError(
+                    "No valid folds: dataset too short for the given "
+                    "split parameters"
+                )
             raise ValueError(
-                "No valid folds: dataset too short for the given split parameters"
+                f"No valid folds: {n_excluded} fold(s) excluded "
+                f"(truncation or min_samples filtering)"
             )
 
         return folds
