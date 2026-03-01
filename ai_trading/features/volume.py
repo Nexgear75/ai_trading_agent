@@ -32,7 +32,7 @@ class LogVolume(BaseFeature):
     required_params: list[str] = ["logvol_epsilon"]
 
     def min_periods(self, params: dict) -> int:
-        return 1
+        return 0
 
     def compute(self, ohlcv: pd.DataFrame, params: dict) -> pd.Series:
         """Compute log-volume from OHLCV volume column."""
@@ -48,7 +48,7 @@ class DLogVolume(BaseFeature):
     required_params: list[str] = ["logvol_epsilon"]
 
     def min_periods(self, params: dict) -> int:
-        return 2
+        return 1
 
     def compute(self, ohlcv: pd.DataFrame, params: dict) -> pd.Series:
         """Compute differential log-volume from OHLCV volume column."""

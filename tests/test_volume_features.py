@@ -84,15 +84,15 @@ class TestRegistration:
 
 
 class TestMinPeriods:
-    """logvol.min_periods=1, dlogvol.min_periods=2."""
+    """logvol.min_periods=0, dlogvol.min_periods=1 (contract: leading NaN count)."""
 
-    def test_logvol_min_periods_is_1(self):
+    def test_logvol_min_periods_is_0(self):
         feature = FEATURE_REGISTRY["logvol"]()
-        assert feature.min_periods(_PARAMS) == 1
+        assert feature.min_periods(_PARAMS) == 0
 
-    def test_dlogvol_min_periods_is_2(self):
+    def test_dlogvol_min_periods_is_1(self):
         feature = FEATURE_REGISTRY["dlogvol"]()
-        assert feature.min_periods(_PARAMS) == 2
+        assert feature.min_periods(_PARAMS) == 1
 
 
 # ===========================================================================
