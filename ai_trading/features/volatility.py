@@ -43,7 +43,8 @@ def _compute_rolling_volatility(
         Rolling volatility. NaN where the window is incomplete.
     """
     logret = np.log(close / close.shift(1))
-    return logret.rolling(window=window, min_periods=window).std(ddof=ddof)
+    result = logret.rolling(window=window, min_periods=window).std(ddof=ddof)
+    return result.rename(f"vol_{window}")
 
 
 @register_feature("vol_24")

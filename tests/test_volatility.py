@@ -290,7 +290,6 @@ class TestCausality:
         pd.testing.assert_series_equal(
             result_orig.iloc[:61],
             result_mod.iloc[:61],
-            check_names=False,
         )
 
     def test_vol_72_causality(self):
@@ -311,7 +310,6 @@ class TestCausality:
         pd.testing.assert_series_equal(
             result_orig.iloc[:120],
             result_mod.iloc[:120],
-            check_names=False,
         )
 
 

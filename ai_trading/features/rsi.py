@@ -20,8 +20,10 @@ import pandas as pd
 
 from ai_trading.features.registry import BaseFeature, register_feature
 
+_FEATURE_NAME = "rsi_14"
 
-@register_feature("rsi_14")
+
+@register_feature(_FEATURE_NAME)
 class RSI14(BaseFeature):
     """RSI-14 with Wilder smoothing (spec §6.3).
 
@@ -71,7 +73,7 @@ class RSI14(BaseFeature):
         result = np.full(length, np.nan, dtype=np.float64)
 
         if length < n + 1:
-            return pd.Series(result, index=ohlcv.index, name="rsi_14")
+            return pd.Series(result, index=ohlcv.index, name=_FEATURE_NAME)
 
         # Compute deltas: delta[i] = close[i+1] - close[i]
         # gains[i] and losses[i] correspond to bar i+1
@@ -92,7 +94,7 @@ class RSI14(BaseFeature):
             al = ((n - 1) * al + losses[i]) / n
             result[i + 1] = _rsi_from_ag_al(ag, al, epsilon)
 
-        return pd.Series(result, index=ohlcv.index, name="rsi_14")
+        return pd.Series(result, index=ohlcv.index, name=_FEATURE_NAME)
 
 
 def _rsi_from_ag_al(ag: float, al: float, epsilon: float) -> float:

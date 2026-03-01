@@ -1,7 +1,7 @@
 # Request Changes — Revue globale branche Max6000i1
 
 
-Statut : TODO
+Statut : DONE
 Ordre : 0001
 
 **Date** : 2026-03-01
@@ -13,7 +13,9 @@ Ordre : 0001
 
 ## BLOQUANTS
 
-### B-1. Mismatch colonne `timestamp` vs `timestamp_utc` entre QA et ingestion
+### B-1. ~~Mismatch colonne `timestamp` vs `timestamp_utc` entre QA et ingestion~~ ✅ RÉSOLU
+
+> **Résolu** : commit `96f745c` — `[RC-0001] FIX B-1: timestamp -> timestamp_utc dans QA et tests`
 
 **Fichiers** : `ai_trading/data/qa.py` (L14), `ai_trading/data/ingestion.py` (L196)
 **Sévérité** : BLOQUANT — les deux modules ne peuvent pas fonctionner ensemble.
@@ -37,7 +39,9 @@ Toutes les références internes dans `qa.py` (`df["timestamp"]` aux lignes 96, 
 
 ---
 
-### B-2. `min_periods` hardcodé dans RSI et EMA — diverge si config change
+### B-2. ~~`min_periods` hardcodé dans RSI et EMA — diverge si config change~~ ✅ RÉSOLU
+
+> **Résolu** : commit `0a7f244` — `[RC-0001] FIX B-2: Refactor min_periods en methode(params) dynamique - Option A`
 
 **Fichiers** : `ai_trading/features/rsi.py` (L45), `ai_trading/features/ema.py` (L65)
 **Sévérité** : BLOQUANT — risque de samples incorrects en downstream.
@@ -61,7 +65,9 @@ Le `window.min_warmup` cross-field validator dans `config.py` protège partielle
 
 ## WARNINGS
 
-### W-1. `vol_windows` config param trompeur — n'affecte pas le calcul des features
+### W-1. ~~`vol_windows` config param trompeur — n'affecte pas le calcul des features~~ ✅ RÉSOLU
+
+> **Résolu** : commit `25c8849` — `[RC-0001] FIX W-1: vol_windows lock`
 
 **Fichiers** : `configs/default.yaml` (L67), `ai_trading/features/volatility.py` (L51), `ai_trading/config.py` (L346)
 **Sévérité** : WARNING — config trompeuse pour l'utilisateur.
@@ -74,7 +80,9 @@ Si un utilisateur met `vol_windows: [24, 48]`, aucune erreur n'est levée, les f
 
 ---
 
-### W-2. Aucune validation des prix à zéro (division par zéro dans les features)
+### W-2. ~~Aucune validation des prix à zéro (division par zéro dans les features)~~ ✅ RÉSOLU
+
+> **Résolu** : commit `25c8849` — `[RC-0001] FIX W-2: close<=0 check dans QA`
 
 **Fichiers** : `ai_trading/data/qa.py` (L75), `ai_trading/features/log_returns.py`, `ai_trading/features/ema.py`
 **Sévérité** : WARNING — data corruption silencieuse possible.
@@ -89,7 +97,9 @@ Tout prix `close <= 0` est pathologique pour des données financières.
 
 ---
 
-### W-3. API random legacy dans `test_rsi.py`
+### W-3. ~~API random legacy dans `test_rsi.py`~~ ✅ RÉSOLU
+
+> **Résolu** : commit `c43e7d1` — `[RC-0001] FIX W-3: default_rng dans test_rsi`
 
 **Fichier** : `tests/test_rsi.py` (lignes 172, 227, 298, 375, 390, 418)
 **Sévérité** : WARNING — violation convention projet.
@@ -100,7 +110,9 @@ Tout prix `close <= 0` est pathologique pour des données financières.
 
 ---
 
-### W-4. `SmaConfig.slow` sans contrainte de borne inférieure
+### W-4. ~~`SmaConfig.slow` sans contrainte de borne inférieure~~ ✅ RÉSOLU
+
+> **Résolu** : commit `25c8849` — `[RC-0001] FIX W-4: SmaConfig.slow ge=2`
 
 **Fichier** : `ai_trading/config.py` (L156)
 **Sévérité** : WARNING — validation incomplète.
@@ -117,7 +129,9 @@ class SmaConfig(_StrictBase):
 
 ---
 
-### W-5. Risque timezone dans `_check_missing_candles` du module QA
+### W-5. ~~Risque timezone dans `_check_missing_candles` du module QA~~ ✅ RÉSOLU
+
+> **Résolu** : commit `25c8849` — `[RC-0001] FIX W-5: timezone propagation dans QA`
 
 **Fichier** : `ai_trading/data/qa.py` (L115)
 **Sévérité** : WARNING — faux positifs silencieux possible.
@@ -134,7 +148,9 @@ Si le DataFrame d'entrée contient des timestamps tz-aware (`datetime64[ns, UTC]
 
 ---
 
-### W-6. Pagination ingestion — arrêt prématuré silencieux sur page vide
+### W-6. ~~Pagination ingestion — arrêt prématuré silencieux sur page vide~~ ✅ RÉSOLU
+
+> **Résolu** : commit `c43e7d1` — `[RC-0001] FIX W-6: warning pagination tronquee dans ingestion`
 
 **Fichier** : `ai_trading/data/ingestion.py` (L143)
 **Sévérité** : WARNING — données tronquées possible.
@@ -147,7 +163,9 @@ Si l'exchange retourne une page vide avant d'atteindre `end_ms` (trou temporaire
 
 ## MINEURS
 
-### M-1. Fixtures dupliquées entre fichiers de tests
+### M-1. ~~Fixtures dupliquées entre fichiers de tests~~ ✅ RÉSOLU
+
+> **Résolu** : commit `81276cd` — `[RC-0001] FIX M-1: fixtures partagees conftest.py`
 
 **Fichiers** : `tests/test_config.py`, `tests/test_config_validation.py`, `tests/test_rsi.py`, `tests/test_ema_ratio.py`
 **Sévérité** : MINEUR — DRY violation, risque de drift.
@@ -161,7 +179,9 @@ Si l'exchange retourne une page vide avant d'atteindre `end_ms` (trou temporaire
 
 ---
 
-### M-2. Pattern de registry fixture incohérent entre fichiers de tests
+### M-2. ~~Pattern de registry fixture incohérent entre fichiers de tests~~ ✅ RÉSOLU
+
+> **Résolu** : commit `81276cd` — `[RC-0001] FIX M-2: registry fixture standardisee`
 
 **Fichiers** : `tests/test_log_returns.py`, `tests/test_volatility.py`, `tests/test_ema_ratio.py`, `tests/test_rsi.py`, `tests/test_feature_registry.py`
 **Sévérité** : MINEUR — fragilité, maintenance.
@@ -178,7 +198,9 @@ Trois stratégies différentes pour le même besoin (isolation du registre) :
 
 ---
 
-### M-3. Nommage `Series.name` incohérent entre features
+### M-3. ~~Nommage `Series.name` incohérent entre features~~ ✅ RÉSOLU
+
+> **Résolu** : toutes les features nomment leur Series avec le nom de registre.
 
 **Fichiers** : `ai_trading/features/rsi.py`, `ai_trading/features/log_returns.py`, `ai_trading/features/ema.py`, `ai_trading/features/volatility.py`
 **Sévérité** : MINEUR — incohérence d'interface.
@@ -196,7 +218,9 @@ Si du code downstream utilise `series.name` pour identifier la feature, le compo
 
 ---
 
-### M-4. `QAReport.missing_timestamps` typé `list` au lieu de `list[pd.Timestamp]`
+### M-4. ~~`QAReport.missing_timestamps` typé `list` au lieu de `list[pd.Timestamp]`~~ ✅ RÉSOLU
+
+> **Résolu** : commit `25c8849` — `[RC-0001] FIX M-4: type annotation`
 
 **Fichier** : `ai_trading/data/qa.py` (L26)
 **Sévérité** : MINEUR — perte d'information de type.
@@ -209,7 +233,9 @@ missing_timestamps: list  # Devrait être list[pd.Timestamp]
 
 ---
 
-### M-5. `_resolve_symbol` — heuristique `base_len in (3, 4)` limitée
+### M-5. ~~`_resolve_symbol` — heuristique `base_len in (3, 4)` limitée~~ ✅ RÉSOLU
+
+> **Résolu** : limitation documentée dans le code source.
 
 **Fichier** : `ai_trading/data/ingestion.py` (L75)
 **Sévérité** : MINEUR — limitation connue non documentée.
@@ -225,7 +251,9 @@ Ne gère pas les symboles crypto avec base > 4 chars (PEPE, SHIB, DOGE, etc.).
 
 ---
 
-### M-6. Nom `"rsi_14"` dupliqué entre `@register_feature` et `pd.Series(name=...)`
+### M-6. ~~Nom `"rsi_14"` dupliqué entre `@register_feature` et `pd.Series(name=...)`~~ ✅ RÉSOLU
+
+> **Résolu** : nom extrait dans la constante `_FEATURE_NAME` dans `rsi.py`.
 
 **Fichier** : `ai_trading/features/rsi.py` (L88)
 **Sévérité** : MINEUR — risque de désynchronisation.
@@ -236,7 +264,9 @@ Le string `"rsi_14"` apparaît à la fois dans `@register_feature("rsi_14")` et 
 
 ---
 
-### M-7. `logvol` et `dlogvol` non implémentés mais référencés dans la config
+### M-7. `logvol` et `dlogvol` non implémentés mais référencés dans la config — ⏳ DIFFÉRÉ
+
+> **Différé** : aucune action immédiate — à résoudre par la tâche #012.
 
 **Fichier** : `configs/default.yaml` (L52-53)
 **Sévérité** : MINEUR — attendu (tâche #012 non commencée).
@@ -247,7 +277,9 @@ La config `feature_list` référence 9 features, mais seulement 7 sont implémen
 
 ---
 
-### M-8. Construction d'OHLCV incohérente entre fichiers de tests
+### M-8. ~~Construction d'OHLCV incohérente entre fichiers de tests~~ ✅ RÉSOLU
+
+> **Résolu** : commit `81276cd` — `[RC-0001] FIX M-8: OHLCV builder partagé dans conftest.py`
 
 **Fichiers** : `tests/test_qa.py`, `tests/test_volatility.py`, `tests/test_rsi.py`, `tests/test_ema_ratio.py`, `tests/test_log_returns.py`, `tests/test_ingestion.py`
 **Sévérité** : MINEUR — fragilité face à un refactoring d'interface.
@@ -266,7 +298,9 @@ Au moins 4 patterns différents :
 
 ---
 
-### M-9. `_current_fmt` état global mutable dans le module logging
+### M-9. ~~`_current_fmt` état global mutable dans le module logging~~ ✅ RÉSOLU
+
+> **Résolu** : état regroupé dans un dict `_state` pour faciliter le reset en tests.
 
 **Fichier** : `ai_trading/utils/logging.py` (L20)
 **Sévérité** : MINEUR — fragilité du testing.

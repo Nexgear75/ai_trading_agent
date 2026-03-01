@@ -78,7 +78,10 @@ def _resolve_symbol(exchange: ccxt.Exchange, symbol_config: str) -> str:
         return symbol_config
 
     # Try inserting a slash for common patterns like BTCUSDT -> BTC/USDT
-    # Try splitting at common base lengths (3, 4)
+    # Try splitting at common base lengths (3, 4).
+    # Limitation: does not handle crypto symbols with base > 4 chars
+    # (e.g. PEPEUSDT, SHIBUSDT, DOGEUSDT). For such symbols, use the
+    # slash-separated form directly (e.g. "DOGE/USDT").
     for base_len in (3, 4):
         candidate = f"{symbol_config[:base_len]}/{symbol_config[base_len:]}"
         if candidate in exchange.markets:

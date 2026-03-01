@@ -120,7 +120,7 @@ class TestNumericalCorrectness:
         feature = FEATURE_REGISTRY["logret_1"]()
         result = feature.compute(ohlcv_10bars, {})
         close = ohlcv_10bars["close"]
-        expected = np.log(close / close.shift(1)).rename(None)
+        expected = np.log(close / close.shift(1)).rename("logret_1")
         pd.testing.assert_series_equal(result, expected, atol=1e-12)
 
     def test_logret_2_values(self, ohlcv_10bars: pd.DataFrame) -> None:
@@ -128,7 +128,7 @@ class TestNumericalCorrectness:
         feature = FEATURE_REGISTRY["logret_2"]()
         result = feature.compute(ohlcv_10bars, {})
         close = ohlcv_10bars["close"]
-        expected = np.log(close / close.shift(2)).rename(None)
+        expected = np.log(close / close.shift(2)).rename("logret_2")
         pd.testing.assert_series_equal(result, expected, atol=1e-12)
 
     def test_logret_4_values(self, ohlcv_10bars: pd.DataFrame) -> None:
@@ -136,7 +136,7 @@ class TestNumericalCorrectness:
         feature = FEATURE_REGISTRY["logret_4"]()
         result = feature.compute(ohlcv_10bars, {})
         close = ohlcv_10bars["close"]
-        expected = np.log(close / close.shift(4)).rename(None)
+        expected = np.log(close / close.shift(4)).rename("logret_4")
         pd.testing.assert_series_equal(result, expected, atol=1e-12)
 
     def test_logret_1_hand_calculated(self) -> None:

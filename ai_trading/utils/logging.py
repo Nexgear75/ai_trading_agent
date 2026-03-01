@@ -14,9 +14,9 @@ from pathlib import Path
 _VALID_LEVELS = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
 _VALID_FORMATS = {"text", "json"}
 
-# Store current format so add_file_handler can reuse it.
-# None means setup_logging() has not been called yet.
-_current_fmt: str | None = None
+# Mutable module state grouped in a single namespace for easier testing reset.
+# _state["fmt"] is None until setup_logging() has been called.
+_state: dict[str, str | None] = {"fmt": None}
 
 _TEXT_FORMAT = "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s"
 _TEXT_DATE_FORMAT = "%Y-%m-%dT%H:%M:%S"
@@ -69,8 +69,6 @@ def setup_logging(level: str, fmt: str) -> None:
     Raises:
         ValueError: If *level* or *fmt* is invalid.
     """
-    global _current_fmt  # noqa: PLW0603
-
     if not isinstance(level, str):
         raise TypeError(
             f"level must be a str, got {type(level).__name__}"
@@ -83,7 +81,7 @@ def setup_logging(level: str, fmt: str) -> None:
         )
 
     formatter = _make_formatter(fmt)  # validates fmt
-    _current_fmt = fmt
+    _state["fmt"] = fmt
 
     root = logging.getLogger()
     root.handlers.clear()
@@ -113,13 +111,13 @@ def add_file_handler(run_dir: Path, filename: str) -> None:
             f"run_dir does not exist or is not a directory: {run_dir}"
         )
 
-    if _current_fmt is None:
+    if _state["fmt"] is None:
         raise RuntimeError(
             "setup_logging() must be called before add_file_handler()"
         )
 
     log_path = run_dir / filename
-    formatter = _make_formatter(_current_fmt)
+    formatter = _make_formatter(_state["fmt"])
 
     file_handler = logging.FileHandler(str(log_path), encoding="utf-8")
     file_handler.setFormatter(formatter)

@@ -121,4 +121,4 @@ class EmaRatio1226(BaseFeature):
         for i in range(slow - 1, length):
             result[i] = ema_fast_arr[i] / ema_slow_arr[i] - 1.0
 
-        return pd.Series(result, index=ohlcv.index)
+        return pd.Series(result, index=ohlcv.index, name="ema_ratio_12_26")
