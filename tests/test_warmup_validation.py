@@ -62,7 +62,7 @@ class TestNominal:
         valid_mask = np.ones(n, dtype=bool)
         instances = [_FakeFeature(100)]
 
-        final_mask = apply_warmup(features_df, valid_mask, min_warmup, instances)
+        final_mask = apply_warmup(features_df, valid_mask, min_warmup, instances, {})
 
         assert final_mask.dtype == bool
         assert final_mask.shape == (n,)
@@ -76,7 +76,7 @@ class TestNominal:
         valid_mask = np.ones(n, dtype=bool)
         instances = [_FakeFeature(10)]
 
-        final_mask = apply_warmup(features_df, valid_mask, min_warmup, instances)
+        final_mask = apply_warmup(features_df, valid_mask, min_warmup, instances, {})
 
         assert not np.any(final_mask[:min_warmup])
         assert np.all(final_mask[min_warmup:])
@@ -92,7 +92,7 @@ class TestNominal:
         valid_mask[70] = False
         instances = [_FakeFeature(10)]
 
-        final_mask = apply_warmup(features_df, valid_mask, min_warmup, instances)
+        final_mask = apply_warmup(features_df, valid_mask, min_warmup, instances, {})
 
         # Warmup zone: all False
         assert not np.any(final_mask[:min_warmup])
@@ -118,7 +118,7 @@ class TestCombinationWithGaps:
         valid_mask[80:91] = False
         instances = [_FakeFeature(30)]
 
-        final_mask = apply_warmup(features_df, valid_mask, min_warmup, instances)
+        final_mask = apply_warmup(features_df, valid_mask, min_warmup, instances, {})
 
         # Warmup zone: all False
         assert not np.any(final_mask[:min_warmup])
@@ -136,7 +136,7 @@ class TestCombinationWithGaps:
         valid_mask = np.zeros(n, dtype=bool)
         instances = [_FakeFeature(10)]
 
-        final_mask = apply_warmup(features_df, valid_mask, min_warmup, instances)
+        final_mask = apply_warmup(features_df, valid_mask, min_warmup, instances, {})
 
         assert not np.any(final_mask)
 
@@ -160,7 +160,7 @@ class TestErrors:
         instances = [_FakeFeature(10)]
 
         with pytest.raises(ValueError, match="NaN"):
-            apply_warmup(features_df, valid_mask, min_warmup, instances)
+            apply_warmup(features_df, valid_mask, min_warmup, instances, {})
 
     def test_nan_in_multiple_columns_raises(self):
         """NaN in any column of valid zone → ValueError."""
@@ -173,7 +173,7 @@ class TestErrors:
         instances = [_FakeFeature(10)]
 
         with pytest.raises(ValueError, match="NaN"):
-            apply_warmup(features_df, valid_mask, min_warmup, instances)
+            apply_warmup(features_df, valid_mask, min_warmup, instances, {})
 
     def test_min_warmup_less_than_max_min_periods_raises(self):
         """#014 AC: min_warmup < max(min_periods) → ValueError."""
@@ -185,7 +185,7 @@ class TestErrors:
         instances = [_FakeFeature(5), _FakeFeature(20)]
 
         with pytest.raises(ValueError, match="min_warmup"):
-            apply_warmup(features_df, valid_mask, min_warmup, instances)
+            apply_warmup(features_df, valid_mask, min_warmup, instances, {})
 
     def test_nan_in_warmup_zone_is_ok(self):
         """NaN in warmup zone (masked out) should NOT raise."""
@@ -196,7 +196,7 @@ class TestErrors:
         instances = [_FakeFeature(25)]
 
         # Should not raise — NaNs are all in the warmup zone
-        final_mask = apply_warmup(features_df, valid_mask, min_warmup, instances)
+        final_mask = apply_warmup(features_df, valid_mask, min_warmup, instances, {})
         assert final_mask.sum() == n - min_warmup
 
     def test_nan_in_gap_zone_is_ok(self):
@@ -212,11 +212,11 @@ class TestErrors:
         instances = [_FakeFeature(10)]
 
         # Should not raise — NaN is in a masked-out row
-        final_mask = apply_warmup(features_df, valid_mask, min_warmup, instances)
+        final_mask = apply_warmup(features_df, valid_mask, min_warmup, instances, {})
         assert not final_mask[50]
 
     def test_missing_params_key_raises_valueerror(self):
-        """Feature needing params key but params=None → ValueError (not KeyError)."""
+        """Feature needing params key but params={} → ValueError (not KeyError)."""
         n = 100
         min_warmup = 20
         features_df = _make_features_df(n, nan_prefix=10)
@@ -229,7 +229,7 @@ class TestErrors:
         instances = [_ParamFeature()]
 
         with pytest.raises(ValueError, match="params is missing a key"):
-            apply_warmup(features_df, valid_mask, min_warmup, instances)
+            apply_warmup(features_df, valid_mask, min_warmup, instances, {})
 
 
 # ---------------------------------------------------------------------------
@@ -248,7 +248,7 @@ class TestEdgeCases:
         valid_mask = np.ones(n, dtype=bool)
         instances = [_FakeFeature(20), _FakeFeature(10)]
 
-        final_mask = apply_warmup(features_df, valid_mask, min_warmup, instances)
+        final_mask = apply_warmup(features_df, valid_mask, min_warmup, instances, {})
         assert final_mask.sum() == n - min_warmup
 
     def test_min_warmup_equals_n(self):
@@ -259,7 +259,7 @@ class TestEdgeCases:
         valid_mask = np.ones(n, dtype=bool)
         instances = [_FakeFeature(10)]
 
-        final_mask = apply_warmup(features_df, valid_mask, min_warmup, instances)
+        final_mask = apply_warmup(features_df, valid_mask, min_warmup, instances, {})
         assert final_mask.sum() == 0
 
     def test_min_warmup_greater_than_n(self):
@@ -270,7 +270,7 @@ class TestEdgeCases:
         valid_mask = np.ones(n, dtype=bool)
         instances = [_FakeFeature(10)]
 
-        final_mask = apply_warmup(features_df, valid_mask, min_warmup, instances)
+        final_mask = apply_warmup(features_df, valid_mask, min_warmup, instances, {})
         assert final_mask.sum() == 0
 
     def test_single_feature_instance(self):
@@ -281,7 +281,7 @@ class TestEdgeCases:
         valid_mask = np.ones(n, dtype=bool)
         instances = [_FakeFeature(5)]
 
-        final_mask = apply_warmup(features_df, valid_mask, min_warmup, instances)
+        final_mask = apply_warmup(features_df, valid_mask, min_warmup, instances, {})
         assert final_mask.sum() == n - min_warmup
 
     def test_empty_feature_instances_raises(self):
@@ -292,7 +292,7 @@ class TestEdgeCases:
         valid_mask = np.ones(n, dtype=bool)
 
         with pytest.raises(ValueError, match="feature_instances"):
-            apply_warmup(features_df, valid_mask, min_warmup, [])
+            apply_warmup(features_df, valid_mask, min_warmup, [], {})
 
     def test_return_type_is_ndarray(self):
         """Return value is a numpy bool array."""
@@ -302,7 +302,7 @@ class TestEdgeCases:
         valid_mask = np.ones(n, dtype=bool)
         instances = [_FakeFeature(5)]
 
-        final_mask = apply_warmup(features_df, valid_mask, min_warmup, instances)
+        final_mask = apply_warmup(features_df, valid_mask, min_warmup, instances, {})
         assert isinstance(final_mask, np.ndarray)
         assert final_mask.dtype == bool
 
@@ -315,7 +315,7 @@ class TestEdgeCases:
         instances = [_FakeFeature(5)]
 
         with pytest.raises(ValueError, match="length"):
-            apply_warmup(features_df, valid_mask, min_warmup, instances)
+            apply_warmup(features_df, valid_mask, min_warmup, instances, {})
 
     def test_multiple_features_max_min_periods_used(self):
         """With multiple features, the max(min_periods) is the constraint."""
@@ -326,7 +326,7 @@ class TestEdgeCases:
         # min_periods: 5, 25, 15 → max = 25 <= 30 → OK
         instances = [_FakeFeature(5), _FakeFeature(25), _FakeFeature(15)]
 
-        final_mask = apply_warmup(features_df, valid_mask, min_warmup, instances)
+        final_mask = apply_warmup(features_df, valid_mask, min_warmup, instances, {})
         assert final_mask.sum() == n - min_warmup
 
     def test_min_warmup_one_less_than_max_min_periods_raises(self):
@@ -338,4 +338,4 @@ class TestEdgeCases:
         instances = [_FakeFeature(20)]
 
         with pytest.raises(ValueError, match="min_warmup"):
-            apply_warmup(features_df, valid_mask, min_warmup, instances)
+            apply_warmup(features_df, valid_mask, min_warmup, instances, {})

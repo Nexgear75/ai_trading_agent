@@ -18,7 +18,7 @@ def apply_warmup(
     valid_mask: np.ndarray,
     min_warmup: int,
     feature_instances: list,
-    params: dict | None = None,
+    params: dict,
 ) -> np.ndarray:
     """Apply warmup masking and validate absence of NaN in valid zone.
 
@@ -33,9 +33,9 @@ def apply_warmup(
         Number of leading bars to invalidate (from ``config.window.min_warmup``).
     feature_instances : list[BaseFeature]
         Resolved feature instances (with ``min_periods(params)`` method).
-    params : dict | None
+    params : dict
         Feature params dict (from ``config.features.params``), passed to
-        ``min_periods()``. If ``None``, an empty dict is used.
+        ``min_periods()``.
 
     Returns
     -------
@@ -63,8 +63,7 @@ def apply_warmup(
             f"features_df length ({n})."
         )
 
-    # Resolve params for min_periods calls
-    params_dict = params if params is not None else {}
+    params_dict = params
 
     # Runtime assertion: min_warmup >= max(min_periods)
     try:
