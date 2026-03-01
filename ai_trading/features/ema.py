@@ -17,6 +17,8 @@ import pandas as pd
 
 from ai_trading.features.registry import BaseFeature, register_feature
 
+_FEATURE_NAME = "ema_ratio_12_26"
+
 
 def _compute_ema(close: np.ndarray, span: int) -> np.ndarray:
     """Compute EMA with SMA initialisation.
@@ -52,7 +54,7 @@ def _compute_ema(close: np.ndarray, span: int) -> np.ndarray:
     return result
 
 
-@register_feature("ema_ratio_12_26")
+@register_feature(_FEATURE_NAME)
 class EmaRatio1226(BaseFeature):
     """EMA ratio feature: EMA_fast / EMA_slow - 1 (spec §6.4).
 
@@ -103,8 +105,8 @@ class EmaRatio1226(BaseFeature):
         if slow <= 0:
             msg = f"ema_slow must be >= 1, got {slow}"
             raise ValueError(msg)
-        if fast > slow:
-            msg = f"ema_fast ({fast}) must be <= ema_slow ({slow})"
+        if fast >= slow:
+            msg = f"ema_fast ({fast}) must be < ema_slow ({slow})"
             raise ValueError(msg)
 
         close = ohlcv["close"].to_numpy(dtype=np.float64)
@@ -121,4 +123,4 @@ class EmaRatio1226(BaseFeature):
         for i in range(slow - 1, length):
             result[i] = ema_fast_arr[i] / ema_slow_arr[i] - 1.0
 
-        return pd.Series(result, index=ohlcv.index, name="ema_ratio_12_26")
+        return pd.Series(result, index=ohlcv.index, name=_FEATURE_NAME)

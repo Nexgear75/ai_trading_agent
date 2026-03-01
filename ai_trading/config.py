@@ -411,6 +411,14 @@ class PipelineConfig(_StrictBase):
                     f"window.min_warmup ({self.window.min_warmup})"
                 )
 
+        # --- EMA cross-constraint: ema_fast < ema_slow ---
+        if self.features.params.ema_fast >= self.features.params.ema_slow:
+            errors.append(
+                f"features.params.ema_fast ({self.features.params.ema_fast}) "
+                f"must be < features.params.ema_slow "
+                f"({self.features.params.ema_slow})"
+            )
+
         # --- Raise all collected errors ---
         if errors:
             raise ValueError(" | ".join(errors))

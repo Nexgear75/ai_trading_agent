@@ -29,6 +29,14 @@ _TIMEFRAME_MS: dict[str, int] = {
     k: int(v.total_seconds() * 1000) for k, v in _TIMEFRAME_DELTA.items()
 }
 
+# Canonical OHLCV column names (single source of truth within this module)
+_OHLCV_RAW_COLUMNS = ("timestamp_ms", "open", "high", "low", "close", "volume")
+_PRICE_VOLUME_COLUMNS = ("open", "high", "low", "close", "volume")
+_OHLCV_CANONICAL_COLUMNS = ("timestamp_utc", "open", "high", "low", "close", "volume", "symbol")
+
+# Buffer size for streaming file hashing (SHA-256)
+_HASH_CHUNK_BYTES = 65_536
+
 # Supported exchanges (MVP: binance only)
 _SUPPORTED_EXCHANGES: dict[str, type] = {
     "binance": ccxt.binance,
@@ -195,7 +203,7 @@ def _build_dataframe(rows: list[list], symbol: str) -> pd.DataFrame:
     """Convert raw ccxt rows to a canonical DataFrame."""
     df = pd.DataFrame(
         rows,
-        columns=["timestamp_ms", "open", "high", "low", "close", "volume"],
+        columns=list(_OHLCV_RAW_COLUMNS),
     )
 
     # Convert millisecond timestamps to datetime64[ns, UTC]
@@ -205,7 +213,7 @@ def _build_dataframe(rows: list[list], symbol: str) -> pd.DataFrame:
     df = df.drop(columns=["timestamp_ms"])
 
     # Ensure float64
-    for col in ("open", "high", "low", "close", "volume"):
+    for col in _PRICE_VOLUME_COLUMNS:
         df[col] = df[col].astype("float64")
 
     df["symbol"] = symbol
@@ -214,7 +222,7 @@ def _build_dataframe(rows: list[list], symbol: str) -> pd.DataFrame:
     df = df.sort_values("timestamp_utc").reset_index(drop=True)
 
     # Canonical column order
-    df = df[["timestamp_utc", "open", "high", "low", "close", "volume", "symbol"]]
+    df = df[list(_OHLCV_CANONICAL_COLUMNS)]
 
     return df
 
@@ -223,7 +231,7 @@ def _sha256_file(path: Path) -> str:
     """Compute SHA-256 hex digest of a file."""
     h = hashlib.sha256()
     with open(path, "rb") as f:
-        for chunk in iter(lambda: f.read(65_536), b""):
+        for chunk in iter(lambda: f.read(_HASH_CHUNK_BYTES), b""):
             h.update(chunk)
     return h.hexdigest()
 

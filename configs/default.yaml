@@ -49,8 +49,7 @@ features:
     - logret_4
     - vol_24
     - vol_72
-    - logvol
-    - dlogvol
+    # logvol and dlogvol temporarily removed — not yet implemented (task #012)
     - rsi_14
     - ema_ratio_12_26
   # Paramètres des features individuelles

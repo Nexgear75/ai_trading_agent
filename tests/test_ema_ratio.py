@@ -408,24 +408,17 @@ class TestEdgeCases:
         """min_periods should equal index of first non-NaN (ema_slow - 1 = 25)."""
         assert ema_instance.min_periods({"ema_fast": 12, "ema_slow": 26}) == 25
 
-    def test_ema_fast_equals_slow_ratio_zero(self, ema_instance):
-        """When ema_fast == ema_slow, ratio should be 0 everywhere non-NaN."""
-        close_values = [100.0 + i * 0.5 for i in range(40)]
-        ohlcv = _make_ohlcv(close_values)
-        params = {"ema_fast": 10, "ema_slow": 10}
-        result = ema_instance.compute(ohlcv, params)
+    def test_ema_fast_equals_slow_raises(self, ema_instance):
+        """When ema_fast == ema_slow, should raise ValueError (degenerate ratio=0)."""
+        ohlcv = _make_ohlcv([100.0 + i * 0.5 for i in range(40)])
+        with pytest.raises(ValueError, match="ema_fast.*must be <.*ema_slow"):
+            ema_instance.compute(ohlcv, {"ema_fast": 10, "ema_slow": 10})
 
-        valid = result.dropna()
-        np.testing.assert_allclose(valid.to_numpy(), 0.0, atol=1e-14)
-
-    def test_min_fast_min_slow(self, ema_instance):
-        """ema_fast=1, ema_slow=1: ratio=0 everywhere, 0 NaN."""
-        close_values = [10.0, 20.0, 30.0, 25.0]
-        ohlcv = _make_ohlcv(close_values)
-        result = ema_instance.compute(ohlcv, {"ema_fast": 1, "ema_slow": 1})
-
-        assert not result.isna().any(), "No NaN expected when fast=slow=1"
-        np.testing.assert_allclose(result.to_numpy(), 0.0, atol=1e-14)
+    def test_min_fast_min_slow_raises(self, ema_instance):
+        """ema_fast=1, ema_slow=1: should raise ValueError."""
+        ohlcv = _make_ohlcv([10.0, 20.0, 30.0, 25.0])
+        with pytest.raises(ValueError, match="ema_fast.*must be <.*ema_slow"):
+            ema_instance.compute(ohlcv, {"ema_fast": 1, "ema_slow": 1})
 
     def test_fast_greater_than_slow_raises(self, ema_instance):
         """ema_fast > ema_slow should raise ValueError."""
