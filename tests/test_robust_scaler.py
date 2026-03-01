@@ -509,6 +509,50 @@ class TestRobustSaveLoad:
         with pytest.raises(ValueError, match="mismatch"):
             scaler2.load(path)
 
+    def test_load_quantile_low_mismatch_raises(
+        self, x_train_3d, config_epsilon,
+        config_quantile_low, config_quantile_high, tmp_path
+    ):
+        """Load with different quantile_low → ValueError."""
+        scaler1 = RobustScaler(
+            epsilon=config_epsilon,
+            quantile_low=config_quantile_low,
+            quantile_high=config_quantile_high,
+        )
+        scaler1.fit(x_train_3d)
+        path = tmp_path / "params.npz"
+        scaler1.save(path)
+
+        scaler2 = RobustScaler(
+            epsilon=config_epsilon,
+            quantile_low=0.01,
+            quantile_high=config_quantile_high,
+        )
+        with pytest.raises(ValueError, match="quantile_low mismatch"):
+            scaler2.load(path)
+
+    def test_load_quantile_high_mismatch_raises(
+        self, x_train_3d, config_epsilon,
+        config_quantile_low, config_quantile_high, tmp_path
+    ):
+        """Load with different quantile_high → ValueError."""
+        scaler1 = RobustScaler(
+            epsilon=config_epsilon,
+            quantile_low=config_quantile_low,
+            quantile_high=config_quantile_high,
+        )
+        scaler1.fit(x_train_3d)
+        path = tmp_path / "params.npz"
+        scaler1.save(path)
+
+        scaler2 = RobustScaler(
+            epsilon=config_epsilon,
+            quantile_low=config_quantile_low,
+            quantile_high=0.99,
+        )
+        with pytest.raises(ValueError, match="quantile_high mismatch"):
+            scaler2.load(path)
+
 
 # ===========================================================================
 # Float32 consistency

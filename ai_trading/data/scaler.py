@@ -363,11 +363,23 @@ class RobustScaler:
             self.clip_low_ = data["clip_low"]
             self.clip_high_ = data["clip_high"]
             loaded_epsilon = float(data["epsilon"])
+            loaded_quantile_low = float(data["quantile_low"])
+            loaded_quantile_high = float(data["quantile_high"])
 
         if loaded_epsilon != self._epsilon:
             raise ValueError(
                 f"Epsilon mismatch: file has {loaded_epsilon}, "
                 f"instance has {self._epsilon}"
+            )
+        if loaded_quantile_low != self._quantile_low:
+            raise ValueError(
+                f"quantile_low mismatch: file has {loaded_quantile_low}, "
+                f"instance has {self._quantile_low}"
+            )
+        if loaded_quantile_high != self._quantile_high:
+            raise ValueError(
+                f"quantile_high mismatch: file has {loaded_quantile_high}, "
+                f"instance has {self._quantile_high}"
             )
         return self
 
