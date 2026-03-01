@@ -8,9 +8,9 @@ import logging
 
 import numpy as np
 import pytest
-from ai_trading.data.scaler import CONSTANT_FEATURE_SIGMA_THRESHOLD, StandardScaler
 
 from ai_trading.config import load_config
+from ai_trading.data.scaler import CONSTANT_FEATURE_SIGMA_THRESHOLD, StandardScaler
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -216,6 +216,21 @@ class TestErrors:
         with pytest.raises(ValueError, match="3D"):
             scaler.fit(np.ones((2, 3, 4, 5), dtype=np.float32))
 
+    def test_negative_epsilon_raises(self):
+        """Negative epsilon → ValueError."""
+        with pytest.raises(ValueError, match="epsilon"):
+            StandardScaler(epsilon=-1e-12)
+
+    def test_nan_epsilon_raises(self):
+        """NaN epsilon → ValueError."""
+        with pytest.raises(ValueError, match="epsilon"):
+            StandardScaler(epsilon=float("nan"))
+
+    def test_inf_epsilon_raises(self):
+        """Inf epsilon → ValueError."""
+        with pytest.raises(ValueError, match="epsilon"):
+            StandardScaler(epsilon=float("inf"))
+
 
 # ===========================================================================
 # Edge cases
@@ -342,3 +357,31 @@ class TestSaveLoad:
         scaler = StandardScaler(epsilon=config_epsilon)
         with pytest.raises(FileNotFoundError):
             scaler.load(tmp_path / "nonexistent.npz")
+
+    def test_load_epsilon_mismatch_raises(
+        self, x_train_3d, config_epsilon, tmp_path
+    ):
+        """Load with different epsilon → ValueError."""
+        scaler1 = StandardScaler(epsilon=config_epsilon)
+        scaler1.fit(x_train_3d)
+        path = tmp_path / "params.npz"
+        scaler1.save(path)
+
+        scaler2 = StandardScaler(epsilon=1e-6)
+        with pytest.raises(ValueError, match="mismatch"):
+            scaler2.load(path)
+
+
+# ===========================================================================
+# Float32 consistency
+# ===========================================================================
+
+class TestFloat32:
+    """#021 — Verify float32 consistency in stats and output."""
+
+    def test_mean_std_are_float32(self, x_train_3d, config_epsilon):
+        """Fitted mean_ and std_ must be float32."""
+        scaler = StandardScaler(epsilon=config_epsilon)
+        scaler.fit(x_train_3d)
+        assert scaler.mean_.dtype == np.float32
+        assert scaler.std_.dtype == np.float32

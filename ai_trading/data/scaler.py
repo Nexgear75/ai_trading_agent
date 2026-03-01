@@ -31,6 +31,10 @@ class StandardScaler:
     """
 
     def __init__(self, epsilon: float) -> None:
+        if not np.isfinite(epsilon) or epsilon < 0:
+            raise ValueError(
+                f"epsilon must be finite and >= 0, got {epsilon}"
+            )
         self._epsilon = epsilon
         self.mean_: np.ndarray | None = None
         self.std_: np.ndarray | None = None
@@ -70,8 +74,8 @@ class StandardScaler:
         n, seq_len, f = x_train.shape
         flat = x_train.reshape(n * seq_len, f)
 
-        mean = flat.mean(axis=0)
-        std = flat.std(axis=0)
+        mean = flat.mean(axis=0).astype(np.float32)
+        std = flat.std(axis=0).astype(np.float32)
         self.mean_ = mean
         self.std_ = std
 
@@ -151,7 +155,14 @@ class StandardScaler:
         if not path.exists():
             raise FileNotFoundError(f"Scaler parameter file not found: {path}")
 
-        data = np.load(path)
-        self.mean_ = data["mean"]
-        self.std_ = data["std"]
+        with np.load(path) as data:
+            self.mean_ = data["mean"]
+            self.std_ = data["std"]
+            loaded_epsilon = float(data["epsilon"])
+
+        if loaded_epsilon != self._epsilon:
+            raise ValueError(
+                f"Epsilon mismatch: file has {loaded_epsilon}, "
+                f"instance has {self._epsilon}"
+            )
         return self
