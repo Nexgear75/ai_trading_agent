@@ -35,7 +35,7 @@ class TestNominalShape:
         """Shape should be (N, L*F) for basic input."""
         x_seq = _make_x_seq(10, 4, 3)
         feature_names = ["logret", "vol", "rsi"]
-        x_tab, col_names = flatten_seq_to_tab(x_seq, feature_names)
+        x_tab, _ = flatten_seq_to_tab(x_seq, feature_names)
         assert x_tab.shape == (10, 4 * 3)
 
     def test_shape_spec_example(self):
