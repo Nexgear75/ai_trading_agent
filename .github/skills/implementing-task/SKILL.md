@@ -124,17 +124,22 @@ pytest
 - `ruff check ai_trading/ tests/` → **0 erreur, 0 warning**. Si une erreur persiste, revenir à l'étape 6 et corriger à la source.
 - `pytest` → **tous GREEN** (nouveaux + existants), aucune régression, 0 échec, 0 erreur de collection.
 
-**Vérifications complémentaires** (exécuter si disponibles dans l'environnement) :
-```bash
-# Type checking (si Pylance/pyright disponible)
-pyright ai_trading/ tests/        # ou vérifier les erreurs Pylance dans l'IDE
+**Pylance / type checking (obligatoire)** :
+Appeler l'outil `get_errors` sur **chaque fichier modifié** (`ai_trading/` et `tests/`). C'est l'équivalent IDE de Pylance — il est **toujours disponible** et ne nécessite pas `pyright` en CLI.
+```
+get_errors(filePaths=[...tous les fichiers modifiés...])
+```
+Si des erreurs de type sont signalées, les corriger (utiliser des variables locales pour le type narrowing sur `self.attr`, `np.asarray()` au lieu de `.values`, typer les retours, etc.). **Ne pas ignorer les erreurs de type.**
 
+**Ne jamais** passer à l'étape 8 si `get_errors` retourne des erreurs sur les fichiers modifiés.
+
+**Vérification complémentaire** (exécuter si disponible dans l'environnement) :
+```bash
 # Couverture — prépare les gates G-Features (>=90%), M1 (>=95%)
 pytest --cov=ai_trading --cov-report=term-missing
 ```
-Si Pylance/pyright signale des erreurs de type dans les fichiers modifiés, les corriger (utiliser `np.asarray()` au lieu de `.values`, typer les retours, etc.). Ne pas ignorer les erreurs de type.
 
-**Ne jamais** passer à l'étape 8 si `ruff check` ou `pytest` échoue.
+**Ne jamais** passer à l'étape 8 si `ruff check`, `pytest` ou `get_errors` échoue.
 
 ### 8. Audit strict (obligatoire — ne pas escamoter)
 Relecture manuelle de **chaque fichier modifié**. Checklist minimale :
@@ -154,7 +159,7 @@ Relecture manuelle de **chaque fichier modifié**. Checklist minimale :
 #### 8c. Qualité du code (post-implémentation)
 - [ ] **Aucun import inutilisé** : chaque `import` est référencé dans le code.
 - [ ] **DRY** : pas de duplication de code dans le projet. Si un bloc de code est copié-collé, extraire une fonction ou classe réutilisable. 
-- [ ] **PYLANCE** : corriger les erreurs de type signalées par Pylance/pyright dans les fichiers du projet.
+- [ ] **PYLANCE (via `get_errors`)** : appeler `get_errors` sur chaque fichier modifié et corriger toutes les erreurs de type. Attention aux pièges courants : type narrowing sur `self.attr` (Pylance ne narrow pas les attributs `self` après affectation — utiliser des variables locales), `Optional` non vérifié, retours `Any` implicites.
 - [ ] **Aucune variable morte** : chaque variable assignée est utilisée au moins une fois.
 - [ ] **Aucun `# noqa` injustifié** : seuls les `# noqa` pour des noms imposés par la spec sont tolérés (ex : `N815` sur `horizon_H_bars`). Si un `# noqa` existe, vérifier qu'il est encore nécessaire.
 - [ ] **Imports ordonnés** : stdlib → third-party → local, séparés par des lignes vides. Pas de `# noqa: I001`.
