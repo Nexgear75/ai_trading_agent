@@ -1,6 +1,6 @@
 # Tâche — Sample builder (N, L, F)
 
-Statut : TODO
+Statut : DONE
 Ordre : 016
 Workstream : WS-4
 Milestone : M2
@@ -40,29 +40,29 @@ N = nombre de samples valides (après application de tous les masques).
 - Valider l'absence de NaN dans les tenseurs produits.
 
 ## Critères d'acceptation
-- [ ] Shape `X_seq` correcte : `(N, L, F)` avec les bonnes dimensions.
-- [ ] Shape `y` correcte : `(N,)`.
-- [ ] `X_seq.dtype == np.float32` et `y.dtype == np.float32`.
-- [ ] Pas de NaN dans `X_seq` ni `y` pour les samples retenus.
-- [ ] N < N_total (warmup + trous + label invalides éliminés).
-- [ ] `L` lu depuis la config (pas hardcodé).
-- [ ] Chaque fenêtre contient les bonnes valeurs de features aux bons timestamps.
-- [ ] `timestamps` correspond aux timestamps de décision de chaque sample.
-- [ ] Tests couvrent les scénarios nominaux + erreurs + bords.
-- [ ] Suite de tests verte après implémentation.
-- [ ] `ruff check` passe sans erreur.
+- [x] Shape `X_seq` correcte : `(N, L, F)` avec les bonnes dimensions.
+- [x] Shape `y` correcte : `(N,)`.
+- [x] `X_seq.dtype == np.float32` et `y.dtype == np.float32`.
+- [x] Pas de NaN dans `X_seq` ni `y` pour les samples retenus.
+- [x] N < N_total (warmup + trous + label invalides éliminés).
+- [x] `L` lu depuis la config (pas hardcodé).
+- [x] Chaque fenêtre contient les bonnes valeurs de features aux bons timestamps.
+- [x] `timestamps` correspond aux timestamps de décision de chaque sample.
+- [x] Tests couvrent les scénarios nominaux + erreurs + bords.
+- [x] Suite de tests verte après implémentation.
+- [x] `ruff check` passe sans erreur.
 
 ## Pré-condition de démarrage
 - **Tous les tests existants sont GREEN** avant de commencer.
 - **Créer une branche dédiée** `task/016-sample-builder` depuis `Max6000i1`.
 
 ## Checklist de fin de tâche
-- [ ] Branche `task/016-sample-builder` créée depuis `Max6000i1`.
-- [ ] Tests RED écrits avant implémentation.
-- [ ] **Commit RED** : `[WS-4] #016 RED: tests sample builder`.
-- [ ] Tests GREEN passants et reproductibles.
-- [ ] Critères d'acceptation tous satisfaits.
-- [ ] `ruff check ai_trading/ tests/` passe sans erreur.
-- [ ] Fichier de tâche mis à jour (statut DONE, critères cochés).
-- [ ] **Commit GREEN** : `[WS-4] #016 GREEN: sample builder`.
-- [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-4] #016 — Sample builder (N, L, F)`.
+- [x] Branche `task/016-sample-builder` créée depuis `Max6000i1`.
+- [x] Tests RED écrits avant implémentation.
+- [x] **Commit RED** : `[WS-4] #016 RED: tests sample builder`.
+- [x] Tests GREEN passants et reproductibles.
+- [x] Critères d'acceptation tous satisfaits.
+- [x] `ruff check ai_trading/ tests/` passe sans erreur.
+- [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
+- [x] **Commit GREEN** : `[WS-4] #016 GREEN: sample builder`.
+- [x] **Pull Request ouverte** vers `Max6000i1` : `[WS-4] #016 — Sample builder (N, L, F)`.
