@@ -383,3 +383,93 @@ class TestMinPeriodsContract:
             f"RSI14: min_periods={feat.min_periods(params)} "
             f"but leading NaN count={leading_nan}"
         )
+
+    def test_min_periods_matches_leading_nan_ema_ratio(self):
+        """#023: ema_ratio — min_periods == count of leading NaN."""
+        import numpy as np
+
+        from ai_trading.features.ema import EmaRatio1226
+
+        n_bars = 50
+        close = np.linspace(100.0, 150.0, n_bars)
+        ohlcv = pd.DataFrame({
+            "open": close,
+            "high": close,
+            "low": close,
+            "close": close,
+            "volume": np.ones(n_bars),
+        }, index=pd.date_range("2024-01-01", periods=n_bars, freq="h"))
+        params = {"ema_fast": 12, "ema_slow": 26}
+
+        feat = EmaRatio1226()
+        result = feat.compute(ohlcv, params)
+        leading_nan = 0
+        for v in result:
+            if np.isnan(v):
+                leading_nan += 1
+            else:
+                break
+        assert feat.min_periods(params) == leading_nan, (
+            f"EmaRatio1226: min_periods={feat.min_periods(params)} "
+            f"but leading NaN count={leading_nan}"
+        )
+
+    def test_min_periods_matches_leading_nan_logvol(self):
+        """#023: logvol — min_periods == count of leading NaN."""
+        import numpy as np
+
+        from ai_trading.features.volume import LogVolume
+
+        n_bars = 50
+        close = np.linspace(100.0, 150.0, n_bars)
+        ohlcv = pd.DataFrame({
+            "open": close,
+            "high": close,
+            "low": close,
+            "close": close,
+            "volume": np.ones(n_bars) * 1000,
+        }, index=pd.date_range("2024-01-01", periods=n_bars, freq="h"))
+        params = {"logvol_epsilon": 1e-8}
+
+        feat = LogVolume()
+        result = feat.compute(ohlcv, params)
+        leading_nan = 0
+        for v in result:
+            if np.isnan(v):
+                leading_nan += 1
+            else:
+                break
+        assert feat.min_periods(params) == leading_nan, (
+            f"LogVolume: min_periods={feat.min_periods(params)} "
+            f"but leading NaN count={leading_nan}"
+        )
+
+    def test_min_periods_matches_leading_nan_dlogvol(self):
+        """#023: dlogvol — min_periods == count of leading NaN."""
+        import numpy as np
+
+        from ai_trading.features.volume import DLogVolume
+
+        n_bars = 50
+        close = np.linspace(100.0, 150.0, n_bars)
+        ohlcv = pd.DataFrame({
+            "open": close,
+            "high": close,
+            "low": close,
+            "close": close,
+            "volume": np.ones(n_bars) * 1000,
+        }, index=pd.date_range("2024-01-01", periods=n_bars, freq="h"))
+        params = {"logvol_epsilon": 1e-8}
+
+        feat = DLogVolume()
+        result = feat.compute(ohlcv, params)
+        leading_nan = 0
+        for v in result:
+            if np.isnan(v):
+                leading_nan += 1
+            else:
+                break
+        assert feat.min_periods(params) == leading_nan, (
+            f"DLogVolume: min_periods={feat.min_periods(params)} "
+            f"but leading NaN count={leading_nan}"
+        )

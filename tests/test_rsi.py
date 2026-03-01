@@ -129,9 +129,10 @@ class TestRSINumerical:
         # After warmup, RSI should be close to 50
         valid = result.iloc[14:]
         assert all(np.isfinite(valid))
-        # For alternating series, AG ≈ AL, so RSI oscillates around 50.
-        # Due to Wilder smoothing, the oscillation amplitude is ~3.6 for n=14.
-        np.testing.assert_allclose(valid.values, 50.0, atol=4.0)
+        # Compare against the pure-Python Wilder reference (exact match).
+        expected = _compute_rsi_reference(close, n=14, epsilon=1e-12)
+        expected_valid = np.array(expected[14:])
+        np.testing.assert_allclose(valid.values, expected_valid, atol=1e-10)
 
     def test_rsi_matches_reference(self, rsi_instance, default_params):
         """Compare output against pure-Python Wilder reference."""

@@ -380,3 +380,29 @@ class TestFloat32:
         scaler.fit(x_train_3d)
         assert scaler.mean_.dtype == np.float32
         assert scaler.std_.dtype == np.float32
+
+
+# ===========================================================================
+# Inverse transform roundtrip
+# ===========================================================================
+
+class TestInverseRoundtrip:
+    """#021 — Verify that scaling is reversible via manual inverse."""
+
+    def test_inverse_transform_roundtrip(self, x_train_3d, config_epsilon):
+        """(x_scaled * (σ + ε) + μ) must recover the original data."""
+        scaler = StandardScaler(epsilon=config_epsilon)
+        scaler.fit(x_train_3d)
+        x_scaled = scaler.transform(x_train_3d)
+
+        # Manual inverse
+        x_recovered = x_scaled * (scaler.std_ + config_epsilon) + scaler.mean_
+
+        # Exclude constant features where information is lost (set to 0.0)
+        non_constant = scaler.std_ >= CONSTANT_FEATURE_SIGMA_THRESHOLD
+        np.testing.assert_allclose(
+            x_recovered[:, :, non_constant],
+            x_train_3d[:, :, non_constant],
+            atol=1e-4,
+            rtol=1e-4,
+        )

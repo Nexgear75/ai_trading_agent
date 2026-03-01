@@ -86,6 +86,7 @@ Les skills `.github/skills/*/SKILL.md` fournissent des workflows spécialisés i
 | `task-creator` | « crée les tâches pour WS-X » | Génération de tâches structurées depuis spec/plan |
 | `gate-validator` | « valide le gate M2 » | Audit Go/No-Go des gates M1–M5, G-* |
 | `global-review` | « revue globale », « audit du code », « revue de la branche » | Revue complète de branche : cohérence inter-modules, conformité spec, qualité |
+| `test-adherence` | « vérifie l'adhérence des tests », « tests vs spec », « matrice couverture » | Audit croisé tests ↔ spec ↔ tâches : formules, critères, anti-patterns |
 | `markdown-redaction` | « rédige un document Markdown » | Conventions GFM, mode Corporate FR, templates |
 
 ## Instructions automatiques
