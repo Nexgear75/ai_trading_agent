@@ -63,5 +63,5 @@ Appliquer la règle de purge exacte de la spec §8.2 :
 - [x] Critères d'acceptation tous satisfaits.
 - [x] `ruff check ai_trading/ tests/` passe sans erreur.
 - [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
-- [ ] **Commit GREEN** : `[WS-4] #020 GREEN: embargo et purge`.
-- [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-4] #020 — Embargo et purge`.
+- [x] **Commit GREEN** : `[WS-4] #020 GREEN: embargo et purge`.
+- [x] **Pull Request ouverte** vers `Max6000i1` : `[WS-4] #020 — Embargo et purge`.
