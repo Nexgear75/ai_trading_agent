@@ -1,6 +1,6 @@
 # Tâche — Standard scaler (fit-on-train)
 
-Statut : TODO
+Statut : DONE
 Ordre : 021
 Workstream : WS-5
 Milestone : M2
@@ -42,30 +42,30 @@ Implémenter le standard scaler dans `ai_trading/data/scaler.py` :
 - Le scaler est instancié et utilisé par le fold trainer (WS-6.3), pas directement par l'orchestrateur.
 
 ## Critères d'acceptation
-- [ ] Stats (μ, σ) estimées uniquement sur X_train (X_val/X_test non vus).
-- [ ] Moyenne du train transformé ≈ 0 (tolérance `atol=1e-5`).
-- [ ] Écart-type du train transformé ≈ 1 (tolérance `atol=1e-5`).
-- [ ] `epsilon` lu depuis la config (pas hardcodé).
-- [ ] NaN dans X_train → `ValueError`.
-- [ ] Feature constante (σ < 1e-8) → sortie = 0.0 + warning émis via logging.
-- [ ] Paramètres (μ, σ) sérialisables et rechargeable (save/load).
-- [ ] Shape d'entrée validée : non-3D → `ValueError`.
-- [ ] Transform préserve le dtype float32.
-- [ ] Tests couvrent les scénarios nominaux + erreurs + bords.
-- [ ] Suite de tests verte après implémentation.
-- [ ] `ruff check` passe sans erreur.
+- [x] Stats (μ, σ) estimées uniquement sur X_train (X_val/X_test non vus).
+- [x] Moyenne du train transformé ≈ 0 (tolérance `atol=1e-5`).
+- [x] Écart-type du train transformé ≈ 1 (tolérance `atol=1e-5`).
+- [x] `epsilon` lu depuis la config (pas hardcodé).
+- [x] NaN dans X_train → `ValueError`.
+- [x] Feature constante (σ < 1e-8) → sortie = 0.0 + warning émis via logging.
+- [x] Paramètres (μ, σ) sérialisables et rechargeable (save/load).
+- [x] Shape d'entrée validée : non-3D → `ValueError`.
+- [x] Transform préserve le dtype float32.
+- [x] Tests couvrent les scénarios nominaux + erreurs + bords.
+- [x] Suite de tests verte après implémentation.
+- [x] `ruff check` passe sans erreur.
 
 ## Pré-condition de démarrage
 - **Tous les tests existants sont GREEN** avant de commencer.
 - **Créer une branche dédiée** `task/021-standard-scaler` depuis `Max6000i1`.
 
 ## Checklist de fin de tâche
-- [ ] Branche `task/021-standard-scaler` créée depuis `Max6000i1`.
-- [ ] Tests RED écrits avant implémentation.
-- [ ] **Commit RED** : `[WS-5] #021 RED: tests standard scaler`.
-- [ ] Tests GREEN passants et reproductibles.
-- [ ] Critères d'acceptation tous satisfaits.
-- [ ] `ruff check ai_trading/ tests/` passe sans erreur.
-- [ ] Fichier de tâche mis à jour (statut DONE, critères cochés).
-- [ ] **Commit GREEN** : `[WS-5] #021 GREEN: standard scaler`.
-- [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-5] #021 — Standard scaler`.
+- [x] Branche `task/021-standard-scaler` créée depuis `Max6000i1`.
+- [x] Tests RED écrits avant implémentation.
+- [x] **Commit RED** : `[WS-5] #021 RED: tests standard scaler`.
+- [x] Tests GREEN passants et reproductibles.
+- [x] Critères d'acceptation tous satisfaits.
+- [x] `ruff check ai_trading/ tests/` passe sans erreur.
+- [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
+- [x] **Commit GREEN** : `[WS-5] #021 GREEN: standard scaler`.
+- [x] **Pull Request ouverte** vers `Max6000i1` : `[WS-5] #021 — Standard scaler`.
