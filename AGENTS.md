@@ -81,9 +81,11 @@ Les skills `.github/skills/*/SKILL.md` fournissent des workflows spécialisés i
 | Skill | Déclencheur | Description |
 |---|---|---|
 | `implementing-task` | « implémente la tâche #NNN » | TDD strict RED→GREEN, conventions du repo |
+| `implementing-request-change` | « implémente les request changes 0001 », « corrige les bloquants » | Corrections issues d'un rapport request_changes, par sévérité |
 | `pr-reviewer` | « review la PR », « vérifie avant merge » | Revue systématique de PR |
 | `task-creator` | « crée les tâches pour WS-X » | Génération de tâches structurées depuis spec/plan |
 | `gate-validator` | « valide le gate M2 » | Audit Go/No-Go des gates M1–M5, G-* |
+| `global-review` | « revue globale », « audit du code », « revue de la branche » | Revue complète de branche : cohérence inter-modules, conformité spec, qualité |
 | `markdown-redaction` | « rédige un document Markdown » | Conventions GFM, mode Corporate FR, templates |
 
 ## Instructions automatiques

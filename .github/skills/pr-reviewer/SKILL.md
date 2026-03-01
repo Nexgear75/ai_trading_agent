@@ -132,6 +132,20 @@ Tu dois :
 - [ ] Pas d'exigence inventée hors des documents source.
 - [ ] **Formules doc vs code** : si la tâche ou un critère d'acceptation contient une formule mathématique (intervalles, bornes, indices), vérifier qu'elle correspond **exactement** à l'implémentation et aux tests. Un off-by-one entre la doc et le code est **bloquant** (ambiguïté potentiellement masquant un bug).
 
+### 8. Cohérence intermodule
+
+Vérifier que les changements de la PR ne créent pas de divergence avec les modules existants.
+
+- [ ] **Signatures et types de retour** : les fonctions/classes modifiées ou créées respectent les signatures attendues par les modules appelants existants (mêmes noms de paramètres, mêmes types, même ordre). Si une signature existante est modifiée, vérifier tous les appels dans le codebase (`grep_search`).
+- [ ] **Noms de colonnes DataFrame** : les colonnes produites ou consommées (ex : `close`, `logret_1`, `vol_24`) sont identiques à celles utilisées dans les modules amont/aval. Pas de renommage silencieux ni de divergence de convention.
+- [ ] **Clés de configuration** : les clés lues depuis `configs/default.yaml` correspondent aux noms définis dans le modèle Pydantic (`config.py`). Pas de clé orpheline (présente en YAML mais pas lue) ni manquante (lue mais absente du YAML).
+- [ ] **Registres et conventions partagées** : si le module s'inscrit dans un registre (ex : `FEATURE_REGISTRY`), vérifier que l'interface implémentée (méthodes, attributs comme `name`, `min_periods`) est cohérente avec les autres entrées du registre et avec le code qui itère dessus.
+- [ ] **Structures de données partagées** : les dataclasses, TypedDict ou NamedTuple partagées entre modules sont utilisées de manière identique (mêmes champs, mêmes types). Pas de champ ajouté dans un module sans mise à jour des consommateurs.
+- [ ] **Conventions numériques** : les dtypes (float32 vs float64), les conventions NaN (NaN en tête vs valeurs par défaut), et les index (DatetimeIndex, RangeIndex) sont cohérents avec les modules voisins.
+- [ ] **Imports croisés** : si le nouveau code importe des symboles d'autres modules du projet, vérifier que ces symboles existent bien dans la branche `Max6000i1` (pas de dépendance sur du code non encore mergé).
+
+Une incohérence intermodule est **bloquante** — elle provoque des bugs silencieux à l'intégration.
+
 ## Format du rapport de revue
 
 ```markdown
@@ -191,6 +205,17 @@ Date : YYYY-MM-DD
 |---|---|
 | Spécification | ✅/❌ |
 | Plan d'implémentation | ✅/❌ |
+
+## Cohérence intermodule
+| Critère | Verdict | Commentaire |
+|---|---|---|
+| Signatures et types de retour | ✅/❌ | |
+| Noms de colonnes DataFrame | ✅/❌ | |
+| Clés de configuration | ✅/❌ | |
+| Registres et conventions partagées | ✅/❌ | |
+| Structures de données partagées | ✅/❌ | |
+| Conventions numériques | ✅/❌ | |
+| Imports croisés | ✅/❌ | |
 
 ## Bonnes pratiques métier
 | Critère | Verdict | Commentaire |

@@ -110,6 +110,7 @@ git commit -m "[WS-X] #NNN RED: <résumé des tests ajoutés>"
 - **Imports** : pas d'import `*`, pas d'imports inutilisés, pas de variables assignées mais jamais référencées (dead code). Ordre isort strict (stdlib → third-party → local).
 - **Pas de print()** : utiliser `logging` uniquement si le module en a besoin. Ne pas importer `logging` ni créer `logger` « au cas où ».
 - **Exports `__init__.py`** : si le nouveau module doit être découvert à l'import du package (ex : feature enregistrée via `@register_feature`), ajouter l'import dans le `__init__.py` du package (ex : `from ai_trading.features import ema  # noqa: F401` dans `ai_trading/features/__init__.py`).
+- **Cohérence intermodule** : avant d'implémenter, identifier les modules existants qui consomment ou produisent les mêmes structures (DataFrames, configs, registres). S'assurer que les signatures, noms de colonnes, types de retour et conventions adoptées dans le nouveau code sont alignés avec les modules voisins. En cas de doute, lire le code appelant/appelé pour vérifier la cohérence.
 - **Ajustement des tests autorisé** : si l'implémentation révèle une inexactitude mineure dans les tests RED (ex : tolérance numérique, nom de colonne), corriger les tests dans le commit GREEN. Les modifications de tests dans le GREEN doivent rester mineures et tracées.
 - **Corrections à la source** : si ruff signale un problème, corriger la cause (renommer, réordonner, supprimer). Ne jamais appliquer deux corrections contradictoires en même temps (ex : renommer un symbol ET ajouter un `# noqa` sur le même diagnostic).
 
@@ -157,6 +158,16 @@ Relecture manuelle de **chaque fichier modifié**. Checklist minimale :
 - [ ] **Pas de code mort, commenté, ou TODO orphelin.**
 - [ ] **Pas de `print()`** restant.
 - [ ] **`__init__.py` à jour** : si un nouveau module a été créé, vérifier que le `__init__.py` du package l'importe si nécessaire (ex : pour l'enregistrement automatique des features).
+
+#### 8d. Cohérence intermodule
+Vérifier que les changements ne créent pas de divergence avec les modules existants qui interagissent avec le code modifié.
+
+- [ ] **Signatures et types de retour** : les fonctions/classes modifiées ou créées respectent les signatures attendues par les modules appelants existants (mêmes noms de paramètres, mêmes types, même ordre). Si une signature est modifiée, vérifier tous les appels dans le codebase (`grep_search`).
+- [ ] **Noms de colonnes DataFrame** : les colonnes produites ou consommées (ex : `close`, `logret_1`, `vol_24`) sont identiques à celles utilisées dans les modules amont/aval. Pas de renommage silencieux.
+- [ ] **Clés de configuration** : les clés lues depuis `configs/default.yaml` correspondent aux noms définis dans le modèle Pydantic (`config.py`). Pas de clé orpheline ni manquante.
+- [ ] **Registres et conventions partagées** : si le module s'inscrit dans un registre (ex : `FEATURE_REGISTRY`), vérifier que l'interface implémentée (méthodes, attributs comme `name`, `min_periods`) est cohérente avec les autres entrées du registre et avec le code qui itère sur le registre.
+- [ ] **Structures de données partagées** : les dataclasses, TypedDict ou NamedTuple partagées entre modules sont utilisées de manière identique (mêmes champs, mêmes types). Pas de champ ajouté dans un module sans mise à jour des consommateurs.
+- [ ] **Conventions numériques** : les dtypes (float32 vs float64), les conventions NaN (NaN en tête vs valeurs par défaut), et les index (DatetimeIndex, RangeIndex) sont cohérents avec les modules voisins.
 
 Si un point de cette checklist échoue, corriger et **revenir à l'étape 7** pour revalider.
 
