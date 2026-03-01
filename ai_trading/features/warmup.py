@@ -67,9 +67,15 @@ def apply_warmup(
     params_dict = params if params is not None else {}
 
     # Runtime assertion: min_warmup >= max(min_periods)
-    max_min_periods = max(
-        inst.min_periods(params_dict) for inst in feature_instances
-    )
+    try:
+        max_min_periods = max(
+            inst.min_periods(params_dict) for inst in feature_instances
+        )
+    except KeyError as exc:
+        raise ValueError(
+            f"params is missing a key required by min_periods(): {exc}. "
+            f"Pass the full config.features.params dict."
+        ) from exc
     if min_warmup < max_min_periods:
         raise ValueError(
             f"min_warmup ({min_warmup}) must be >= max(min_periods) "
@@ -87,8 +93,9 @@ def apply_warmup(
 
     # Check for residual NaN in the valid zone
     valid_zone = features_df.values[final_mask]
-    if np.any(np.isnan(valid_zone)):
-        nan_count = int(np.sum(np.isnan(valid_zone)))
+    nan_mask = np.isnan(valid_zone)
+    if np.any(nan_mask):
+        nan_count = int(np.sum(nan_mask))
         raise ValueError(
             f"NaN values detected in the valid zone (post-warmup, post-gap mask): "
             f"{nan_count} NaN(s) found. This indicates a feature computation bug "

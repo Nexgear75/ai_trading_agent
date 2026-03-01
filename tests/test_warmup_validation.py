@@ -6,7 +6,7 @@ Tests cover:
 - Warmup mask: first min_warmup rows always False in final mask.
 - AND combination of warmup mask and valid_mask (gap mask).
 - ValueError when NaN found in valid zone (post-warmup).
-- min_warmup read from config (config-driven).
+- min_warmup passed by caller (config-driven: caller reads config.window.min_warmup).
 - min_warmup < max(min_periods) → ValueError.
 - Nominal: 500 bars, min_warmup=200, no gaps → 300 valid samples.
 - NaN injected post-warmup → error raised.
@@ -17,6 +17,7 @@ Tests cover:
 import numpy as np
 import pandas as pd
 import pytest
+
 from ai_trading.features.warmup import apply_warmup
 
 # ---------------------------------------------------------------------------
@@ -213,6 +214,22 @@ class TestErrors:
         # Should not raise — NaN is in a masked-out row
         final_mask = apply_warmup(features_df, valid_mask, min_warmup, instances)
         assert not final_mask[50]
+
+    def test_missing_params_key_raises_valueerror(self):
+        """Feature needing params key but params=None → ValueError (not KeyError)."""
+        n = 100
+        min_warmup = 20
+        features_df = _make_features_df(n, nan_prefix=10)
+        valid_mask = np.ones(n, dtype=bool)
+
+        class _ParamFeature:
+            def min_periods(self, params: dict) -> int:
+                return params["rsi_period"]
+
+        instances = [_ParamFeature()]
+
+        with pytest.raises(ValueError, match="params is missing a key"):
+            apply_warmup(features_df, valid_mask, min_warmup, instances)
 
 
 # ---------------------------------------------------------------------------
