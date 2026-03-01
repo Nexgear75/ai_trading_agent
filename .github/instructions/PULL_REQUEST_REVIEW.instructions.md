@@ -4,6 +4,13 @@ applyTo: "**"
 
 # Revue de Pull Request — AI Trading Pipeline
 
+## Sortie obligatoire
+
+À la fin de la revue, **produire un fichier de rapport** :
+- **Chemin** : `docs/pr_review_copilot/<nom_de_branche>_review.md`
+  - `<nom_de_branche>` = nom de la branche source de la PR (ex : `task/014-warmup-validation` → `task_014-warmup-validation_review.md`). Remplacer les `/` par `_`.
+- **Contenu** : la grille d'audit ci-dessous, remplie avec les résultats (`[x]` = OK, `[ ]` = non conforme, `[N/A]` = non applicable), plus une section verdict final (APPROVE / REQUEST CHANGES) et la liste des remarques numérotées avec recommandations.
+
 ## Contexte repo
 
 - **Spécification** : `docs/specifications/Specification_Pipeline_Commun_AI_Trading_v1.0.md`
@@ -65,3 +72,30 @@ applyTo: "**"
 - [ ] snake_case.
 - [ ] Pas de print(), code mort, TODO orphelin.
 - [ ] Imports propres.
+
+## Format du fichier de rapport
+
+Le fichier `docs/pr_review_copilot/<nom_de_branche>_review.md` doit suivre cette structure :
+
+```markdown
+# PR Review — <titre de la PR>
+
+**Branche** : `<nom_de_branche>`
+**Date** : <date de la revue>
+**Verdict** : APPROVE | REQUEST CHANGES
+
+## Grille d'audit
+
+<copier la grille ci-dessus avec les cases cochées/décochées>
+
+## Remarques
+
+1. [BLOQUANT|WARNING|MINEUR] <description>
+   - Fichier : `<chemin>`
+   - Ligne(s) : <numéros>
+   - Suggestion : <correction proposée>
+
+## Résumé
+
+<synthèse en 2-3 phrases>
+```
