@@ -39,7 +39,7 @@ def _make_ohlcv(
     freq = freq_map[timeframe]
     timestamps = pd.date_range(start=start, periods=n, freq=freq, tz="UTC")
     return pd.DataFrame({
-        "timestamp": timestamps,
+        "timestamp_utc": timestamps,
         "open": [100.0 + i for i in range(n)],
         "high": [105.0 + i for i in range(n)],
         "low": [95.0 + i for i in range(n)],
@@ -91,7 +91,7 @@ class TestDuplicateTimestamps:
         """A single duplicate timestamp is detected."""
         df = _make_ohlcv(n=10, timeframe="1h")
         # Duplicate the second row's timestamp
-        df.loc[2, "timestamp"] = df.loc[1, "timestamp"]
+        df.loc[2, "timestamp_utc"] = df.loc[1, "timestamp_utc"]
         report = run_qa_checks(df, timeframe="1h", zero_volume_min_streak=_DEFAULT_STREAK)
         assert report.duplicate_count >= 1
         assert report.passed is False
@@ -99,8 +99,8 @@ class TestDuplicateTimestamps:
     def test_multiple_duplicates_count(self):
         """Multiple duplicates are counted correctly."""
         df = _make_ohlcv(n=10, timeframe="1h")
-        df.loc[2, "timestamp"] = df.loc[1, "timestamp"]
-        df.loc[4, "timestamp"] = df.loc[3, "timestamp"]
+        df.loc[2, "timestamp_utc"] = df.loc[1, "timestamp_utc"]
+        df.loc[4, "timestamp_utc"] = df.loc[3, "timestamp_utc"]
         report = run_qa_checks(df, timeframe="1h", zero_volume_min_streak=_DEFAULT_STREAK)
         assert report.duplicate_count >= 2
 
@@ -141,7 +141,7 @@ class TestMissingCandles:
     def test_missing_timestamps_are_correct(self):
         """The returned missing timestamps match expected values."""
         df = _make_ohlcv(n=10, timeframe="1h")
-        expected_missing = df.loc[5, "timestamp"]
+        expected_missing = df.loc[5, "timestamp_utc"]
         df = df.drop(index=5).reset_index(drop=True)
         report = run_qa_checks(df, timeframe="1h", zero_volume_min_streak=_DEFAULT_STREAK)
         assert expected_missing in report.missing_timestamps
@@ -302,7 +302,7 @@ class TestIrregularDelta:
         """A timestamp shifted by half Δ is detected as irregular."""
         df = _make_ohlcv(n=10, timeframe="1h")
         # Shift one timestamp by 30 minutes (half of 1h)
-        df.loc[5, "timestamp"] = df.loc[5, "timestamp"] + pd.Timedelta(minutes=30)
+        df.loc[5, "timestamp_utc"] = df.loc[5, "timestamp_utc"] + pd.Timedelta(minutes=30)
         report = run_qa_checks(df, timeframe="1h", zero_volume_min_streak=_DEFAULT_STREAK)
         # Should detect irregular spacing
         assert report.irregular_delta_count >= 1
@@ -353,13 +353,13 @@ class TestEdgeCases:
 
     def test_empty_dataframe_raises(self):
         """An empty DataFrame raises ValueError."""
-        df = pd.DataFrame(columns=["timestamp", "open", "high", "low", "close", "volume"])
+        df = pd.DataFrame(columns=["timestamp_utc", "open", "high", "low", "close", "volume"])
         with pytest.raises(ValueError, match="[Ee]mpty"):
             run_qa_checks(df, timeframe="1h", zero_volume_min_streak=_DEFAULT_STREAK)
 
     def test_missing_columns_raises(self):
         """DataFrame missing required columns raises ValueError."""
-        df = pd.DataFrame({"timestamp": [1, 2], "open": [1.0, 2.0]})
+        df = pd.DataFrame({"timestamp_utc": [1, 2], "open": [1.0, 2.0]})
         with pytest.raises(ValueError, match="[Cc]olumn"):
             run_qa_checks(df, timeframe="1h", zero_volume_min_streak=_DEFAULT_STREAK)
 

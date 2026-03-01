@@ -13,7 +13,7 @@ import pandas as pd
 
 from ai_trading.data.timeframes import TIMEFRAME_DELTA as _TIMEFRAME_DELTA
 
-_REQUIRED_COLUMNS = {"timestamp", "open", "high", "low", "close", "volume"}
+_REQUIRED_COLUMNS = {"timestamp_utc", "open", "high", "low", "close", "volume"}
 _PRICE_COLUMNS = ["open", "high", "low", "close"]
 
 
@@ -191,7 +191,7 @@ def run_qa_checks(
     Parameters
     ----------
     df : pd.DataFrame
-        OHLCV DataFrame with columns: timestamp, open, high, low, close, volume.
+        OHLCV DataFrame with columns: timestamp_utc, open, high, low, close, volume.
     timeframe : str
         Expected candle interval (e.g. "1h", "4h", "1d").
     zero_volume_min_streak : int
@@ -220,11 +220,11 @@ def run_qa_checks(
     _check_negative_prices(df)
 
     # Check 2: Duplicate timestamps
-    duplicate_count = _check_duplicates(df["timestamp"])
+    duplicate_count = _check_duplicates(df["timestamp_utc"])
 
     # Check 3: Missing candles
     # Only meaningful on deduplicated timestamps
-    ts_deduped = df["timestamp"].drop_duplicates()
+    ts_deduped = df["timestamp_utc"].drop_duplicates()
     missing_timestamps = _check_missing_candles(ts_deduped, expected_delta)
 
     # Check 4: OHLC consistency
@@ -234,7 +234,7 @@ def run_qa_checks(
     zero_volume_streak_count = _check_zero_volume_streaks(df, zero_volume_min_streak)
 
     # Check 6: Irregular delta
-    irregular_delta_count = _check_irregular_delta(df["timestamp"], expected_delta)
+    irregular_delta_count = _check_irregular_delta(df["timestamp_utc"], expected_delta)
 
     # Global pass/fail
     passed = (
