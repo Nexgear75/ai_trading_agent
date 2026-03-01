@@ -66,7 +66,7 @@ def _ema_reference(close_values, span):
 def _ema_ratio_reference(close_values, fast=12, slow=26):
     """Compute reference ema_ratio = EMA_fast / EMA_slow - 1.
 
-    NaN wherever EMA_slow is NaN (t < slow).
+    NaN wherever EMA_slow is NaN (i.e. for t < slow - 1; first valid at t = slow - 1).
     """
     ema_fast = _ema_reference(close_values, fast)
     ema_slow = _ema_reference(close_values, slow)
@@ -439,9 +439,9 @@ class TestEdgeCases:
         result = ema_instance.compute(ohlcv, default_params)
         pd.testing.assert_index_equal(result.index, ohlcv.index)
 
-    def test_min_periods_returns_slow(self, ema_instance):
-        """min_periods should return ema_slow (26 by default spec)."""
-        assert ema_instance.min_periods == 26
+    def test_min_periods_returns_slow_minus_one(self, ema_instance):
+        """min_periods should equal index of first non-NaN (ema_slow - 1 = 25)."""
+        assert ema_instance.min_periods == 25
 
     def test_ema_fast_equals_slow_ratio_zero(self, ema_instance):
         """When ema_fast == ema_slow, ratio should be 0 everywhere non-NaN."""

@@ -65,19 +65,19 @@ class EmaRatio1226(BaseFeature):
 
     @property
     def min_periods(self) -> int:
-        """Number of leading NaN values: 26 (spec-default ``ema_slow=26``).
+        """Number of leading NaN values: 25 (spec-default ``ema_slow=26``).
 
         ``compute()`` produces its first non-NaN value at index
-        ``ema_slow - 1`` (i.e. 26 leading NaN for the default period of 26,
+        ``ema_slow - 1`` (i.e. 25 leading NaN for the default period of 26,
         since the first valid value is at index 25).
 
         .. note::
             This value is valid only for the spec-default ``ema_slow=26``.
             If a different ``ema_slow`` is configured, the actual leading
-            NaN count will be ``ema_slow``, which may differ from this
+            NaN count will be ``ema_slow - 1``, which may differ from this
             hard-coded return value.
         """
-        return 26
+        return 25
 
     def compute(self, ohlcv: pd.DataFrame, params: dict) -> pd.Series:
         """Compute EMA ratio from close prices.
@@ -93,7 +93,7 @@ class EmaRatio1226(BaseFeature):
         -------
         pd.Series
             EMA ratio values indexed by ohlcv timestamps.
-            NaN for t < ema_slow.
+            First non-NaN value at index ``ema_slow - 1``; NaN for ``t < ema_slow - 1``.
 
         Raises
         ------
