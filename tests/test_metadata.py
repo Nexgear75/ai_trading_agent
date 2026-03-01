@@ -280,9 +280,9 @@ class TestCoherenceLogReturnCloseToClose:
 
         # y_t ≈ log(Close[t+H] / Close[t])
         # exit_price = Close[t+H], Close[t] = ohlcv.close.iloc[t_idx]
-        for _i, t_idx in enumerate(valid_indices):
+        for i, t_idx in enumerate(valid_indices):
             close_t_h = ohlcv["close"].iloc[t_idx + h]
-            assert meta["exit_price"].iloc[_i] == close_t_h
+            assert meta["exit_price"].iloc[i] == close_t_h
             expected = np.log(
                 ohlcv["close"].iloc[t_idx + h] / ohlcv["close"].iloc[t_idx]
             )
