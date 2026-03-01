@@ -70,11 +70,13 @@ class StandardScaler:
         n, seq_len, f = x_train.shape
         flat = x_train.reshape(n * seq_len, f)
 
-        self.mean_ = flat.mean(axis=0)
-        self.std_ = flat.std(axis=0)
+        mean = flat.mean(axis=0)
+        std = flat.std(axis=0)
+        self.mean_ = mean
+        self.std_ = std
 
         # Guard: warn about constant features
-        constant_mask = self.std_ < CONSTANT_FEATURE_SIGMA_THRESHOLD
+        constant_mask = std < CONSTANT_FEATURE_SIGMA_THRESHOLD
         if constant_mask.any():
             indices = np.where(constant_mask)[0].tolist()
             logger.warning(
