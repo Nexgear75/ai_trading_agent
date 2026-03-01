@@ -72,6 +72,7 @@ applyTo: "**"
 - [ ] snake_case.
 - [ ] Pas de print(), code mort, TODO orphelin.
 - [ ] Imports propres.
+- [ ] DRY : pas de duplication de logique (ex : formules, conditions) dans tout le projet.
 
 ## Format du fichier de rapport
 

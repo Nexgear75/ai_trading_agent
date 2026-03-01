@@ -153,6 +153,8 @@ Relecture manuelle de **chaque fichier modifié**. Checklist minimale :
 
 #### 8c. Qualité du code (post-implémentation)
 - [ ] **Aucun import inutilisé** : chaque `import` est référencé dans le code.
+- [ ] **DRY** : pas de duplication de code dans le projet. Si un bloc de code est copié-collé, extraire une fonction ou classe réutilisable. 
+- [ ] **PYLANCE** : corriger les erreurs de type signalées par Pylance/pyright dans les fichiers du projet.
 - [ ] **Aucune variable morte** : chaque variable assignée est utilisée au moins une fois.
 - [ ] **Aucun `# noqa` injustifié** : seuls les `# noqa` pour des noms imposés par la spec sont tolérés (ex : `N815` sur `horizon_H_bars`). Si un `# noqa` existe, vérifier qu'il est encore nécessaire.
 - [ ] **Imports ordonnés** : stdlib → third-party → local, séparés par des lignes vides. Pas de `# noqa: I001`.
