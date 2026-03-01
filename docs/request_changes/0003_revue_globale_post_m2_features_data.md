@@ -1,6 +1,6 @@
 # Request Changes — Revue globale post-M2 (features + data pipeline)
 
-Statut : TODO
+Statut : DONE
 Ordre : 0003
 
 **Date** : 2026-03-01
@@ -26,7 +26,7 @@ Ordre : 0003
 
 ## BLOQUANTS (1)
 
-### B-1. `logvol` et `dlogvol` : `min_periods` viole le contrat unifié (tâche #023)
+### B-1. `logvol` et `dlogvol` : `min_periods` viole le contrat unifié (tâche #023) — ✅ RÉSOLU (4e30d84)
 
 **Fichiers** : `ai_trading/features/volume.py` (L39, L52), `tests/test_volume_features.py` (L89–L95)
 **Sévérité** : BLOQUANT — violation du contrat inter-modules établi par la tâche #023. Impact potentiel sur le calcul du warmup si `min_periods` est utilisé en aval pour déterminer automatiquement `min_warmup`.
@@ -63,7 +63,7 @@ Les tests `test_volume_features.py` (L89, L93) assertent les valeurs incorrectes
 
 ## WARNINGS (1)
 
-### W-1. `warmup.py` : paramètre `params` avec default implicite `None → {}`
+### W-1. `warmup.py` : paramètre `params` avec default implicite `None → {}` — ✅ RÉSOLU (910cceb)
 
 **Fichiers** : `ai_trading/features/warmup.py` (L21, L67)
 **Sévérité** : WARNING — violation de la règle « strict code, no fallbacks ».
@@ -83,7 +83,7 @@ Impact actuel : limité car l'exception KeyError est bien catchée et ré-emball
 
 ## MINEURS (5)
 
-### M-1. Duplication des helpers OHLCV dans les tests
+### M-1. Duplication des helpers OHLCV dans les tests — ✅ RÉSOLU (51835f3)
 
 **Fichiers** : `tests/test_qa.py` (L28–59), `tests/test_label_target.py` (L32–54), `tests/test_metadata.py` (L20–34)
 **Sévérité** : MINEUR — duplication DRY inter-fichiers de tests.
@@ -92,7 +92,7 @@ Trois fichiers de tests définissent des fonctions `_make_ohlcv()` locales qui d
 
 **Action** : Étendre les helpers de `conftest.py` pour couvrir les cas d'usage de ces trois fichiers (paramètre `seed`, volume personnalisable), puis remplacer les helpers locaux par des imports.
 
-### M-2. `test_feature_registry.py` : fixture `_clean_registry` locale au lieu du factory partagé
+### M-2. `test_feature_registry.py` : fixture `_clean_registry` locale au lieu du factory partagé — ✅ RÉSOLU (51835f3)
 
 **Fichiers** : `tests/test_feature_registry.py` (L43–51)
 **Sévérité** : MINEUR — incohérence de pattern de test.
@@ -101,7 +101,7 @@ Ce fichier réimplémente localement la fixture `_clean_registry` au lieu d'util
 
 **Action** : Remplacer la fixture locale par `_clean_registry = clean_registry_with_reload()` (appel sans arguments, pas de rechargement de module) ou documenter explicitement pourquoi la version locale est appropriée ici.
 
-### M-3. Validation `Series.name` non uniforme dans les tests de features
+### M-3. Validation `Series.name` non uniforme dans les tests de features — ✅ RÉSOLU (51835f3)
 
 **Fichiers** : `tests/test_rsi.py`, `tests/test_ema_ratio.py`, `tests/test_volatility.py`
 **Sévérité** : MINEUR — couverture de test incomplète.
@@ -110,7 +110,7 @@ Seuls `test_log_returns.py` (via `pd.testing.assert_series_equal`) et `test_volu
 
 **Action** : Ajouter `assert result.name == "<expected>"` dans chaque fichier de test de feature pour garantir le contrat de nommage.
 
-### M-4. Fixture `rng` dupliquée entre `test_standard_scaler.py` et `test_robust_scaler.py`
+### M-4. Fixture `rng` dupliquée entre `test_standard_scaler.py` et `test_robust_scaler.py` — ✅ RÉSOLU (51835f3)
 
 **Fichiers** : `tests/test_standard_scaler.py` (L31), `tests/test_robust_scaler.py` (L37)
 **Sévérité** : MINEUR — duplication DRY mineure.
@@ -119,7 +119,7 @@ Les deux fichiers définissent `@pytest.fixture def rng(): return np.random.defa
 
 **Action** : Extraire la fixture `rng` dans `conftest.py` si pertinent, ou laisser en l'état (impact très faible).
 
-### M-5. Builders de timestamps dupliqués entre tests
+### M-5. Builders de timestamps dupliqués entre tests — ✅ RÉSOLU (51835f3)
 
 **Fichiers** : `tests/test_missing.py` (L14–23), `tests/test_splitter.py` (L32–44)
 **Sévérité** : MINEUR — duplication DRY de helpers de test.
