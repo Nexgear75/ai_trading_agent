@@ -14,9 +14,9 @@ Covers:
 import numpy as np
 import pandas as pd
 import pytest
-from ai_trading.data.labels import compute_labels
 
 from ai_trading.config import LabelConfig
+from ai_trading.data.labels import compute_labels
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -60,9 +60,9 @@ class TestLogReturnTrade:
         n = 20
         ohlcv = _make_ohlcv(n)
         cfg = _label_config(horizon=4, target_type="log_return_trade")
-        valid_mask = np.ones(n, dtype=bool)
+        candle_mask = np.ones(n, dtype=bool)
 
-        y, label_mask = compute_labels(ohlcv, cfg, valid_mask)
+        y, label_mask = compute_labels(ohlcv, cfg, candle_mask)
 
         # Manual check for a few positions
         close = ohlcv["close"].values
@@ -79,9 +79,9 @@ class TestLogReturnTrade:
         h = 4
         ohlcv = _make_ohlcv(n)
         cfg = _label_config(horizon=h)
-        valid_mask = np.ones(n, dtype=bool)
+        candle_mask = np.ones(n, dtype=bool)
 
-        y, label_mask = compute_labels(ohlcv, cfg, valid_mask)
+        y, label_mask = compute_labels(ohlcv, cfg, candle_mask)
 
         # Positions n-h..n-1 cannot compute Close[t+H] (out of bounds)
         for t in range(n - h, n):
@@ -98,9 +98,9 @@ class TestLogReturnTrade:
         n = 10
         ohlcv = _make_ohlcv(n)
         cfg = _label_config(horizon=1)
-        valid_mask = np.ones(n, dtype=bool)
+        candle_mask = np.ones(n, dtype=bool)
 
-        y, label_mask = compute_labels(ohlcv, cfg, valid_mask)
+        y, label_mask = compute_labels(ohlcv, cfg, candle_mask)
 
         close = ohlcv["close"].values
         open_ = ohlcv["open"].values
@@ -126,9 +126,9 @@ class TestLogReturnCloseToClose:
         n = 20
         ohlcv = _make_ohlcv(n)
         cfg = _label_config(horizon=4, target_type="log_return_close_to_close")
-        valid_mask = np.ones(n, dtype=bool)
+        candle_mask = np.ones(n, dtype=bool)
 
-        y, label_mask = compute_labels(ohlcv, cfg, valid_mask)
+        y, label_mask = compute_labels(ohlcv, cfg, candle_mask)
 
         close = ohlcv["close"].values
         for t in range(n - 4):
@@ -142,9 +142,9 @@ class TestLogReturnCloseToClose:
         h = 4
         ohlcv = _make_ohlcv(n)
         cfg = _label_config(horizon=h, target_type="log_return_close_to_close")
-        valid_mask = np.ones(n, dtype=bool)
+        candle_mask = np.ones(n, dtype=bool)
 
-        y, label_mask = compute_labels(ohlcv, cfg, valid_mask)
+        y, label_mask = compute_labels(ohlcv, cfg, candle_mask)
 
         for t in range(n - h, n):
             assert not label_mask[t]
@@ -155,9 +155,9 @@ class TestLogReturnCloseToClose:
         n = 10
         ohlcv = _make_ohlcv(n)
         cfg = _label_config(horizon=1, target_type="log_return_close_to_close")
-        valid_mask = np.ones(n, dtype=bool)
+        candle_mask = np.ones(n, dtype=bool)
 
-        y, label_mask = compute_labels(ohlcv, cfg, valid_mask)
+        y, label_mask = compute_labels(ohlcv, cfg, candle_mask)
 
         close = ohlcv["close"].values
         for t in range(n - 1):
@@ -180,13 +180,13 @@ class TestTargetTypeSwitching:
         """log_return_trade != log_return_close_to_close on same OHLCV."""
         n = 20
         ohlcv = _make_ohlcv(n)
-        valid_mask = np.ones(n, dtype=bool)
+        candle_mask = np.ones(n, dtype=bool)
 
         cfg_trade = _label_config(target_type="log_return_trade")
         cfg_c2c = _label_config(target_type="log_return_close_to_close")
 
-        y_trade, mask_trade = compute_labels(ohlcv, cfg_trade, valid_mask)
-        y_c2c, mask_c2c = compute_labels(ohlcv, cfg_c2c, valid_mask)
+        y_trade, mask_trade = compute_labels(ohlcv, cfg_trade, candle_mask)
+        y_c2c, mask_c2c = compute_labels(ohlcv, cfg_c2c, candle_mask)
 
         # Where both masks are valid, values should generally differ
         both_valid = mask_trade & mask_c2c
@@ -197,7 +197,7 @@ class TestTargetTypeSwitching:
 
 
 # ---------------------------------------------------------------------------
-# Gap handling (missing candles / valid_mask)
+# Gap handling (missing candles / candle_mask)
 # ---------------------------------------------------------------------------
 
 
@@ -210,12 +210,12 @@ class TestGapInvalidation:
         h = 4
         ohlcv = _make_ohlcv(n)
         cfg = _label_config(horizon=h, target_type="log_return_trade")
-        valid_mask = np.ones(n, dtype=bool)
+        candle_mask = np.ones(n, dtype=bool)
 
         # Introduce gap at position 5 → label at t=4 needs Open[5] → invalid
-        valid_mask[5] = False
+        candle_mask[5] = False
 
-        y, label_mask = compute_labels(ohlcv, cfg, valid_mask)
+        y, label_mask = compute_labels(ohlcv, cfg, candle_mask)
 
         assert not label_mask[4]  # needs Open[t+1=5] which is a gap
         assert np.isnan(y[4])
@@ -226,12 +226,12 @@ class TestGapInvalidation:
         h = 4
         ohlcv = _make_ohlcv(n)
         cfg = _label_config(horizon=h, target_type="log_return_trade")
-        valid_mask = np.ones(n, dtype=bool)
+        candle_mask = np.ones(n, dtype=bool)
 
         # Gap at position 10 → labels needing Close[10] are invalid → t=6
-        valid_mask[10] = False
+        candle_mask[10] = False
 
-        y, label_mask = compute_labels(ohlcv, cfg, valid_mask)
+        y, label_mask = compute_labels(ohlcv, cfg, candle_mask)
 
         assert not label_mask[6]  # needs Close[t+H=10] which is a gap
         assert np.isnan(y[6])
@@ -242,13 +242,13 @@ class TestGapInvalidation:
         h = 4
         ohlcv = _make_ohlcv(n)
         cfg = _label_config(horizon=h, target_type="log_return_trade")
-        valid_mask = np.ones(n, dtype=bool)
+        candle_mask = np.ones(n, dtype=bool)
 
         # Gap at position 8 → any t where 8 is in [t+1, t+H] is invalid
         # t+1 <= 8 <= t+4 → 4 <= t <= 7
-        valid_mask[8] = False
+        candle_mask[8] = False
 
-        y, label_mask = compute_labels(ohlcv, cfg, valid_mask)
+        y, label_mask = compute_labels(ohlcv, cfg, candle_mask)
 
         for t in range(4, 8):
             assert not label_mask[t], f"label_mask[{t}] should be False (gap at 8)"
@@ -261,20 +261,20 @@ class TestGapInvalidation:
         h = 4
         ohlcv = _make_ohlcv(n)
         cfg = _label_config(horizon=h, target_type="log_return_trade")
-        valid_mask = np.ones(n, dtype=bool)
+        candle_mask = np.ones(n, dtype=bool)
 
         # Gap at t=3 itself, but t+1=4..t+H=7 all valid
-        valid_mask[3] = False
+        candle_mask[3] = False
 
-        y, label_mask = compute_labels(ohlcv, cfg, valid_mask)
+        y, label_mask = compute_labels(ohlcv, cfg, candle_mask)
 
-        # t=3: valid_mask[3] is False but the *label* uses [t+1..t+H]
+        # t=3: candle_mask[3] is False but the *label* uses [t+1..t+H]
         # The gap at t itself should not invalidate since label only needs
-        # data in range [t+1, t+H]. However, valid_mask at t means the
+        # data in range [t+1, t+H]. However, candle_mask at t means the
         # sample itself might be excluded by downstream logic.
         # compute_labels masks = label_mask (about label computability)
         # The label at t=3 IS computable (Open[4] and Close[7] exist).
-        # But valid_mask[3]=False means the overall sample at t=3 is already invalid
+        # But candle_mask[3]=False means the overall sample at t=3 is already invalid
         # so label_mask can reflect either. The task says "final_mask & label_mask"
         # which means label_mask focuses on label computability.
         # Since [t+1..t+H] = [4..7] are all valid, label IS computable.
@@ -286,11 +286,11 @@ class TestGapInvalidation:
         h = 4
         ohlcv = _make_ohlcv(n)
         cfg = _label_config(horizon=h, target_type="log_return_close_to_close")
-        valid_mask = np.ones(n, dtype=bool)
+        candle_mask = np.ones(n, dtype=bool)
 
-        valid_mask[3] = False  # Gap at t=3 → need Close[t=3] → invalid
+        candle_mask[3] = False  # Gap at t=3 → need Close[t=3] → invalid
 
-        y, label_mask = compute_labels(ohlcv, cfg, valid_mask)
+        y, label_mask = compute_labels(ohlcv, cfg, candle_mask)
 
         assert not label_mask[3]
         assert np.isnan(y[3])
@@ -300,9 +300,9 @@ class TestGapInvalidation:
         n = 10
         ohlcv = _make_ohlcv(n)
         cfg = _label_config(horizon=4)
-        valid_mask = np.zeros(n, dtype=bool)
+        candle_mask = np.zeros(n, dtype=bool)
 
-        y, label_mask = compute_labels(ohlcv, cfg, valid_mask)
+        y, label_mask = compute_labels(ohlcv, cfg, candle_mask)
 
         assert not np.any(label_mask)
         assert np.all(np.isnan(y))
@@ -321,10 +321,30 @@ class TestErrorCases:
         n = 10
         ohlcv = _make_ohlcv(n)
         cfg = _label_config(target_type="unknown_type")
-        valid_mask = np.ones(n, dtype=bool)
+        candle_mask = np.ones(n, dtype=bool)
 
         with pytest.raises(ValueError, match="target_type"):
-            compute_labels(ohlcv, cfg, valid_mask)
+            compute_labels(ohlcv, cfg, candle_mask)
+
+    def test_candle_mask_wrong_shape_raises(self):
+        """#015 — candle_mask with wrong shape raises ValueError."""
+        n = 10
+        ohlcv = _make_ohlcv(n)
+        cfg = _label_config()
+        candle_mask = np.ones(n + 5, dtype=bool)
+
+        with pytest.raises(ValueError, match="candle_mask shape"):
+            compute_labels(ohlcv, cfg, candle_mask)
+
+    def test_candle_mask_wrong_dtype_raises(self):
+        """#015 — candle_mask with non-bool dtype raises ValueError."""
+        n = 10
+        ohlcv = _make_ohlcv(n)
+        cfg = _label_config()
+        candle_mask = np.ones(n, dtype=np.int32)
+
+        with pytest.raises(ValueError, match="candle_mask dtype"):
+            compute_labels(ohlcv, cfg, candle_mask)
 
 
 # ---------------------------------------------------------------------------
@@ -339,13 +359,13 @@ class TestConfigDriven:
         """#015 — Changing horizon H changes label values."""
         n = 30
         ohlcv = _make_ohlcv(n)
-        valid_mask = np.ones(n, dtype=bool)
+        candle_mask = np.ones(n, dtype=bool)
 
         y_h2, mask_h2 = compute_labels(
-            ohlcv, _label_config(horizon=2), valid_mask
+            ohlcv, _label_config(horizon=2), candle_mask
         )
         y_h8, mask_h8 = compute_labels(
-            ohlcv, _label_config(horizon=8), valid_mask
+            ohlcv, _label_config(horizon=8), candle_mask
         )
 
         # Some position valid in both → values differ
@@ -370,9 +390,9 @@ class TestAntiLeakage:
         t_check = 10
         ohlcv_orig = _make_ohlcv(n)
         cfg = _label_config(horizon=h)
-        valid_mask = np.ones(n, dtype=bool)
+        candle_mask = np.ones(n, dtype=bool)
 
-        y_orig, mask_orig = compute_labels(ohlcv_orig, cfg, valid_mask)
+        y_orig, mask_orig = compute_labels(ohlcv_orig, cfg, candle_mask)
 
         # Perturb all prices after t+H
         ohlcv_perturbed = ohlcv_orig.copy()
@@ -380,7 +400,7 @@ class TestAntiLeakage:
         ohlcv_perturbed.iloc[perturb_start:, ohlcv_perturbed.columns.get_loc("close")] = 999.0
         ohlcv_perturbed.iloc[perturb_start:, ohlcv_perturbed.columns.get_loc("open")] = 999.0
 
-        y_pert, mask_pert = compute_labels(ohlcv_perturbed, cfg, valid_mask)
+        y_pert, mask_pert = compute_labels(ohlcv_perturbed, cfg, candle_mask)
 
         # y_t for all t <= t_check must be identical
         for t in range(t_check + 1):
@@ -402,9 +422,9 @@ class TestOutputShape:
         n = 20
         ohlcv = _make_ohlcv(n)
         cfg = _label_config()
-        valid_mask = np.ones(n, dtype=bool)
+        candle_mask = np.ones(n, dtype=bool)
 
-        y, label_mask = compute_labels(ohlcv, cfg, valid_mask)
+        y, label_mask = compute_labels(ohlcv, cfg, candle_mask)
 
         assert y.shape == (n,)
         assert label_mask.shape == (n,)
@@ -414,9 +434,9 @@ class TestOutputShape:
         n = 20
         ohlcv = _make_ohlcv(n)
         cfg = _label_config()
-        valid_mask = np.ones(n, dtype=bool)
+        candle_mask = np.ones(n, dtype=bool)
 
-        y, _ = compute_labels(ohlcv, cfg, valid_mask)
+        y, _ = compute_labels(ohlcv, cfg, candle_mask)
 
         assert y.dtype == np.float64
 
@@ -425,9 +445,9 @@ class TestOutputShape:
         n = 20
         ohlcv = _make_ohlcv(n)
         cfg = _label_config()
-        valid_mask = np.ones(n, dtype=bool)
+        candle_mask = np.ones(n, dtype=bool)
 
-        _, label_mask = compute_labels(ohlcv, cfg, valid_mask)
+        _, label_mask = compute_labels(ohlcv, cfg, candle_mask)
 
         assert label_mask.dtype == bool
 
@@ -446,46 +466,46 @@ class TestEdgeCases:
         h = 4
         ohlcv = _make_ohlcv(n)
         cfg = _label_config(horizon=h)
-        valid_mask = np.ones(n, dtype=bool)
+        candle_mask = np.ones(n, dtype=bool)
 
-        y, label_mask = compute_labels(ohlcv, cfg, valid_mask)
+        y, label_mask = compute_labels(ohlcv, cfg, candle_mask)
 
         assert not np.any(label_mask)
         assert np.all(np.isnan(y))
 
-    def test_dataset_exactly_h_plus_1(self):
-        """#015 — N = H+1: exactly one valid label for close_to_close, check trade too."""
+    def test_dataset_exactly_h_plus_2(self):
+        """#015 — N = H+2: two valid labels for trade, two for close_to_close."""
         h = 4
         n = h + 2  # Need t+1 and t+H both valid for trade label; min is t=0 → t+H=H → need n>H
         ohlcv = _make_ohlcv(n)
-        valid_mask = np.ones(n, dtype=bool)
+        candle_mask = np.ones(n, dtype=bool)
 
         # For log_return_trade: need t+1 < n AND t+H < n
         # t=0: t+1=1 (<6), t+H=4 (<6) → valid
         # t=1: t+1=2 (<6), t+H=5 (<6) → valid
         # t=2: t+1=3, t+H=6 (=n) → invalid
         cfg_trade = _label_config(horizon=h, target_type="log_return_trade")
-        y_t, mask_t = compute_labels(ohlcv, cfg_trade, valid_mask)
+        y_t, mask_t = compute_labels(ohlcv, cfg_trade, candle_mask)
         assert mask_t[0]
         assert mask_t[1]
         assert not mask_t[2]
 
         # For close_to_close: need t+H < n → t < n-h = 2
         cfg_c2c = _label_config(horizon=h, target_type="log_return_close_to_close")
-        y_c, mask_c = compute_labels(ohlcv, cfg_c2c, valid_mask)
+        y_c, mask_c = compute_labels(ohlcv, cfg_c2c, candle_mask)
         assert mask_c[0]
         assert mask_c[1]
         assert not mask_c[2]
 
-    def test_valid_mask_all_true(self):
-        """#015 — valid_mask all True: only boundary labels are invalid."""
+    def test_candle_mask_all_true(self):
+        """#015 — candle_mask all True: only boundary labels are invalid."""
         n = 20
         h = 4
         ohlcv = _make_ohlcv(n)
         cfg = _label_config(horizon=h)
-        valid_mask = np.ones(n, dtype=bool)
+        candle_mask = np.ones(n, dtype=bool)
 
-        y, label_mask = compute_labels(ohlcv, cfg, valid_mask)
+        y, label_mask = compute_labels(ohlcv, cfg, candle_mask)
 
         # For log_return_trade: valid when t+1 < n and t+H < n
         # → t < n-h and t < n-1 → t < n-h (since h >= 1)

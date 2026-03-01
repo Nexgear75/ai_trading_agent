@@ -22,7 +22,7 @@ _VALID_TARGET_TYPES = {"log_return_trade", "log_return_close_to_close"}
 def compute_labels(
     ohlcv: pd.DataFrame,
     config: LabelConfig,
-    valid_mask: np.ndarray,
+    candle_mask: np.ndarray,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Compute label targets and validity mask.
 
@@ -32,9 +32,10 @@ def compute_labels(
         OHLCV DataFrame with columns ``open``, ``close`` (at minimum).
     config:
         Label configuration with ``horizon_H_bars`` and ``target_type``.
-    valid_mask:
+    candle_mask:
         Boolean array of shape ``(N,)`` — ``True`` where the candle is present
-        (not a gap).
+        (not a gap). This is a candle-presence mask, not a sample-level mask
+        (see ``compute_valid_mask`` in ``missing.py`` for sample-level masking).
 
     Returns
     -------
@@ -53,6 +54,16 @@ def compute_labels(
     h = config.horizon_H_bars
     n = len(ohlcv)
 
+    if candle_mask.shape != (n,):
+        raise ValueError(
+            f"candle_mask shape {candle_mask.shape} does not match "
+            f"ohlcv length ({n},)."
+        )
+    if candle_mask.dtype != bool:
+        raise ValueError(
+            f"candle_mask dtype must be bool, got {candle_mask.dtype}."
+        )
+
     close = ohlcv["close"].values.astype(np.float64)
     open_ = ohlcv["open"].values.astype(np.float64)
 
@@ -69,7 +80,7 @@ def compute_labels(
             if t + 1 >= n:
                 continue
             # Check no gap in [t+1, t+h]
-            if not np.all(valid_mask[t + 1 : t + h + 1]):
+            if not np.all(candle_mask[t + 1 : t + h + 1]):
                 continue
             y[t] = np.log(close[t + h] / open_[t + 1])
             label_mask[t] = True
@@ -78,10 +89,10 @@ def compute_labels(
             # Need Close[t] and Close[t+H], plus no gaps at t or in [t+1, t+H]
             if t + h >= n:
                 continue
-            if not valid_mask[t]:
+            if not candle_mask[t]:
                 continue
             # Check no gap in [t+1, t+h] (if h >= 1, range is non-empty)
-            if h >= 1 and not np.all(valid_mask[t + 1 : t + h + 1]):
+            if h >= 1 and not np.all(candle_mask[t + 1 : t + h + 1]):
                 continue
             y[t] = np.log(close[t + h] / close[t])
             label_mask[t] = True
