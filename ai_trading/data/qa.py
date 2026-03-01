@@ -41,7 +41,7 @@ class QAReport:
 
     passed: bool
     duplicate_count: int
-    missing_timestamps: list
+    missing_timestamps: list[pd.Timestamp]
     ohlc_inconsistency_count: int
     zero_volume_streak_count: int
     irregular_delta_count: int
@@ -77,12 +77,15 @@ def _validate_inputs(df: pd.DataFrame, timeframe: str) -> pd.Timedelta:
 
 
 def _check_negative_prices(df: pd.DataFrame) -> None:
-    """Check for negative prices and raise if any found.
+    """Check for negative or zero close prices and raise if any found.
+
+    All price columns must be >= 0. Additionally, close must be strictly
+    positive since downstream features use log(close) which requires > 0.
 
     Raises
     ------
     ValueError
-        If any price column contains a negative value.
+        If any price column contains a negative value, or if close <= 0.
     """
     neg_mask = (df[_PRICE_COLUMNS] < 0).any(axis=1)
     count = int(neg_mask.sum())
@@ -90,6 +93,14 @@ def _check_negative_prices(df: pd.DataFrame) -> None:
         raise ValueError(
             f"Negative price detected in {count} row(s). "
             "All price columns (open, high, low, close) must be >= 0."
+        )
+
+    zero_close_mask = df["close"] <= 0
+    zero_close_count = int(zero_close_mask.sum())
+    if zero_close_count > 0:
+        raise ValueError(
+            f"Zero or negative close price detected in {zero_close_count} row(s). "
+            "Close must be strictly > 0 (required for log-return computation)."
         )
 
 
@@ -101,7 +112,7 @@ def _check_duplicates(timestamps: pd.Series) -> int:
 def _check_missing_candles(
     timestamps: pd.Series,
     expected_delta: pd.Timedelta,
-) -> list:
+) -> list[pd.Timestamp]:
     """Identify missing candle timestamps based on expected delta.
 
     Returns the list of timestamps that should exist but are absent.
@@ -113,8 +124,10 @@ def _check_missing_candles(
     first = ts_sorted.iloc[0]
     last = ts_sorted.iloc[-1]
 
-    # Build the full expected grid
-    expected_grid = pd.date_range(start=first, end=last, freq=expected_delta)
+    # Build the full expected grid (propagate timezone from input)
+    expected_grid = pd.date_range(
+        start=first, end=last, freq=expected_delta, tz=first.tzinfo
+    )
     existing_set = set(ts_sorted)
     missing = [ts for ts in expected_grid if ts not in existing_set]
     return missing

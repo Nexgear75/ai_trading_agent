@@ -375,14 +375,20 @@ class TestEdgeCases:
         report = run_qa_checks(df, timeframe="1h", zero_volume_min_streak=_DEFAULT_STREAK)
         assert report.passed is True
 
-    def test_all_zero_prices_no_raise(self):
-        """All-zero prices (open=0) do not raise because zero is not negative."""
+    def test_all_zero_prices_raises_for_close(self):
+        """#RC-0001 W-2: All-zero close prices raise ValueError."""
         df = _make_ohlcv(n=5, timeframe="1h")
         df["open"] = 0.0
         df["high"] = 0.0
         df["low"] = 0.0
         df["close"] = 0.0
-        # Zero is not negative, so should not raise; OHLC consistency
-        # should still hold (0 >= max(0,0) and 0 <= min(0,0))
-        report = run_qa_checks(df, timeframe="1h", zero_volume_min_streak=_DEFAULT_STREAK)
-        assert report.ohlc_inconsistency_count == 0
+        # Zero close is pathological — log(0) would produce -inf
+        with pytest.raises(ValueError, match="[Zz]ero.*close|close.*> 0"):
+            run_qa_checks(df, timeframe="1h", zero_volume_min_streak=_DEFAULT_STREAK)
+
+    def test_zero_close_single_row_raises(self):
+        """#RC-0001 W-2: Even a single zero close value raises ValueError."""
+        df = _make_ohlcv(n=5, timeframe="1h")
+        df.loc[2, "close"] = 0.0
+        with pytest.raises(ValueError, match="[Zz]ero.*close|close.*> 0"):
+            run_qa_checks(df, timeframe="1h", zero_volume_min_streak=_DEFAULT_STREAK)

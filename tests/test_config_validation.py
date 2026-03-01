@@ -442,6 +442,12 @@ class TestAdditionalNumericBounds:
         with pytest.raises(ValidationError, match="vol_windows"):
             load_config(tmp_yaml(data))
 
+    def test_vol_windows_non_standard_raises(self, default_yaml_data, tmp_yaml):
+        """#RC-0001 W-1: vol_windows must be [24, 72] (locked per spec §6.5)."""
+        data = _mutate(default_yaml_data, "features.params.vol_windows", [24, 48])
+        with pytest.raises(ValidationError, match="vol_windows"):
+            load_config(tmp_yaml(data))
+
 
 # ===========================================================================
 # Dropout bounds for all model types with dropout
@@ -537,4 +543,16 @@ class TestSMACrossConstraint:
         data = _mutate(data, "baselines.sma.fast", 20)
         data = _mutate(data, "baselines.sma.slow", 300)
         with pytest.raises(ValidationError, match="sma"):
+            load_config(tmp_yaml(data))
+
+    def test_sma_slow_zero_raises(self, default_yaml_data, tmp_yaml):
+        """#RC-0001 W-4: sma.slow must be >= 2."""
+        data = _mutate(default_yaml_data, "baselines.sma.slow", 0)
+        with pytest.raises(ValidationError, match="slow"):
+            load_config(tmp_yaml(data))
+
+    def test_sma_slow_one_raises(self, default_yaml_data, tmp_yaml):
+        """#RC-0001 W-4: sma.slow must be >= 2."""
+        data = _mutate(default_yaml_data, "baselines.sma.slow", 1)
+        with pytest.raises(ValidationError, match="slow"):
             load_config(tmp_yaml(data))

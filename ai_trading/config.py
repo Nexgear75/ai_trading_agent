@@ -93,6 +93,21 @@ class FeaturesParamsConfig(_StrictBase):
     logvol_epsilon: float
     volatility_ddof: int
 
+    @field_validator("vol_windows")
+    @classmethod
+    def _vol_windows_locked(cls, v: list[int]) -> list[int]:
+        """Reject any value other than [24, 72].
+
+        The volatility features (vol_24, vol_72) use fixed windows matching
+        the spec §6.5. Changing vol_windows has no effect on computation
+        and would mislead users.
+        """
+        if v != [24, 72]:
+            raise ValueError(
+                f"vol_windows must be [24, 72] (fixed per spec §6.5), got {v}"
+            )
+        return v
+
 
 class FeaturesConfig(_StrictBase):
     feature_version: str
@@ -182,7 +197,7 @@ class BacktestConfig(_StrictBase):
 
 class SmaConfig(_StrictBase):
     fast: int = Field(ge=2)
-    slow: int
+    slow: int = Field(ge=2)
 
 
 class BaselinesConfig(_StrictBase):
