@@ -466,7 +466,7 @@ class TestRSIErrors:
 
     def test_min_periods_property(self, rsi_instance):
         """#023: min_periods = number of leading NaN = 14 (not rsi_period + 1)."""
-        assert rsi_instance.min_periods == 14  # 14 leading NaN values
+        assert rsi_instance.min_periods({"rsi_period": 14, "rsi_epsilon": 1e-12}) == 14
 
     def test_output_is_series(self, rsi_instance, default_params):
         """compute() returns a pd.Series."""

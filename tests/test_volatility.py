@@ -108,13 +108,13 @@ class TestMinPeriods:
         """#009 vol_24.min_periods == 24."""
         _import_volatility()
         instance = FEATURE_REGISTRY["vol_24"]()
-        assert instance.min_periods == 24
+        assert instance.min_periods({}) == 24
 
     def test_vol_72_min_periods(self):
         """#009 vol_72.min_periods == 72."""
         _import_volatility()
         instance = FEATURE_REGISTRY["vol_72"]()
-        assert instance.min_periods == 72
+        assert instance.min_periods({}) == 72
 
 
 # ---------------------------------------------------------------------------

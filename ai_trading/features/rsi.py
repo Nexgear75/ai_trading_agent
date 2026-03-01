@@ -32,21 +32,13 @@ class RSI14(BaseFeature):
 
     required_params: list[str] = ["rsi_period", "rsi_epsilon"]
 
-    @property
-    def min_periods(self) -> int:
-        """Number of leading NaN values: 14 (spec-default ``rsi_period=14``).
+    def min_periods(self, params: dict) -> int:
+        """Number of leading NaN values: ``rsi_period`` from config.
 
         ``compute()`` produces its first non-NaN value at index
-        ``rsi_period`` (i.e. 14 leading NaN for the default period).
-
-        .. note::
-            This value is valid only for the spec-default ``rsi_period=14``.
-            If a different ``rsi_period`` is configured, the actual leading
-            NaN count will be ``rsi_period``, which may differ from this
-            hard-coded return value.  The config validation (task #003)
-            ensures ``min_warmup >= rsi_period`` independently.
+        ``rsi_period`` (i.e. ``rsi_period`` leading NaN).
         """
-        return 14  # 14 leading NaN for rsi_period=14
+        return params["rsi_period"]
 
     def compute(self, ohlcv: pd.DataFrame, params: dict) -> pd.Series:
         """Compute RSI with Wilder smoothing.

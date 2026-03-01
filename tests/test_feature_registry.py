@@ -22,8 +22,7 @@ class _ConcreteFeature(BaseFeature):
 
     required_params: list[str] = ["some_param"]
 
-    @property
-    def min_periods(self) -> int:
+    def min_periods(self, params: dict) -> int:
         return 5
 
     def compute(self, ohlcv: pd.DataFrame, params: dict) -> pd.Series:
@@ -35,8 +34,7 @@ class _NoComputeFeature(BaseFeature):
 
     required_params: list[str] = []
 
-    @property
-    def min_periods(self) -> int:
+    def min_periods(self, params: dict) -> int:
         return 1
 
 
@@ -247,7 +245,7 @@ class TestEdgeCases:
     def test_concrete_subclass_instantiates(self):
         """A fully concrete subclass can be instantiated."""
         feat = _ConcreteFeature()
-        assert feat.min_periods == 5
+        assert feat.min_periods({}) == 5
 
     def test_compute_returns_series(self):
         """compute() returns a pd.Series."""
@@ -264,11 +262,11 @@ class TestEdgeCases:
 
         assert "" in FEATURE_REGISTRY
 
-    def test_min_periods_is_property(self):
-        """min_periods is accessed as a property, not a method."""
+    def test_min_periods_is_method(self):
+        """min_periods is accessed as a method, not a property."""
         feat = _ConcreteFeature()
-        assert not callable(feat.min_periods) or isinstance(feat.min_periods, int)
-        assert feat.min_periods == 5
+        assert callable(feat.min_periods)
+        assert feat.min_periods({}) == 5
 
     def test_registry_type_mapping(self):
         """Registry stores the class, not an instance."""
@@ -326,8 +324,8 @@ class TestMinPeriodsContract:
                     leading_nan += 1
                 else:
                     break
-            assert feat.min_periods == leading_nan, (
-                f"{cls.__name__}: min_periods={feat.min_periods} "
+            assert feat.min_periods({}) == leading_nan, (
+                f"{cls.__name__}: min_periods={feat.min_periods({})} "
                 f"but leading NaN count={leading_nan}"
             )
 
@@ -357,8 +355,8 @@ class TestMinPeriodsContract:
                     leading_nan += 1
                 else:
                     break
-            assert feat.min_periods == leading_nan, (
-                f"{cls.__name__}: min_periods={feat.min_periods} "
+            assert feat.min_periods(params) == leading_nan, (
+                f"{cls.__name__}: min_periods={feat.min_periods(params)} "
                 f"but leading NaN count={leading_nan}"
             )
 
@@ -387,7 +385,7 @@ class TestMinPeriodsContract:
                 leading_nan += 1
             else:
                 break
-        assert feat.min_periods == leading_nan, (
-            f"RSI14: min_periods={feat.min_periods} "
+        assert feat.min_periods(params) == leading_nan, (
+            f"RSI14: min_periods={feat.min_periods(params)} "
             f"but leading NaN count={leading_nan}"
         )

@@ -60,7 +60,7 @@ class BaseFeature(ABC):
 
     Subclasses **must** implement:
     - ``compute(ohlcv, params) -> pd.Series``
-    - ``min_periods -> int`` (as a property)
+    - ``min_periods(params) -> int``
 
     Subclasses **must** explicitly declare the class attribute
     ``required_params: list[str]`` (even if empty ``[]``). Omitting it
@@ -85,9 +85,8 @@ class BaseFeature(ABC):
                 f"Inheriting the base default silently is not allowed."
             )
 
-    @property
     @abstractmethod
-    def min_periods(self) -> int:
+    def min_periods(self, params: dict) -> int:
         """Number of leading NaN values in the output of ``compute()``.
 
         Equivalently, the 0-based index of the first non-NaN value.
@@ -98,6 +97,12 @@ class BaseFeature(ABC):
         This value can be used by the pipeline and configuration to
         determine the minimum warmup period (i.e. how many leading rows
         must be excluded because they contain NaN).
+
+        Parameters
+        ----------
+        params : dict
+            Full ``config.features.params`` dict. The feature reads only
+            the keys it needs to compute its warmup length.
         """
 
     @abstractmethod

@@ -441,7 +441,7 @@ class TestEdgeCases:
 
     def test_min_periods_returns_slow_minus_one(self, ema_instance):
         """min_periods should equal index of first non-NaN (ema_slow - 1 = 25)."""
-        assert ema_instance.min_periods == 25
+        assert ema_instance.min_periods({"ema_fast": 12, "ema_slow": 26}) == 25
 
     def test_ema_fast_equals_slow_ratio_zero(self, ema_instance):
         """When ema_fast == ema_slow, ratio should be 0 everywhere non-NaN."""

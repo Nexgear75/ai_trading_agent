@@ -113,7 +113,7 @@ class TestRegistration:
     def test_min_periods(self, name: str, expected_min: int) -> None:
         """#008: min_periods must equal k for logret_k."""
         feature = FEATURE_REGISTRY[name]()
-        assert feature.min_periods == expected_min
+        assert feature.min_periods({}) == expected_min
 
     @pytest.mark.parametrize("name", ["logret_1", "logret_2", "logret_4"])
     def test_required_params_empty(self, name: str) -> None:

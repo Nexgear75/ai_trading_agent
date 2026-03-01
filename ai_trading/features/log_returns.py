@@ -42,8 +42,7 @@ def _make_log_return_class(k: int) -> type[BaseFeature]:
 
         required_params: list[str] = []
 
-        @property
-        def min_periods(self) -> int:
+        def min_periods(self, params: dict) -> int:
             return k
 
         def compute(self, ohlcv: pd.DataFrame, params: dict) -> pd.Series:

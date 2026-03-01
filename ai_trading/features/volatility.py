@@ -59,8 +59,7 @@ class Volatility24(BaseFeature):
 
     required_params: list[str] = ["volatility_ddof"]
 
-    @property
-    def min_periods(self) -> int:
+    def min_periods(self, params: dict) -> int:
         """Minimum bars before first valid value: 24."""
         return self._WINDOW
 
@@ -101,8 +100,7 @@ class Volatility72(BaseFeature):
 
     required_params: list[str] = ["volatility_ddof"]
 
-    @property
-    def min_periods(self) -> int:
+    def min_periods(self, params: dict) -> int:
         """Minimum bars before first valid value: 72."""
         return self._WINDOW
 
