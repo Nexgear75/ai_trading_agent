@@ -1,6 +1,6 @@
 # Tâche — Robust scaler (option)
 
-Statut : TODO
+Statut : DONE
 Ordre : 022
 Workstream : WS-5
 Milestone : M2
@@ -38,29 +38,29 @@ Implémenter le robust scaler avec la même interface que le standard scaler :
 - Factory ou sélection par config : `create_scaler(config) -> StandardScaler | RobustScaler`.
 
 ## Critères d'acceptation
-- [ ] Stats estimées uniquement sur X_train (test non vu).
-- [ ] Outliers extrêmes clippés aux quantiles configurés.
-- [ ] `robust_quantile_low` et `robust_quantile_high` lus depuis la config.
-- [ ] NaN dans X_train → `ValueError`.
-- [ ] Même interface que `StandardScaler` : `fit()`, `transform()`, `fit_transform()`, `save()`, `load()`.
-- [ ] Factory `create_scaler(config)` retourne le bon scaler selon `config.scaling.method`.
-- [ ] `scaling.method` inconnu → `ValueError`.
-- [ ] Paramètres sérialisables (save/load).
-- [ ] Tests couvrent les scénarios nominaux + erreurs + bords.
-- [ ] Suite de tests verte après implémentation.
-- [ ] `ruff check` passe sans erreur.
+- [x] Stats estimées uniquement sur X_train (test non vu).
+- [x] Outliers extrêmes clippés aux quantiles configurés.
+- [x] `robust_quantile_low` et `robust_quantile_high` lus depuis la config.
+- [x] NaN dans X_train → `ValueError`.
+- [x] Même interface que `StandardScaler` : `fit()`, `transform()`, `fit_transform()`, `save()`, `load()`.
+- [x] Factory `create_scaler(config)` retourne le bon scaler selon `config.scaling.method`.
+- [x] `scaling.method` inconnu → `ValueError`.
+- [x] Paramètres sérialisables (save/load).
+- [x] Tests couvrent les scénarios nominaux + erreurs + bords.
+- [x] Suite de tests verte après implémentation.
+- [x] `ruff check` passe sans erreur.
 
 ## Pré-condition de démarrage
 - **Tous les tests existants sont GREEN** avant de commencer.
 - **Créer une branche dédiée** `task/022-robust-scaler` depuis `Max6000i1`.
 
 ## Checklist de fin de tâche
-- [ ] Branche `task/022-robust-scaler` créée depuis `Max6000i1`.
-- [ ] Tests RED écrits avant implémentation.
-- [ ] **Commit RED** : `[WS-5] #022 RED: tests robust scaler`.
-- [ ] Tests GREEN passants et reproductibles.
-- [ ] Critères d'acceptation tous satisfaits.
-- [ ] `ruff check ai_trading/ tests/` passe sans erreur.
-- [ ] Fichier de tâche mis à jour (statut DONE, critères cochés).
-- [ ] **Commit GREEN** : `[WS-5] #022 GREEN: robust scaler`.
-- [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-5] #022 — Robust scaler`.
+- [x] Branche `task/022-robust-scaler` créée depuis `Max6000i1`.
+- [x] Tests RED écrits avant implémentation.
+- [x] **Commit RED** : `[WS-5] #022 RED: tests robust scaler`.
+- [x] Tests GREEN passants et reproductibles.
+- [x] Critères d'acceptation tous satisfaits.
+- [x] `ruff check ai_trading/ tests/` passe sans erreur.
+- [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
+- [x] **Commit GREEN** : `[WS-5] #022 GREEN: robust scaler`.
+- [x] **Pull Request ouverte** vers `Max6000i1` : `[WS-5] #022 — Robust scaler`.

@@ -191,6 +191,7 @@ class TestRobustClipping:
 
         x_scaled = scaler.transform(x_test)
         # The clipped value should not exceed the quantile bounds computed from train
+        assert scaler.clip_high_ is not None
         assert x_scaled[0, 0, 0] == scaler.clip_high_[0]
 
     def test_values_within_bounds_unchanged(
@@ -208,6 +209,7 @@ class TestRobustClipping:
         scaler.fit(x_train)
 
         # Transform the median value (should be ≈ 0 after centering)
+        assert scaler.median_ is not None
         x_median = np.zeros((1, 5, 2), dtype=np.float32)
         for j in range(2):
             x_median[0, :, j] = scaler.median_[j]
@@ -241,6 +243,8 @@ class TestRobustAntiLeak:
         q_high = np.quantile(flat, config_quantile_high, axis=0).astype(np.float32)
         expected_iqr = (q_high - q_low).astype(np.float32)
 
+        assert scaler.median_ is not None
+        assert scaler.iqr_ is not None
         np.testing.assert_allclose(scaler.median_, expected_median, atol=1e-6)
         np.testing.assert_allclose(scaler.iqr_, expected_iqr, atol=1e-6)
 
@@ -523,6 +527,8 @@ class TestRobustFloat32:
             quantile_high=config_quantile_high,
         )
         scaler.fit(x_train_3d)
+        assert scaler.median_ is not None
+        assert scaler.iqr_ is not None
         assert scaler.median_.dtype == np.float32
         assert scaler.iqr_.dtype == np.float32
 
