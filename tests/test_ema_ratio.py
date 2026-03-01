@@ -85,9 +85,16 @@ def _ema_ratio_reference(close_values, fast=12, slow=26):
 
 @pytest.fixture(autouse=True)
 def _clean_registry():
-    """Save, clear, and restore FEATURE_REGISTRY around each test."""
+    """Save, clear, and restore FEATURE_REGISTRY around each test.
+
+    Uses importlib.reload() to re-run @register_feature decorator after
+    clearing, so registration tests exercise the real decorator path.
+    """
+    import ai_trading.features.ema as ema_module
+
     saved = dict(FEATURE_REGISTRY)
     FEATURE_REGISTRY.clear()
+    importlib.reload(ema_module)
     yield
     FEATURE_REGISTRY.clear()
     FEATURE_REGISTRY.update(saved)
@@ -95,10 +102,7 @@ def _clean_registry():
 
 @pytest.fixture
 def ema_class():
-    """Import EmaRatio1226 and ensure it is in the registry."""
-    import ai_trading.features.ema as ema_module
-
-    importlib.reload(ema_module)
+    """Return EmaRatio1226 class (already registered by _clean_registry)."""
     from ai_trading.features.ema import EmaRatio1226
 
     return EmaRatio1226
