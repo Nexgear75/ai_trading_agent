@@ -64,5 +64,5 @@ N = nombre de samples valides (après application de tous les masques).
 - [x] Critères d'acceptation tous satisfaits.
 - [x] `ruff check ai_trading/ tests/` passe sans erreur.
 - [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
-- [ ] **Commit GREEN** : `[WS-4] #016 GREEN: sample builder`.
-- [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-4] #016 — Sample builder (N, L, F)`.
+- [x] **Commit GREEN** : `[WS-4] #016 GREEN: sample builder`.
+- [x] **Pull Request ouverte** vers `Max6000i1` : `[WS-4] #016 — Sample builder (N, L, F)`.
