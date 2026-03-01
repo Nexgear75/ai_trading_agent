@@ -784,14 +784,15 @@ class TestPurgeE2E:
     def test_embargo_gap_bars(self, purged_folds, mvp_timestamps):
         """At least embargo_bars candles between last train/val label and test (#020)."""
         delta = timedelta(hours=1)
+        embargo_bars = 4
         for fold in purged_folds:
             all_tv_idx = list(fold.train_indices) + list(fold.val_indices)
             if len(all_tv_idx) == 0:
                 continue
             max_label_reach = max(mvp_timestamps[i] + 4 * delta for i in all_tv_idx)
             gap = fold.test_start - max_label_reach
-            assert gap >= delta, (
-                f"Gap {gap} < delta {delta} between last label and test"
+            assert gap >= embargo_bars * delta, (
+                f"Gap {gap} < {embargo_bars}*delta={embargo_bars * delta}"
             )
 
     def test_no_double_embargo(self, purged_folds):
