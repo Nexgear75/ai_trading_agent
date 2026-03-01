@@ -1,6 +1,6 @@
 # Tâche — Walk-forward splitter
 
-Statut : TODO
+Statut : DONE
 Ordre : 019
 Workstream : WS-4
 Milestone : M2
@@ -50,33 +50,33 @@ Implémenter le rolling walk-forward splitter dans `ai_trading/data/splitter.py`
   - `test_end[k] = test_start[k] + test_days - Δ`
 
 ## Critères d'acceptation
-- [ ] Folds disjoints : aucun timestamp de décision commun entre train/val/test d'un même fold.
-- [ ] Nombre de folds : `n_folds_valid <= n_folds_max` et `n_folds_valid >= 1` (borne supérieure théorique).
-- [ ] Bornes UTC correctes conformément à l'exemple numérique du plan (fold k=0, paramètres MVP).
-- [ ] `val_days = floor(train_days * val_frac_in_train)` calculé correctement.
-- [ ] Test de troncation : fold dont `test_end > dataset.end` est exclu.
-- [ ] Test de bord : période totale non multiple exact de `step_days` → formule correcte.
-- [ ] Test dates : bornes de split en dates UTC, un gap de données ne décale pas les bornes.
-- [ ] Test `min_samples` : fold avec trop peu de samples → exclu avec warning.
-- [ ] Test 0 folds valides → `ValueError`.
-- [ ] Test `parse_timeframe` : `"1h"` → `timedelta(hours=1)`, `"4h"` → `timedelta(hours=4)`, `"invalid"` → `ValueError`.
-- [ ] Compteurs loggés : `n_folds_theoretical == n_folds_valid + n_folds_excluded`.
-- [ ] Tous les paramètres lus depuis la config.
-- [ ] Tests couvrent les scénarios nominaux + erreurs + bords.
-- [ ] Suite de tests verte après implémentation.
-- [ ] `ruff check` passe sans erreur.
+- [x] Folds disjoints : aucun timestamp de décision commun entre train/val/test d'un même fold.
+- [x] Nombre de folds : `n_folds_valid <= n_folds_max` et `n_folds_valid >= 1` (borne supérieure théorique).
+- [x] Bornes UTC correctes conformément à l'exemple numérique du plan (fold k=0, paramètres MVP).
+- [x] `val_days = floor(train_days * val_frac_in_train)` calculé correctement.
+- [x] Test de troncation : fold dont `test_end > dataset.end` est exclu.
+- [x] Test de bord : période totale non multiple exact de `step_days` → formule correcte.
+- [x] Test dates : bornes de split en dates UTC, un gap de données ne décale pas les bornes.
+- [x] Test `min_samples` : fold avec trop peu de samples → exclu avec warning.
+- [x] Test 0 folds valides → `ValueError`.
+- [x] Test `parse_timeframe` : `"1h"` → `timedelta(hours=1)`, `"4h"` → `timedelta(hours=4)`, `"invalid"` → `ValueError`.
+- [x] Compteurs loggés : `n_folds_theoretical == n_folds_valid + n_folds_excluded`.
+- [x] Tous les paramètres lus depuis la config.
+- [x] Tests couvrent les scénarios nominaux + erreurs + bords.
+- [x] Suite de tests verte après implémentation.
+- [x] `ruff check` passe sans erreur.
 
 ## Pré-condition de démarrage
 - **Tous les tests existants sont GREEN** avant de commencer.
 - **Créer une branche dédiée** `task/019-walk-forward-splitter` depuis `Max6000i1`.
 
 ## Checklist de fin de tâche
-- [ ] Branche `task/019-walk-forward-splitter` créée depuis `Max6000i1`.
-- [ ] Tests RED écrits avant implémentation.
-- [ ] **Commit RED** : `[WS-4] #019 RED: tests walk-forward splitter`.
-- [ ] Tests GREEN passants et reproductibles.
-- [ ] Critères d'acceptation tous satisfaits.
-- [ ] `ruff check ai_trading/ tests/` passe sans erreur.
-- [ ] Fichier de tâche mis à jour (statut DONE, critères cochés).
-- [ ] **Commit GREEN** : `[WS-4] #019 GREEN: walk-forward splitter`.
-- [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-4] #019 — Walk-forward splitter`.
+- [x] Branche `task/019-walk-forward-splitter` créée depuis `Max6000i1`.
+- [x] Tests RED écrits avant implémentation.
+- [x] **Commit RED** : `[WS-4] #019 RED: tests walk-forward splitter`.
+- [x] Tests GREEN passants et reproductibles.
+- [x] Critères d'acceptation tous satisfaits.
+- [x] `ruff check ai_trading/ tests/` passe sans erreur.
+- [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
+- [x] **Commit GREEN** : `[WS-4] #019 GREEN: walk-forward splitter`.
+- [x] **Pull Request ouverte** vers `Max6000i1` : `[WS-4] #019 — Walk-forward splitter`.

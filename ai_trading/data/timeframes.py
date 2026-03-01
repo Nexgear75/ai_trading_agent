@@ -5,6 +5,8 @@ corresponding ``pd.Timedelta`` values. Used by QA checks, missing-candle
 policy, and any future data module that needs candle intervals.
 """
 
+from datetime import timedelta
+
 import pandas as pd
 
 TIMEFRAME_DELTA: dict[str, pd.Timedelta] = {
@@ -23,3 +25,22 @@ TIMEFRAME_DELTA: dict[str, pd.Timedelta] = {
     "3d": pd.Timedelta(days=3),
     "1w": pd.Timedelta(weeks=1),
 }
+
+
+def parse_timeframe(tf: str) -> timedelta:
+    """Convert a timeframe string to a :class:`datetime.timedelta`.
+
+    Uses the canonical ``TIMEFRAME_DELTA`` mapping.
+
+    Raises
+    ------
+    ValueError
+        If *tf* is not a recognised timeframe string.
+    """
+    delta = TIMEFRAME_DELTA.get(tf)
+    if delta is None:
+        raise ValueError(
+            f"Unsupported timeframe: {tf!r}. "
+            f"Valid options: {sorted(TIMEFRAME_DELTA)}"
+        )
+    return delta.to_pytimedelta()
