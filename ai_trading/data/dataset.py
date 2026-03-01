@@ -148,6 +148,6 @@ def build_samples(
         x_seq[i] = features_values[t - seq_len + 1 : t + 1].astype(np.float32)
         y_out[i] = np.float32(y[t])
 
-    timestamps = features_df.index[valid_indices]
+    timestamps = pd.DatetimeIndex(features_df.index[valid_indices])
 
     return x_seq, y_out, timestamps
