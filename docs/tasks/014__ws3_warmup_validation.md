@@ -63,5 +63,5 @@ Dépendances :
 - [x] Critères d'acceptation tous satisfaits.
 - [x] `ruff check ai_trading/ tests/` passe sans erreur.
 - [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
-- [ ] **Commit GREEN** : `[WS-3] #014 GREEN: warmup et validation causalité`.
-- [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-3] #014 — Warmup et validation de causalité`.
+- [x] **Commit GREEN** : `[WS-3] #014 GREEN: warmup et validation causalité`.
+- [x] **Pull Request ouverte** vers `Max6000i1` : `[WS-3] #014 — Warmup et validation de causalité`.
