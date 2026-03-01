@@ -14,7 +14,9 @@ import numpy as np
 import pandas as pd
 import pytest
 
+import ai_trading.features.log_returns as _lr_module
 from ai_trading.features.registry import FEATURE_REGISTRY, BaseFeature
+from tests.conftest import clean_registry_with_reload
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -66,24 +68,7 @@ def ohlcv_minimal_2() -> pd.DataFrame:
 # Ensure log_returns module is imported so features are registered
 # ---------------------------------------------------------------------------
 
-
-@pytest.fixture(autouse=True)
-def _clean_registry():
-    """Save, clear, and restore FEATURE_REGISTRY around each test.
-
-    Uses importlib.reload() to re-run @register_feature decorators after
-    clearing, so registration tests exercise the real decorator path.
-    """
-    import importlib
-
-    import ai_trading.features.log_returns as lr_module
-
-    saved = dict(FEATURE_REGISTRY)
-    FEATURE_REGISTRY.clear()
-    importlib.reload(lr_module)
-    yield
-    FEATURE_REGISTRY.clear()
-    FEATURE_REGISTRY.update(saved)
+_clean_registry = clean_registry_with_reload(_lr_module)
 
 
 # ---------------------------------------------------------------------------

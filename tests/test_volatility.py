@@ -7,33 +7,14 @@ import numpy as np
 import pandas as pd
 import pytest
 
+import ai_trading.features.volatility as _vol_module
 from ai_trading.features.registry import FEATURE_REGISTRY, BaseFeature
+from tests.conftest import clean_registry_with_reload
+from tests.conftest import make_ohlcv_random as _make_ohlcv
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-def _make_ohlcv(n_bars: int, seed: int = 42) -> pd.DataFrame:
-    """Create a synthetic OHLCV DataFrame with *n_bars* rows."""
-    rng = np.random.default_rng(seed)
-    timestamps = pd.date_range("2023-01-01", periods=n_bars, freq="h")
-    close = 100.0 + np.cumsum(rng.standard_normal(n_bars) * 0.5)
-    # Ensure positive prices
-    close = np.abs(close) + 1.0
-    high = close + rng.uniform(0, 1, n_bars)
-    low = close - rng.uniform(0, 1, n_bars)
-    open_ = close + rng.uniform(-0.5, 0.5, n_bars)
-    volume = rng.uniform(100, 10000, n_bars)
-    return pd.DataFrame(
-        {
-            "open": open_,
-            "high": high,
-            "low": low,
-            "close": close,
-            "volume": volume,
-        },
-        index=timestamps,
-    )
 
 
 def _default_params() -> dict:
@@ -48,23 +29,7 @@ def _import_volatility():
     import ai_trading.features.volatility  # noqa: F401
 
 
-@pytest.fixture(autouse=True)
-def _clean_registry():
-    """Save, clear, and restore FEATURE_REGISTRY around each test.
-
-    Uses importlib.reload() to re-run @register_feature decorators after
-    clearing, so registration tests exercise the real decorator path.
-    """
-    import importlib
-
-    import ai_trading.features.volatility as vol_module
-
-    saved = dict(FEATURE_REGISTRY)
-    FEATURE_REGISTRY.clear()
-    importlib.reload(vol_module)
-    yield
-    FEATURE_REGISTRY.clear()
-    FEATURE_REGISTRY.update(saved)
+_clean_registry = clean_registry_with_reload(_vol_module)
 
 
 # ---------------------------------------------------------------------------

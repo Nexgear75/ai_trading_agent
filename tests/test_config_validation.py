@@ -9,33 +9,15 @@ import copy
 import logging
 
 import pytest
-import yaml
 from pydantic import ValidationError
 
 from ai_trading.config import PipelineConfig, load_config
 
+# tmp_yaml, default_yaml_data fixtures are inherited from conftest.py
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-
-@pytest.fixture
-def default_yaml_data(default_config_path):
-    """Load the raw dict from configs/default.yaml for reuse."""
-    with open(default_config_path, encoding="utf-8") as f:
-        return yaml.safe_load(f)
-
-
-@pytest.fixture
-def tmp_yaml(tmp_path):
-    """Factory fixture: write a dict to a temp YAML file and return its path."""
-
-    def _write(data: dict, name: str = "cfg.yaml") -> str:
-        p = tmp_path / name
-        p.write_text(yaml.dump(data, default_flow_style=False), encoding="utf-8")
-        return str(p)
-
-    return _write
 
 
 def _mutate(data: dict, dotpath: str, value):

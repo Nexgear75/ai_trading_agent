@@ -9,36 +9,23 @@ import numpy as np
 import pandas as pd
 import pytest
 
+import ai_trading.features.rsi as _rsi_module
 from ai_trading.features.registry import FEATURE_REGISTRY, BaseFeature
+from tests.conftest import clean_registry_with_reload
+from tests.conftest import make_ohlcv_from_close as _make_ohlcv
 
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
 
-
-@pytest.fixture(autouse=True)
-def _clean_registry():
-    """Save, clear, and restore FEATURE_REGISTRY around each test."""
-    saved = dict(FEATURE_REGISTRY)
-    FEATURE_REGISTRY.clear()
-    yield
-    FEATURE_REGISTRY.clear()
-    FEATURE_REGISTRY.update(saved)
+_clean_registry = clean_registry_with_reload(_rsi_module)
 
 
 @pytest.fixture
 def rsi_class():
-    """Import RSI14 and ensure it is in the registry via the decorator mechanism."""
+    """Import RSI14 — already registered by _clean_registry reload."""
     from ai_trading.features.rsi import RSI14
 
-    # The module may be imported here for the first time, which fires the
-    # @register_feature decorator.  On subsequent tests _clean_registry clears
-    # the dict, so we re-register through the decorator (not a raw dict insert)
-    # to validate the registration mechanism.
-    if "rsi_14" not in FEATURE_REGISTRY:
-        from ai_trading.features.registry import register_feature
-
-        register_feature("rsi_14")(RSI14)
     return RSI14
 
 
@@ -52,27 +39,6 @@ def rsi_instance(rsi_class):
 def default_params():
     """Default feature params matching configs/default.yaml."""
     return {"rsi_period": 14, "rsi_epsilon": 1e-12}
-
-
-def _make_ohlcv(close_values):
-    """Build a minimal OHLCV DataFrame from close values.
-
-    open/high/low are set equal to close; volume = 1.0.
-    """
-    n = len(close_values)
-    timestamps = pd.date_range("2024-01-01", periods=n, freq="1h")
-    close = np.array(close_values, dtype=np.float64)
-    df = pd.DataFrame(
-        {
-            "open": close,
-            "high": close,
-            "low": close,
-            "close": close,
-            "volume": np.ones(n, dtype=np.float64),
-        },
-        index=timestamps,
-    )
-    return df
 
 
 def _compute_rsi_reference(close_values, n=14, epsilon=1e-12):
