@@ -34,10 +34,17 @@ class RSI14(BaseFeature):
 
     @property
     def min_periods(self) -> int:
-        """Number of leading NaN values: 14 (spec-default rsi_period=14).
+        """Number of leading NaN values: 14 (spec-default ``rsi_period=14``).
 
         ``compute()`` produces its first non-NaN value at index
         ``rsi_period`` (i.e. 14 leading NaN for the default period).
+
+        .. note::
+            This value is valid only for the spec-default ``rsi_period=14``.
+            If a different ``rsi_period`` is configured, the actual leading
+            NaN count will be ``rsi_period``, which may differ from this
+            hard-coded return value.  The config validation (task #003)
+            ensures ``min_warmup >= rsi_period`` independently.
         """
         return 14  # 14 leading NaN for rsi_period=14
 

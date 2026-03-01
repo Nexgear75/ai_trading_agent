@@ -95,8 +95,9 @@ class BaseFeature(ABC):
         Example: if ``compute()`` returns ``[NaN, NaN, 0.5, ...]``,
         then ``min_periods = 2``.
 
-        The pipeline computes the global warmup as
-        ``max(f.min_periods for f in features)``.
+        This value can be used by the pipeline and configuration to
+        determine the minimum warmup period (i.e. how many leading rows
+        must be excluded because they contain NaN).
         """
 
     @abstractmethod

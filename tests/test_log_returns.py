@@ -71,18 +71,16 @@ def ohlcv_minimal_2() -> pd.DataFrame:
 def _clean_registry():
     """Save, clear, and restore FEATURE_REGISTRY around each test.
 
-    Re-imports log_returns to ensure features are registered even if a
-    previous test file's cleanup wiped the registry.
+    Uses importlib.reload() to re-run @register_feature decorators after
+    clearing, so registration tests exercise the real decorator path.
     """
+    import importlib
+
+    import ai_trading.features.log_returns as lr_module
+
     saved = dict(FEATURE_REGISTRY)
     FEATURE_REGISTRY.clear()
-    # Module is already cached by Python; re-register manually.
-    from ai_trading.features.log_returns import LogReturn1, LogReturn2, LogReturn4
-
-    for name, cls in [("logret_1", LogReturn1), ("logret_2", LogReturn2),
-                      ("logret_4", LogReturn4)]:
-        if name not in FEATURE_REGISTRY:
-            FEATURE_REGISTRY[name] = cls
+    importlib.reload(lr_module)
     yield
     FEATURE_REGISTRY.clear()
     FEATURE_REGISTRY.update(saved)
@@ -137,24 +135,24 @@ class TestNumericalCorrectness:
         feature = FEATURE_REGISTRY["logret_1"]()
         result = feature.compute(ohlcv_10bars, {})
         close = ohlcv_10bars["close"]
-        expected = np.log(close / close.shift(1))
-        pd.testing.assert_series_equal(result, expected, check_names=False, atol=1e-12)
+        expected = np.log(close / close.shift(1)).rename(None)
+        pd.testing.assert_series_equal(result, expected, atol=1e-12)
 
     def test_logret_2_values(self, ohlcv_10bars: pd.DataFrame) -> None:
         """#008: logret_2 = log(close / close.shift(2))."""
         feature = FEATURE_REGISTRY["logret_2"]()
         result = feature.compute(ohlcv_10bars, {})
         close = ohlcv_10bars["close"]
-        expected = np.log(close / close.shift(2))
-        pd.testing.assert_series_equal(result, expected, check_names=False, atol=1e-12)
+        expected = np.log(close / close.shift(2)).rename(None)
+        pd.testing.assert_series_equal(result, expected, atol=1e-12)
 
     def test_logret_4_values(self, ohlcv_10bars: pd.DataFrame) -> None:
         """#008: logret_4 = log(close / close.shift(4))."""
         feature = FEATURE_REGISTRY["logret_4"]()
         result = feature.compute(ohlcv_10bars, {})
         close = ohlcv_10bars["close"]
-        expected = np.log(close / close.shift(4))
-        pd.testing.assert_series_equal(result, expected, check_names=False, atol=1e-12)
+        expected = np.log(close / close.shift(4)).rename(None)
+        pd.testing.assert_series_equal(result, expected, atol=1e-12)
 
     def test_logret_1_hand_calculated(self) -> None:
         """#008: logret_1 hand-verified on 3-bar example."""
