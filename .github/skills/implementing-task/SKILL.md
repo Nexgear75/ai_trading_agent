@@ -69,6 +69,8 @@ Charger uniquement les parties référencées de la spécification et du plan. N
 - **Imports corrects dès l'écriture** : respecter l'ordre ruff/isort (stdlib → third-party → local, séparés par une ligne vide). Ne jamais ajouter d'imports inutiles.
 - Couvrir chaque critère d'acceptation avec au moins un test.
 - Inclure des cas nominaux, erreurs, et bords.
+- **Fuzzing systématique des paramètres numériques** : pour chaque paramètre numérique en entrée (`n`, `L`, `H`, period, window, etc.), inclure un test pour : `param = 0`, `param = 1`, `param = valeur_max`, combinaison de minimums simultanés (ex : `fast=1, slow=1`), `param > taille_données`. Si une combinaison critique manque, l'ajouter.
+- **Atomicité des tests** : chaque test doit vérifier **un seul scénario**. Ne pas empiler plusieurs `pytest.raises` ou assertions indépendantes dans un même test body. Si le premier échoue, les suivants ne s'exécutent pas.
 - Utiliser des données synthétiques (fixtures `conftest.py`), jamais de données réseau.
 - Si la tâche concerne l'anti-fuite : inclure un test de perturbation (modifier prix futurs → résultat identique pour t ≤ T).
 - **Lancer `ruff check` sur le fichier test après écriture**, avant le commit RED. Corriger tout diagnostic à la source (réordonner, supprimer l'import, renommer) — jamais de `# noqa` comme contournement.
@@ -111,6 +113,7 @@ Relecture manuelle de **chaque fichier modifié**. Checklist minimale :
 #### 8a. Traçabilité critères ↔ tests ↔ code
 - [ ] Chaque critère d'acceptation a au moins un test correspondant.
 - [ ] Chaque test correspond à un comportement attendu.
+- [ ] **Vérification texte AC ↔ valeurs du code** : pour chaque critère d'acceptation contenant des bornes, indices ou valeurs numériques (ex : « NaN aux positions t < X »), vérifier que le **texte** du critère correspond **exactement** aux valeurs produites par le code. Un off-by-one entre le texte de la tâche et le comportement réel est bloquant — corriger le texte de la tâche si nécessaire.
 - [ ] Ajouter des tests de bords/erreurs si nécessaire.
 
 #### 8b. Anti-fuite
@@ -132,6 +135,7 @@ Dans `docs/tasks/NNN__slug.md` :
 - Cocher chaque critère d'acceptation vérifié : `- [x]`
 - Cocher chaque item de la checklist de fin de tâche : `- [x]`
 - Passer `Statut : DONE`
+- **Corriger les sections descriptives** (Objectif, Évolutions proposées, Règles attendues) si elles sont factuellement incorrectes après implémentation (ex : `min_periods` retourne une valeur différente de celle annoncée dans la tâche). Le fichier de tâche doit refléter fidèlement le code livré.
 
 ### 10. Commit GREEN (clôture)
 Conditions requises : tests GREEN + tous les critères d'acceptation validés + checklist cochée.
@@ -171,6 +175,7 @@ Aucun commit intermédiaire entre RED et GREEN sauf refactoring mineur (tests ve
 - **Données** : `data/raw/` (Parquet OHLCV).
 - **Artefacts** : `runs/` (manifest.json + metrics.json par run).
 - **Seeds** et **hashes SHA-256** obligatoires pour la reproductibilité.
+- **API random NumPy** : toujours utiliser `np.random.default_rng(seed)` (nouvelle API). Ne jamais utiliser `np.random.seed()` ni `np.random.randn()` (legacy API).
 - **Modules attendus** : config, data/ingestion, data/qa, data/dataset, data/splitter, data/scaler, features/registry, features/pipeline, models/base, models/dummy, training/trainer, calibration/threshold, backtest/engine, baselines/*, metrics/prediction, metrics/trading, metrics/aggregation, artifacts/run_dir, artifacts/manifest, artifacts/metrics_builder, artifacts/schema_validator, utils/seed, pipeline/runner.
 - **Nommage tests** : structurés par module (`test_config.py`, `test_features.py`, `test_splitter.py`, etc.). Identifiant tâche `#NNN` dans les docstrings uniquement.
 - **Ordre des imports** : toujours stdlib → third-party → local, séparés par une ligne vide. Ne jamais contourner I001 avec `# noqa`.

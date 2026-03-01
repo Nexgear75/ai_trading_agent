@@ -1,6 +1,6 @@
 # Tâche — Feature EMA ratio (ema_ratio_12_26)
 
-Statut : TODO
+Statut : DONE
 Ordre : 011
 Workstream : WS-3
 Milestone : M2
@@ -33,31 +33,31 @@ Implémenter la feature `ema_ratio_12_26` :
 ## Évolutions proposées
 - Créer `ai_trading/features/ema.py` avec une classe `EmaRatio1226` décorée `@register_feature("ema_ratio_12_26")`.
 - `required_params = ["ema_fast", "ema_slow"]`.
-- `min_periods` retourne `ema_slow` (26) car l'EMA lente nécessite le plus de données.
+- `min_periods` retourne `ema_slow - 1` (25) car l'EMA lente produit sa première valeur à l'index `ema_slow - 1`.
 - L'EMA est calculée via `pd.Series.ewm(span=n, adjust=False)` ou implémentation manuelle avec initialisation SMA.
 
 ## Critères d'acceptation
-- [ ] Classe enregistrée : `ema_ratio_12_26` dans `FEATURE_REGISTRY`.
-- [ ] Tests numériques avec valeurs calculées à la main.
-- [ ] Convergence vérifiée : série constante → ratio = 0 (tolérance `atol=1e-10`).
-- [ ] `ema_fast` et `ema_slow` lus depuis params (pas hardcodés).
-- [ ] NaN aux positions t < ema_slow (avant que l'EMA lente soit initialisée).
-- [ ] Causalité vérifiée : modifier `close[t > T]` ne modifie pas `ema_ratio[t <= T]`.
-- [ ] Tests couvrent les scénarios nominaux + erreurs + bords.
-- [ ] Suite de tests verte après implémentation.
-- [ ] `ruff check` passe sans erreur.
+- [x] Classe enregistrée : `ema_ratio_12_26` dans `FEATURE_REGISTRY`.
+- [x] Tests numériques avec valeurs calculées à la main.
+- [x] Convergence vérifiée : série constante → ratio = 0 (tolérance `atol=1e-10`).
+- [x] `ema_fast` et `ema_slow` lus depuis params (pas hardcodés).
+- [x] NaN aux positions t < ema_slow - 1 (premier non-NaN à l'index `ema_slow - 1`).
+- [x] Causalité vérifiée : modifier `close[t > T]` ne modifie pas `ema_ratio[t <= T]`.
+- [x] Tests couvrent les scénarios nominaux + erreurs + bords.
+- [x] Suite de tests verte après implémentation.
+- [x] `ruff check` passe sans erreur.
 
 ## Pré-condition de démarrage
 - **Tous les tests existants sont GREEN** avant de commencer.
 - **Créer une branche dédiée** `task/011-ema-ratio` depuis `Max6000i1`.
 
 ## Checklist de fin de tâche
-- [ ] Branche `task/011-ema-ratio` créée depuis `Max6000i1`.
-- [ ] Tests RED écrits avant implémentation.
-- [ ] **Commit RED** : `[WS-3] #011 RED: tests EMA ratio`.
-- [ ] Tests GREEN passants et reproductibles.
-- [ ] Critères d'acceptation tous satisfaits.
-- [ ] `ruff check ai_trading/ tests/` passe sans erreur.
-- [ ] Fichier de tâche mis à jour (statut DONE, critères cochés).
-- [ ] **Commit GREEN** : `[WS-3] #011 GREEN: EMA ratio`.
-- [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-3] #011 — Feature EMA ratio`.
+- [x] Branche `task/011-ema-ratio` créée depuis `Max6000i1`.
+- [x] Tests RED écrits avant implémentation.
+- [x] **Commit RED** : `[WS-3] #011 RED: tests EMA ratio`.
+- [x] Tests GREEN passants et reproductibles.
+- [x] Critères d'acceptation tous satisfaits.
+- [x] `ruff check ai_trading/ tests/` passe sans erreur.
+- [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
+- [x] **Commit GREEN** : `[WS-3] #011 GREEN: EMA ratio`.
+- [x] **Pull Request ouverte** vers `Max6000i1` : `[WS-3] #011 — Feature EMA ratio`.
