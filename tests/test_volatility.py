@@ -48,6 +48,25 @@ def _import_volatility():
     import ai_trading.features.volatility  # noqa: F401
 
 
+@pytest.fixture(autouse=True)
+def _clean_registry():
+    """Save, clear, and restore FEATURE_REGISTRY around each test.
+
+    Uses importlib.reload() to re-run @register_feature decorators after
+    clearing, so registration tests exercise the real decorator path.
+    """
+    import importlib
+
+    import ai_trading.features.volatility as vol_module
+
+    saved = dict(FEATURE_REGISTRY)
+    FEATURE_REGISTRY.clear()
+    importlib.reload(vol_module)
+    yield
+    FEATURE_REGISTRY.clear()
+    FEATURE_REGISTRY.update(saved)
+
+
 # ---------------------------------------------------------------------------
 # Registration tests
 # ---------------------------------------------------------------------------

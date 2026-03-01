@@ -465,8 +465,8 @@ class TestRSIErrors:
     """#010 AC-8: Error and boundary scenarios."""
 
     def test_min_periods_property(self, rsi_instance):
-        """min_periods returns fixed spec-default warmup: rsi_period(14) + 1 = 15."""
-        assert rsi_instance.min_periods == 15  # spec §6.3 default: 14 + 1
+        """#023: min_periods = number of leading NaN = 14 (not rsi_period + 1)."""
+        assert rsi_instance.min_periods == 14  # 14 leading NaN values
 
     def test_output_is_series(self, rsi_instance, default_params):
         """compute() returns a pd.Series."""
