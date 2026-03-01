@@ -5,6 +5,7 @@ tensors for model training: ``X_seq (N, L, F)``, ``y (N,)``, and
 a ``timestamps`` index of decision timestamps.
 
 Task #016 — WS-4.
+Task #018 — WS-4: execution metadata (meta).
 """
 
 from __future__ import annotations
@@ -12,7 +13,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from ai_trading.config import WindowConfig
+from ai_trading.config import LabelConfig, WindowConfig
 
 
 def build_samples(
@@ -214,3 +215,112 @@ def flatten_seq_to_tab(
     ]
 
     return x_tab, column_names
+
+
+def build_meta(
+    ohlcv: pd.DataFrame,
+    timestamps: pd.DatetimeIndex,
+    config: LabelConfig,
+) -> pd.DataFrame:
+    """Build execution metadata for each valid sample.
+
+    For each decision timestamp *t* in *timestamps*, produces:
+
+    - ``decision_time`` = close_time(t) = open_time(t) + candle interval
+    - ``entry_time``    = open_time(t+1) = ohlcv index at position t+1
+    - ``exit_time``     = close_time(t+H) = open_time(t+H) + candle interval
+    - ``entry_price``   = Open[t+1]
+    - ``exit_price``    = Close[t+H]
+
+    The candle interval is inferred from the first two OHLCV index values.
+
+    Task #018 — WS-4.
+
+    Parameters
+    ----------
+    ohlcv:
+        OHLCV DataFrame with columns ``open``, ``close`` (at minimum),
+        indexed by candle open_time.  Must have at least 2 rows to infer
+        the candle interval.
+    timestamps:
+        DatetimeIndex of decision timestamps (subset of ``ohlcv.index``).
+    config:
+        Label configuration with ``horizon_H_bars``.
+
+    Returns
+    -------
+    meta:
+        DataFrame of shape ``(N, 5)`` with columns ``decision_time``,
+        ``entry_time``, ``exit_time``, ``entry_price``, ``exit_price``.
+
+    Raises
+    ------
+    ValueError
+        If the OHLCV has fewer than 2 rows, a timestamp is not found in
+        the OHLCV index, or t+H exceeds the OHLCV range.
+    """
+    h = config.horizon_H_bars
+    n_ohlcv = len(ohlcv)
+
+    # --- Empty timestamps: return empty meta with correct columns ----------
+    if len(timestamps) == 0:
+        return pd.DataFrame(
+            columns=[
+                "decision_time",
+                "entry_time",
+                "exit_time",
+                "entry_price",
+                "exit_price",
+            ]
+        )
+
+    # --- Infer candle interval from the OHLCV index -------------------------
+    if n_ohlcv < 2:
+        raise ValueError(
+            "ohlcv must have at least 2 rows to infer the candle interval, "
+            f"got {n_ohlcv}."
+        )
+    interval = ohlcv.index[1] - ohlcv.index[0]
+
+    # --- Build a positional index for fast lookup ---------------------------
+    index_map: dict[pd.Timestamp, int] = {
+        ts: pos for pos, ts in enumerate(ohlcv.index)
+    }
+
+    open_values = ohlcv["open"].values
+    close_values = ohlcv["close"].values
+    ohlcv_index = ohlcv.index
+
+    decision_times = []
+    entry_times = []
+    exit_times = []
+    entry_prices = []
+    exit_prices = []
+
+    for ts in timestamps:
+        pos = index_map.get(ts)
+        if pos is None:
+            raise ValueError(
+                f"Timestamp {ts} not found in ohlcv index."
+            )
+
+        if pos + h >= n_ohlcv:
+            raise ValueError(
+                f"Timestamp {ts} at position {pos} with H={h} "
+                f"requires position {pos + h}, which is beyond ohlcv "
+                f"(length {n_ohlcv})."
+            )
+
+        decision_times.append(ohlcv_index[pos] + interval)
+        entry_times.append(ohlcv_index[pos + 1])
+        exit_times.append(ohlcv_index[pos + h] + interval)
+        entry_prices.append(open_values[pos + 1])
+        exit_prices.append(close_values[pos + h])
+
+    return pd.DataFrame({
+        "decision_time": decision_times,
+        "entry_time": entry_times,
+        "exit_time": exit_times,
+        "entry_price": entry_prices,
+        "exit_price": exit_prices,
+    })
