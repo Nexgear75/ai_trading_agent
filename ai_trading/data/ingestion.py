@@ -161,6 +161,13 @@ def _fetch_all_pages(
             base_backoff_s=base_backoff_s,
         )
         if not page:
+            if since < end_ms:
+                logger.warning(
+                    "Pagination stopped: exchange returned empty page at %d ms "
+                    "but end_ms=%d not reached. Data may be truncated.",
+                    since,
+                    end_ms,
+                )
             break
 
         # Filter to [start, end[

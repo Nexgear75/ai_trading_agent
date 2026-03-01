@@ -169,8 +169,8 @@ class TestRSINumerical:
 
     def test_rsi_matches_reference(self, rsi_instance, default_params):
         """Compare output against pure-Python Wilder reference."""
-        rng = np.random.RandomState(42)
-        close = 100.0 + np.cumsum(rng.randn(50) * 0.5)
+        rng = np.random.default_rng(42)
+        close = 100.0 + np.cumsum(rng.standard_normal(50) * 0.5)
         ohlcv = _make_ohlcv(close)
         result = rsi_instance.compute(ohlcv, default_params)
 
@@ -224,8 +224,8 @@ class TestRSIRange:
 
     def test_random_series_bounded(self, rsi_instance, default_params):
         """Random walk series — all valid RSI values within [0, 100]."""
-        rng = np.random.RandomState(123)
-        close = 100.0 + np.cumsum(rng.randn(200) * 2.0)
+        rng = np.random.default_rng(123)
+        close = 100.0 + np.cumsum(rng.standard_normal(200) * 2.0)
         ohlcv = _make_ohlcv(close)
         result = rsi_instance.compute(ohlcv, default_params)
 
@@ -295,8 +295,8 @@ class TestRSIConfigDriven:
     def test_different_period(self, rsi_instance):
         """Changing rsi_period changes NaN warmup positions and computed output."""
         params_7 = {"rsi_period": 7, "rsi_epsilon": 1e-12}
-        rng = np.random.RandomState(99)
-        close = 100.0 + np.cumsum(rng.randn(30))
+        rng = np.random.default_rng(99)
+        close = 100.0 + np.cumsum(rng.standard_normal(30))
         ohlcv = _make_ohlcv(close)
 
         result = rsi_instance.compute(ohlcv, params_7)
@@ -372,8 +372,8 @@ class TestRSINaN:
 
     def test_nan_before_period_14(self, rsi_instance, default_params):
         """First 14 bars (indices 0..13) should be NaN with period=14."""
-        rng = np.random.RandomState(7)
-        close = 100.0 + np.cumsum(rng.randn(30))
+        rng = np.random.default_rng(7)
+        close = 100.0 + np.cumsum(rng.standard_normal(30))
         ohlcv = _make_ohlcv(close)
         result = rsi_instance.compute(ohlcv, default_params)
 
@@ -387,8 +387,8 @@ class TestRSINaN:
     def test_nan_before_period_7(self, rsi_instance):
         """With period=7, first 7 bars are NaN."""
         params = {"rsi_period": 7, "rsi_epsilon": 1e-12}
-        rng = np.random.RandomState(8)
-        close = 100.0 + np.cumsum(rng.randn(20))
+        rng = np.random.default_rng(8)
+        close = 100.0 + np.cumsum(rng.standard_normal(20))
         ohlcv = _make_ohlcv(close)
         result = rsi_instance.compute(ohlcv, params)
 
@@ -415,8 +415,8 @@ class TestRSICausality:
 
     def test_causality_unchanged(self, rsi_instance, default_params):
         """Perturbation of future prices must not affect past RSI values."""
-        rng = np.random.RandomState(55)
-        close_original = list(100.0 + np.cumsum(rng.randn(40)))
+        rng = np.random.default_rng(55)
+        close_original = list(100.0 + np.cumsum(rng.standard_normal(40)))
 
         # Compute RSI on original
         ohlcv_orig = _make_ohlcv(close_original)
