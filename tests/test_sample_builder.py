@@ -96,7 +96,7 @@ class TestNominalShapes:
 
 
 class TestDtypeConventions:
-    """#016 — X_seq and y must be float32 per spec §17."""
+    """#016 — X_seq and y must be float32."""
 
     def test_x_seq_dtype(self):
         from ai_trading.data.dataset import build_samples
@@ -528,6 +528,18 @@ class TestErrorCases:
         config = _make_window_config(3)
 
         with pytest.raises(ValueError, match="final_mask.*bool"):
+            build_samples(features_df, y, final_mask, config)
+
+    def test_y_wrong_dtype(self):
+        """y must be a floating-point array."""
+        from ai_trading.data.dataset import build_samples
+
+        features_df = _make_features_df(10, 2)
+        y = np.ones(10, dtype=np.int32)  # Wrong dtype
+        final_mask = np.ones(10, dtype=bool)
+        config = _make_window_config(3)
+
+        with pytest.raises(ValueError, match="y.*floating"):
             build_samples(features_df, y, final_mask, config)
 
     def test_l_greater_than_n_bars(self):

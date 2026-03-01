@@ -85,6 +85,11 @@ def build_samples(
             f"final_mask dtype must be bool, got {final_mask.dtype}."
         )
 
+    if not np.issubdtype(y.dtype, np.floating):
+        raise ValueError(
+            f"y must be a floating-point array, got {y.dtype}."
+        )
+
     # --- Early exit for trivial cases ------------------------------------
     if n_bars < seq_len:
         return (
@@ -93,7 +98,7 @@ def build_samples(
             pd.DatetimeIndex([]),
         )
 
-    # --- Pre-compute feature values as float64 array ----------------------
+    # --- Pre-compute feature values ----------------------------------------
     features_values = features_df.values  # (T, F)
 
     # --- Build valid sample indices ---------------------------------------
@@ -103,17 +108,16 @@ def build_samples(
     #   - no NaN in features window [t-L+1 .. t]
 
     # Compute rolling mask: True at t iff all of [t-L+1..t] are True
-    # Using cumulative sum to efficiently compute this.
+    # Vectorized via cumulative sum.
     mask_cumsum = np.cumsum(final_mask.astype(np.int64))
-    # For t >= L-1: window_all_valid[t] = (cumsum[t] - cumsum[t-L]) == L
-    # For t < L-1: not enough bars
     window_all_valid = np.zeros(n_bars, dtype=bool)
-    for t in range(seq_len - 1, n_bars):
-        if t - seq_len >= 0:
-            window_sum = mask_cumsum[t] - mask_cumsum[t - seq_len]
-        else:
-            window_sum = mask_cumsum[t]
-        window_all_valid[t] = window_sum == seq_len
+    # t == seq_len - 1: first possible window (sum from index 0)
+    window_all_valid[seq_len - 1] = mask_cumsum[seq_len - 1] == seq_len
+    # t >= seq_len: rolling difference
+    if n_bars > seq_len:
+        window_all_valid[seq_len:] = (
+            mask_cumsum[seq_len:] - mask_cumsum[: n_bars - seq_len]
+        ) == seq_len
 
     # Filter by y not NaN
     y_valid = ~np.isnan(y)
@@ -140,14 +144,15 @@ def build_samples(
             pd.DatetimeIndex([]),
         )
 
-    # --- Build output arrays -----------------------------------------------
-    x_seq = np.empty((n_samples, seq_len, n_features), dtype=np.float32)
-    y_out = np.empty(n_samples, dtype=np.float32)
+    # --- Build output arrays (vectorized gather) ----------------------------
+    idx = np.array(valid_indices, dtype=np.intp)
+    # Window offsets: for each valid t, gather rows [t-L+1 .. t]
+    offsets = np.arange(seq_len)  # (L,)
+    # row_indices[i, j] = valid_indices[i] - seq_len + 1 + j
+    row_indices = idx[:, np.newaxis] - seq_len + 1 + offsets[np.newaxis, :]  # (N, L)
+    x_seq = features_values[row_indices].astype(np.float32)  # (N, L, F)
+    y_out = y[idx].astype(np.float32)  # (N,)
 
-    for i, t in enumerate(valid_indices):
-        x_seq[i] = features_values[t - seq_len + 1 : t + 1].astype(np.float32)
-        y_out[i] = np.float32(y[t])
-
-    timestamps = pd.DatetimeIndex(features_df.index[valid_indices])
+    timestamps = pd.DatetimeIndex(features_df.index[idx])
 
     return x_seq, y_out, timestamps
