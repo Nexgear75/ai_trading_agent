@@ -22,7 +22,7 @@ def _validated_logvol(volume: pd.Series, epsilon: float) -> pd.Series:
     """Compute log(V + ε) with explicit epsilon validation."""
     if epsilon <= 0.0:
         raise ValueError(f"logvol_epsilon must be > 0, got {epsilon}")
-    return np.log(volume + epsilon)
+    return pd.Series(np.log(volume + epsilon), index=volume.index)
 
 
 @register_feature("logvol")

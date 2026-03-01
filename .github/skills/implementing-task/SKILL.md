@@ -101,9 +101,10 @@ git commit -m "[WS-X] #NNN RED: <résumé des tests ajoutés>"
 ```
 
 ### 6. Implémenter (GREEN)
-Écrire le **minimum** pour faire passer les tests :
+Écrire pour faire passer les tests :
 - **Strict code** : validation explicite + `raise`. Pas de fallbacks, pas de defaults implicites.
 - **Config-driven** : paramètres dans `configs/default.yaml`, pas hardcodés.
+- **DRY** : éviter la duplication de code, extraire des fonctions/classes réutilisables.
 - **Anti-fuite** : aucun `.shift(-n)` sans justification temporelle correcte.
 - **Float32** pour tenseurs X_seq et y. **Float64** pour calculs de métriques.
 - **Nommage** : snake_case, anglais pour le code.

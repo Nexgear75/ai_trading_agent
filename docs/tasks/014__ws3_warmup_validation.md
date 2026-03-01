@@ -1,6 +1,6 @@
 # Tâche — Warmup et validation de causalité
 
-Statut : TODO
+Statut : DONE
 Ordre : 014
 Workstream : WS-3
 Milestone : M2
@@ -31,7 +31,7 @@ Dépendances :
 - **Anti-fuite** : le masque n'utilise aucune information future.
 
 ## Évolutions proposées
-- Implémenter une fonction `apply_warmup(features_df, valid_mask, min_warmup, feature_instances) -> final_mask` :
+- Implémenter une fonction `apply_warmup(features_df, valid_mask, min_warmup, feature_instances, params=None) -> final_mask` :
   - **Assertion** : `min_warmup >= max(f.min_periods for f in feature_instances)`, sinon `ValueError` explicite.
   - Crée un masque warmup : `False` pour les `min_warmup` premières lignes, `True` ensuite.
   - Combine : `final_mask = warmup_mask & valid_mask`.
@@ -39,29 +39,29 @@ Dépendances :
 - Retourner `final_mask` de shape `(N_total,)` booléen.
 
 ## Critères d'acceptation
-- [ ] Les `min_warmup` premières lignes sont toujours `False` dans le masque final.
-- [ ] Le masque final est la combinaison AND du masque warmup et du masque de trous.
-- [ ] Absence de NaN dans `features_df[final_mask]` vérifiée. NaN résiduel → `ValueError`.
-- [ ] `min_warmup` lu depuis la config (pas hardcodé).
-- [ ] `min_warmup < max(min_periods)` → `ValueError` explicite (assertion runtime).
-- [ ] Test : `min_warmup=200`, features avec 500 bougies sans trou → 300 samples valides.
-- [ ] Test : NaN injecté dans la zone post-warmup → erreur levée.
-- [ ] Test : combinaison avec trou dans les données → masque correct.
-- [ ] Tests couvrent les scénarios nominaux + erreurs + bords.
-- [ ] Suite de tests verte après implémentation.
-- [ ] `ruff check` passe sans erreur.
+- [x] Les `min_warmup` premières lignes sont toujours `False` dans le masque final.
+- [x] Le masque final est la combinaison AND du masque warmup et du masque de trous.
+- [x] Absence de NaN dans `features_df[final_mask]` vérifiée. NaN résiduel → `ValueError`.
+- [x] `min_warmup` lu depuis la config (pas hardcodé).
+- [x] `min_warmup < max(min_periods)` → `ValueError` explicite (assertion runtime).
+- [x] Test : `min_warmup=200`, features avec 500 bougies sans trou → 300 samples valides.
+- [x] Test : NaN injecté dans la zone post-warmup → erreur levée.
+- [x] Test : combinaison avec trou dans les données → masque correct.
+- [x] Tests couvrent les scénarios nominaux + erreurs + bords.
+- [x] Suite de tests verte après implémentation.
+- [x] `ruff check` passe sans erreur.
 
 ## Pré-condition de démarrage
 - **Tous les tests existants sont GREEN** avant de commencer.
 - **Créer une branche dédiée** `task/014-warmup-validation` depuis `Max6000i1`.
 
 ## Checklist de fin de tâche
-- [ ] Branche `task/014-warmup-validation` créée depuis `Max6000i1`.
-- [ ] Tests RED écrits avant implémentation.
-- [ ] **Commit RED** : `[WS-3] #014 RED: tests warmup et validation causalité`.
-- [ ] Tests GREEN passants et reproductibles.
-- [ ] Critères d'acceptation tous satisfaits.
-- [ ] `ruff check ai_trading/ tests/` passe sans erreur.
-- [ ] Fichier de tâche mis à jour (statut DONE, critères cochés).
-- [ ] **Commit GREEN** : `[WS-3] #014 GREEN: warmup et validation causalité`.
-- [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-3] #014 — Warmup et validation de causalité`.
+- [x] Branche `task/014-warmup-validation` créée depuis `Max6000i1`.
+- [x] Tests RED écrits avant implémentation.
+- [x] **Commit RED** : `[WS-3] #014 RED: tests warmup et validation causalité`.
+- [x] Tests GREEN passants et reproductibles.
+- [x] Critères d'acceptation tous satisfaits.
+- [x] `ruff check ai_trading/ tests/` passe sans erreur.
+- [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
+- [x] **Commit GREEN** : `[WS-3] #014 GREEN: warmup et validation causalité`.
+- [x] **Pull Request ouverte** vers `Max6000i1` : `[WS-3] #014 — Warmup et validation de causalité`.
