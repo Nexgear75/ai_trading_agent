@@ -440,6 +440,7 @@ class TestRSIErrors:
         ohlcv = _make_ohlcv(close)
         result = rsi_instance.compute(ohlcv, default_params)
         assert isinstance(result, pd.Series)
+        assert result.name == "rsi_14"
 
     def test_output_index_matches_input(self, rsi_instance, default_params):
         """Output Series has the same index as input OHLCV."""

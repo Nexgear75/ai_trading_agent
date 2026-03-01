@@ -33,11 +33,6 @@ def _load_scaling_config(default_config_path):
 
 
 @pytest.fixture
-def rng():
-    return np.random.default_rng(42)
-
-
-@pytest.fixture
 def x_train_3d(rng):
     """Shape (20, 5, 3): 20 samples, lookback 5, 3 features."""
     return rng.standard_normal((20, 5, 3)).astype(np.float32)

@@ -328,6 +328,7 @@ class TestOutputShape:
         instance = FEATURE_REGISTRY["vol_24"]()
         result = instance.compute(ohlcv, params)
         assert isinstance(result, pd.Series)
+        assert result.name == "vol_24"
 
     def test_vol_24_same_length_as_input(self):
         """#009 vol_24 output length == ohlcv length."""
@@ -355,6 +356,7 @@ class TestOutputShape:
         instance = FEATURE_REGISTRY["vol_72"]()
         result = instance.compute(ohlcv, params)
         assert len(result) == len(ohlcv)
+        assert result.name == "vol_72"
 
 
 # ---------------------------------------------------------------------------

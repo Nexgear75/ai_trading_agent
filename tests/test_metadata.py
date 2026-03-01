@@ -10,6 +10,7 @@ import pandas as pd
 import pytest
 
 from ai_trading.config import LabelConfig
+from tests.conftest import make_ohlcv_random
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -17,19 +18,7 @@ from ai_trading.config import LabelConfig
 
 
 def _make_ohlcv(n_bars: int, seed: int = 42) -> pd.DataFrame:
-    """Create synthetic OHLCV with distinct open/close for verification."""
-    rng = np.random.default_rng(seed)
-    timestamps = pd.date_range("2024-01-01", periods=n_bars, freq="1h", tz="UTC")
-    close = 100.0 + np.cumsum(rng.standard_normal(n_bars) * 0.5)
-    close = np.abs(close) + 1.0
-    open_ = close + rng.uniform(-0.5, 0.5, n_bars)
-    high = np.maximum(open_, close) + rng.uniform(0, 1, n_bars)
-    low = np.minimum(open_, close) - rng.uniform(0, 1, n_bars)
-    volume = rng.uniform(100, 10000, n_bars)
-    return pd.DataFrame(
-        {"open": open_, "high": high, "low": low, "close": close, "volume": volume},
-        index=timestamps,
-    )
+    return make_ohlcv_random(n_bars, seed=seed, start="2024-01-01", tz="UTC")
 
 
 def _make_label_config(

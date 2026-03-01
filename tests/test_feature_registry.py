@@ -11,6 +11,7 @@ from ai_trading.features.registry import (
     BaseFeature,
     register_feature,
 )
+from tests.conftest import clean_registry_with_reload
 
 # ---------------------------------------------------------------------------
 # Helpers: concrete subclasses for testing
@@ -52,14 +53,7 @@ class _NoMinPeriodsFeature(BaseFeature):
 # ---------------------------------------------------------------------------
 
 
-@pytest.fixture(autouse=True)
-def _clean_registry():
-    """Save and restore FEATURE_REGISTRY around each test."""
-    saved = dict(FEATURE_REGISTRY)
-    FEATURE_REGISTRY.clear()
-    yield
-    FEATURE_REGISTRY.clear()
-    FEATURE_REGISTRY.update(saved)
+_clean_registry = clean_registry_with_reload()
 
 
 # ---------------------------------------------------------------------------

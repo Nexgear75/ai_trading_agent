@@ -124,6 +124,8 @@ class TestNumerical:
         result = ema_instance.compute(ohlcv, default_params)
         expected = _ema_ratio_reference(close_values, fast=12, slow=26)
 
+        assert result.name == "ema_ratio_12_26"
+
         for i in range(len(close_values)):
             if np.isnan(expected[i]):
                 assert np.isnan(result.iloc[i]), f"Expected NaN at index {i}"

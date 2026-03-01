@@ -70,20 +70,50 @@ def make_ohlcv_from_close(close_values) -> pd.DataFrame:
     )
 
 
-def make_ohlcv_random(n_bars: int, seed: int = 42) -> pd.DataFrame:
+def make_ohlcv_random(
+    n_bars: int,
+    seed: int = 42,
+    start: str = "2023-01-01",
+    tz: str | None = None,
+) -> pd.DataFrame:
     """Create a synthetic OHLCV DataFrame with *n_bars* rows and random data."""
     rng = np.random.default_rng(seed)
-    timestamps = pd.date_range("2023-01-01", periods=n_bars, freq="h")
+    timestamps = pd.date_range(start, periods=n_bars, freq="h", tz=tz)
     close = 100.0 + np.cumsum(rng.standard_normal(n_bars) * 0.5)
     close = np.abs(close) + 1.0
-    high = close + rng.uniform(0, 1, n_bars)
-    low = close - rng.uniform(0, 1, n_bars)
+    high_delta = rng.uniform(0, 1, n_bars)
+    low_delta = rng.uniform(0, 1, n_bars)
     open_ = close + rng.uniform(-0.5, 0.5, n_bars)
+    high = np.maximum(open_, close) + high_delta
+    low = np.minimum(open_, close) - low_delta
     volume = rng.uniform(100, 10000, n_bars)
     return pd.DataFrame(
         {"open": open_, "high": high, "low": low, "close": close, "volume": volume},
         index=timestamps,
     )
+
+
+# ---------------------------------------------------------------------------
+# Shared helpers — timestamps
+# ---------------------------------------------------------------------------
+
+
+def make_timestamps(
+    n: int, freq: str = "1h", start: str = "2024-01-01"
+) -> pd.Series:
+    """Create a contiguous timestamp Series of *n* candles."""
+    return pd.Series(pd.date_range(start=start, periods=n, freq=freq))
+
+
+# ---------------------------------------------------------------------------
+# Shared fixtures
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def rng():
+    """Seeded RNG for deterministic test data."""
+    return np.random.default_rng(42)
 
 
 # ---------------------------------------------------------------------------

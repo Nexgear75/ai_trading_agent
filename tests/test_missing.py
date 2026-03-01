@@ -14,15 +14,11 @@ import pandas as pd
 import pytest
 
 from ai_trading.data.missing import compute_valid_mask
+from tests.conftest import make_timestamps as _make_timestamps
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-def _make_timestamps(n: int, freq: str = "1h", start: str = "2024-01-01") -> pd.Series:
-    """Create a contiguous timestamp series of *n* candles."""
-    return pd.Series(pd.date_range(start=start, periods=n, freq=freq))
-
 
 def _make_timestamps_with_gap(
     n: int,
