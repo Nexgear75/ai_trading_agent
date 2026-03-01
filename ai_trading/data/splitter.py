@@ -1,12 +1,14 @@
-"""Walk-forward splitter for rolling cross-validation (WS-4.5).
+"""Walk-forward splitter for rolling cross-validation (WS-4.5, WS-4.6).
 
 Computes fold boundaries in UTC dates and returns index-based splits
-for train / val / test partitions with embargo gap.
+for train / val / test partitions with embargo gap and purge.
 """
+
+from __future__ import annotations
 
 import logging
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import timedelta
 
 import numpy as np
@@ -38,6 +40,70 @@ class FoldInfo:
     n_train: int
     n_val: int
     n_test: int
+
+    # Purge cutoff (set by apply_purge, None before purge)
+    purge_cutoff: pd.Timestamp | None = field(default=None)
+
+
+def apply_purge(
+    fold: FoldInfo,
+    timestamps: pd.DatetimeIndex,
+    horizon_H_bars: int,  # noqa: N803
+    embargo_bars: int,
+    delta: timedelta,
+) -> FoldInfo:
+    """Apply purge to a fold, removing samples whose labels leak into test zone.
+
+    Implements the purge rule from spec §8.2:
+    ``purge_cutoff = test_start - embargo_bars * Δ``
+    A sample *t* is kept in train/val iff ``t + H * Δ <= purge_cutoff``.
+
+    Parameters
+    ----------
+    fold
+        Unpurged fold from :class:`WalkForwardSplitter`.
+    timestamps
+        Full DatetimeIndex of the dataset.
+    horizon_H_bars
+        Label look-ahead horizon in bars (``label.horizon_H_bars``).
+    embargo_bars
+        Embargo gap in bars (``splits.embargo_bars``).
+    delta
+        Candle duration (e.g. ``timedelta(hours=1)``).
+
+    Returns
+    -------
+    FoldInfo
+        New fold with filtered train/val indices and ``purge_cutoff`` set.
+    """
+    purge_cutoff = fold.test_start - embargo_bars * delta
+    max_allowed = purge_cutoff - horizon_H_bars * delta
+
+    # Filter train indices
+    train_ts = timestamps[fold.train_indices]
+    train_keep = train_ts <= max_allowed
+    new_train_indices = fold.train_indices[train_keep]
+
+    # Filter val indices
+    val_ts = timestamps[fold.val_indices]
+    val_keep = val_ts <= max_allowed
+    new_val_indices = fold.val_indices[val_keep]
+
+    return FoldInfo(
+        train_indices=new_train_indices,
+        val_indices=new_val_indices,
+        test_indices=fold.test_indices,
+        train_start=fold.train_start,
+        train_only_end=fold.train_only_end,
+        val_start=fold.val_start,
+        train_val_end=fold.train_val_end,
+        test_start=fold.test_start,
+        test_end=fold.test_end,
+        n_train=len(new_train_indices),
+        n_val=len(new_val_indices),
+        n_test=fold.n_test,
+        purge_cutoff=purge_cutoff,
+    )
 
 
 class WalkForwardSplitter:

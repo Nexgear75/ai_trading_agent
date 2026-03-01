@@ -1,4 +1,4 @@
-"""Tests for the walk-forward splitter (WS-4.5, task #019).
+"""Tests for the walk-forward splitter (WS-4.5, task #019) and embargo/purge (WS-4.6, task #020).
 
 Covers:
 - parse_timeframe helper
@@ -11,6 +11,9 @@ Covers:
 - Zero valid folds → ValueError
 - Logging of fold counters
 - Config-driven parameters
+- Purge cutoff computation and sample filtering (#020)
+- E2E anti-leak verification (#020)
+- Numerical example from plan (#020)
 """
 
 import logging
@@ -578,3 +581,465 @@ class TestFoldInfoStructure:
         assert fold0.n_train == len(fold0.train_indices)
         assert fold0.n_val == len(fold0.val_indices)
         assert fold0.n_test == len(fold0.test_indices)
+
+
+# ===========================================================================
+# Embargo & Purge — Task #020
+# ===========================================================================
+
+
+# ---------------------------------------------------------------------------
+# apply_purge — unit tests
+# ---------------------------------------------------------------------------
+
+
+class TestApplyPurge:
+    """Tests for the apply_purge function (#020)."""
+
+    @pytest.fixture
+    def mvp_timestamps(self):
+        """730 days of hourly data starting 2024-01-01 UTC."""
+        return _make_timestamps("2024-01-01", days=730, freq="1h")
+
+    @pytest.fixture
+    def fold0_unpurged(self, mvp_timestamps):
+        """Fold k=0 from the splitter, before purge."""
+        splitter = WalkForwardSplitter(
+            splits_config=_make_mvp_splits_config(),
+            timeframe="1h",
+        )
+        return splitter.split(mvp_timestamps)[0]
+
+    def test_purge_cutoff_formula(self, fold0_unpurged, mvp_timestamps):
+        """purge_cutoff = test_start - embargo_bars * delta (#020)."""
+        from ai_trading.data.splitter import apply_purge
+
+        delta = timedelta(hours=1)
+        purged = apply_purge(
+            fold=fold0_unpurged,
+            timestamps=mvp_timestamps,
+            horizon_H_bars=4,
+            embargo_bars=4,
+            delta=delta,
+        )
+        expected_cutoff = fold0_unpurged.test_start - 4 * delta
+        assert purged.purge_cutoff == expected_cutoff
+
+    def test_kept_samples_satisfy_formula(self, fold0_unpurged, mvp_timestamps):
+        """All kept train/val samples satisfy t + H*Δ <= purge_cutoff (#020)."""
+        from ai_trading.data.splitter import apply_purge
+
+        delta = timedelta(hours=1)
+        purged = apply_purge(
+            fold=fold0_unpurged,
+            timestamps=mvp_timestamps,
+            horizon_H_bars=4,
+            embargo_bars=4,
+            delta=delta,
+        )
+        all_kept_idx = list(purged.train_indices) + list(purged.val_indices)
+        for idx in all_kept_idx:
+            t = mvp_timestamps[idx]
+            assert t + 4 * delta <= purged.purge_cutoff
+
+    def test_purged_samples_violate_formula(self, fold0_unpurged, mvp_timestamps):
+        """All removed val samples have t + H*Δ > purge_cutoff (#020)."""
+        from ai_trading.data.splitter import apply_purge
+
+        delta = timedelta(hours=1)
+        purged = apply_purge(
+            fold=fold0_unpurged,
+            timestamps=mvp_timestamps,
+            horizon_H_bars=4,
+            embargo_bars=4,
+            delta=delta,
+        )
+        original_val = set(fold0_unpurged.val_indices)
+        kept_val = set(purged.val_indices)
+        removed_val = original_val - kept_val
+        assert len(removed_val) > 0, "Expected some val samples to be purged"
+        for idx in removed_val:
+            t = mvp_timestamps[idx]
+            assert t + 4 * delta > purged.purge_cutoff
+
+    def test_train_samples_unchanged_mvp(self, fold0_unpurged, mvp_timestamps):
+        """With MVP params, no train samples are purged (#020)."""
+        from ai_trading.data.splitter import apply_purge
+
+        delta = timedelta(hours=1)
+        purged = apply_purge(
+            fold=fold0_unpurged,
+            timestamps=mvp_timestamps,
+            horizon_H_bars=4,
+            embargo_bars=4,
+            delta=delta,
+        )
+        assert len(purged.train_indices) == len(fold0_unpurged.train_indices)
+
+    def test_val_samples_purged_count_mvp(self, fold0_unpurged, mvp_timestamps):
+        """With MVP params (H=embargo_bars=4, Δ=1h), exactly 3 val samples purged (#020).
+
+        Plan example: last kept val = 2024-06-28 20:00,
+        purged = 21:00, 22:00, 23:00.
+        """
+        from ai_trading.data.splitter import apply_purge
+
+        delta = timedelta(hours=1)
+        purged = apply_purge(
+            fold=fold0_unpurged,
+            timestamps=mvp_timestamps,
+            horizon_H_bars=4,
+            embargo_bars=4,
+            delta=delta,
+        )
+        n_purged = len(fold0_unpurged.val_indices) - len(purged.val_indices)
+        assert n_purged == 3
+
+    def test_test_indices_unchanged(self, fold0_unpurged, mvp_timestamps):
+        """Purge does not affect test indices (#020)."""
+        from ai_trading.data.splitter import apply_purge
+
+        delta = timedelta(hours=1)
+        purged = apply_purge(
+            fold=fold0_unpurged,
+            timestamps=mvp_timestamps,
+            horizon_H_bars=4,
+            embargo_bars=4,
+            delta=delta,
+        )
+        assert list(purged.test_indices) == list(fold0_unpurged.test_indices)
+
+    def test_counters_updated(self, fold0_unpurged, mvp_timestamps):
+        """n_train and n_val match post-purge index lengths (#020)."""
+        from ai_trading.data.splitter import apply_purge
+
+        delta = timedelta(hours=1)
+        purged = apply_purge(
+            fold=fold0_unpurged,
+            timestamps=mvp_timestamps,
+            horizon_H_bars=4,
+            embargo_bars=4,
+            delta=delta,
+        )
+        assert purged.n_train == len(purged.train_indices)
+        assert purged.n_val == len(purged.val_indices)
+        assert purged.n_test == len(purged.test_indices)
+
+    def test_purge_cutoff_stored_in_fold(self, fold0_unpurged, mvp_timestamps):
+        """Returned FoldInfo has purge_cutoff attribute (#020)."""
+        from ai_trading.data.splitter import apply_purge
+
+        delta = timedelta(hours=1)
+        purged = apply_purge(
+            fold=fold0_unpurged,
+            timestamps=mvp_timestamps,
+            horizon_H_bars=4,
+            embargo_bars=4,
+            delta=delta,
+        )
+        assert hasattr(purged, "purge_cutoff")
+        assert isinstance(purged.purge_cutoff, pd.Timestamp)
+
+
+# ---------------------------------------------------------------------------
+# E2E anti-leak verification
+# ---------------------------------------------------------------------------
+
+
+class TestPurgeE2E:
+    """End-to-end purge verification across all folds (#020)."""
+
+    @pytest.fixture
+    def mvp_timestamps(self):
+        return _make_timestamps("2024-01-01", days=730, freq="1h")
+
+    @pytest.fixture
+    def purged_folds(self, mvp_timestamps):
+        from ai_trading.data.splitter import apply_purge
+
+        delta = timedelta(hours=1)
+        splitter = WalkForwardSplitter(
+            splits_config=_make_mvp_splits_config(),
+            timeframe="1h",
+        )
+        folds = splitter.split(mvp_timestamps)
+        return [
+            apply_purge(f, mvp_timestamps, horizon_H_bars=4, embargo_bars=4, delta=delta)
+            for f in folds
+        ]
+
+    def test_no_label_leaks_into_test(self, purged_folds, mvp_timestamps):
+        """For each fold, max(t + H*Δ for t in train+val) < test_start (#020)."""
+        delta = timedelta(hours=1)
+        for fold in purged_folds:
+            all_tv_idx = list(fold.train_indices) + list(fold.val_indices)
+            if len(all_tv_idx) == 0:
+                continue
+            max_label_reach = max(mvp_timestamps[i] + 4 * delta for i in all_tv_idx)
+            assert max_label_reach < fold.test_start, (
+                f"Label leak: max label reach {max_label_reach} >= "
+                f"test_start {fold.test_start}"
+            )
+
+    def test_embargo_gap_bars(self, purged_folds, mvp_timestamps):
+        """At least embargo_bars candles between last train/val label and test (#020)."""
+        delta = timedelta(hours=1)
+        embargo_bars = 4
+        for fold in purged_folds:
+            all_tv_idx = list(fold.train_indices) + list(fold.val_indices)
+            if len(all_tv_idx) == 0:
+                continue
+            max_label_reach = max(mvp_timestamps[i] + 4 * delta for i in all_tv_idx)
+            gap = fold.test_start - max_label_reach
+            assert gap >= embargo_bars * delta, (
+                f"Gap {gap} < {embargo_bars}*delta={embargo_bars * delta}"
+            )
+
+    def test_no_double_embargo(self, purged_folds):
+        """Gap between train_val_end and test_start = (embargo_bars + 1)*Δ (#020).
+
+        The embargo is applied once by the splitter (WS-4.5). The purge (WS-4.6)
+        removes samples within the embargo zone but does not add extra embargo.
+        """
+        delta = timedelta(hours=1)
+        embargo_bars = 4
+        for fold in purged_folds:
+            gap = fold.test_start - fold.train_val_end
+            expected_gap = (embargo_bars + 1) * delta
+            assert gap == expected_gap, (
+                f"Expected gap {expected_gap}, got {gap}"
+            )
+
+
+# ---------------------------------------------------------------------------
+# Numerical example from the plan
+# ---------------------------------------------------------------------------
+
+
+class TestPurgeNumericalExample:
+    """Verify exact numerical example from the plan (fold k=0) (#020)."""
+
+    @pytest.fixture
+    def mvp_ts(self):
+        return _make_timestamps("2024-01-01", days=730, freq="1h")
+
+    @pytest.fixture
+    def purged_fold0(self, mvp_ts):
+        from ai_trading.data.splitter import apply_purge
+
+        delta = timedelta(hours=1)
+        splitter = WalkForwardSplitter(
+            splits_config=_make_mvp_splits_config(),
+            timeframe="1h",
+        )
+        fold0 = splitter.split(mvp_ts)[0]
+        return apply_purge(fold0, mvp_ts, horizon_H_bars=4, embargo_bars=4, delta=delta)
+
+    def test_purge_cutoff_value(self, purged_fold0):
+        """purge_cutoff = 2024-06-29 00:00 (#020)."""
+        expected = pd.Timestamp("2024-06-29 00:00", tz="UTC")
+        assert purged_fold0.purge_cutoff == expected
+
+    def test_last_kept_val_timestamp(self, purged_fold0, mvp_ts):
+        """Last kept val sample = 2024-06-28 20:00 (#020)."""
+        last_val_ts = mvp_ts[purged_fold0.val_indices[-1]]
+        expected = pd.Timestamp("2024-06-28 20:00", tz="UTC")
+        assert last_val_ts == expected
+
+    def test_purged_val_timestamps(self, purged_fold0, mvp_ts):
+        """Purged val timestamps are 21:00, 22:00, 23:00 on 2024-06-28 (#020)."""
+        splitter = WalkForwardSplitter(
+            splits_config=_make_mvp_splits_config(),
+            timeframe="1h",
+        )
+        original_fold0 = splitter.split(mvp_ts)[0]
+
+        original_val = set(original_fold0.val_indices)
+        kept_val = set(purged_fold0.val_indices)
+        removed_val = sorted(original_val - kept_val)
+        removed_timestamps = [mvp_ts[i] for i in removed_val]
+
+        expected = [
+            pd.Timestamp("2024-06-28 21:00", tz="UTC"),
+            pd.Timestamp("2024-06-28 22:00", tz="UTC"),
+            pd.Timestamp("2024-06-28 23:00", tz="UTC"),
+        ]
+        assert removed_timestamps == expected
+
+
+# ---------------------------------------------------------------------------
+# Edge cases for purge
+# ---------------------------------------------------------------------------
+
+
+class TestPurgeEdgeCases:
+    """Edge cases for purge (#020)."""
+
+    def test_embargo_larger_than_horizon(self):
+        """When embargo_bars=8 > H=4, still 3 val samples purged (#020).
+
+        purge_cutoff = test_start - 8*Δ = train_start + 180d.
+        Condition: t + 4Δ <= purge_cutoff → last kept t = 180d - 4Δ.
+        train_val_end = 180d - Δ → 3 val samples purged.
+        """
+        from ai_trading.data.splitter import apply_purge
+
+        class _Cfg:
+            train_days = 180
+            test_days = 30
+            step_days = 30
+            val_frac_in_train = 0.2
+            embargo_bars = 8
+            min_samples_train = 100
+            min_samples_test = 1
+
+        ts = _make_timestamps("2024-01-01", days=730, freq="1h")
+        delta = timedelta(hours=1)
+        splitter = WalkForwardSplitter(splits_config=_Cfg(), timeframe="1h")
+        fold0 = splitter.split(ts)[0]
+        purged = apply_purge(fold0, ts, horizon_H_bars=4, embargo_bars=8, delta=delta)
+
+        # purge_cutoff = test_start - 8*Δ = train_start + 180d
+        # Same as MVP: t + 4Δ <= train_start + 180d
+        # Still 3 val samples purged (same H=4, same train days)
+        n_purged = len(fold0.val_indices) - len(purged.val_indices)
+        assert n_purged == 3
+
+    def test_larger_horizon_purges_more(self):
+        """When H=8 > embargo_bars=4, more val samples purged (#020)."""
+        from ai_trading.data.splitter import apply_purge
+
+        ts = _make_timestamps("2024-01-01", days=730, freq="1h")
+        delta = timedelta(hours=1)
+        splitter = WalkForwardSplitter(
+            splits_config=_make_mvp_splits_config(),
+            timeframe="1h",
+        )
+        fold0 = splitter.split(ts)[0]
+
+        purged_h4 = apply_purge(fold0, ts, horizon_H_bars=4, embargo_bars=4, delta=delta)
+        purged_h8 = apply_purge(fold0, ts, horizon_H_bars=8, embargo_bars=4, delta=delta)
+
+        n_purged_h4 = len(fold0.val_indices) - len(purged_h4.val_indices)
+        n_purged_h8 = len(fold0.val_indices) - len(purged_h8.val_indices)
+        assert n_purged_h8 > n_purged_h4
+
+    def test_horizon_1_purges_zero_with_embargo_4(self):
+        """With H=1 and embargo_bars=4, no samples are purged (#020).
+
+        purge_cutoff = test_start - 4Δ = train_start + 180d.
+        Condition: t + 1Δ <= train_start + 180d → t <= train_start + 180d - Δ.
+        train_val_end = train_start + 180d - Δ. So last val sample exactly at cutoff.
+        No samples purged.
+        """
+        from ai_trading.data.splitter import apply_purge
+
+        ts = _make_timestamps("2024-01-01", days=730, freq="1h")
+        delta = timedelta(hours=1)
+        splitter = WalkForwardSplitter(
+            splits_config=_make_mvp_splits_config(),
+            timeframe="1h",
+        )
+        fold0 = splitter.split(ts)[0]
+        purged = apply_purge(fold0, ts, horizon_H_bars=1, embargo_bars=4, delta=delta)
+
+        n_purged = len(fold0.val_indices) - len(purged.val_indices)
+        assert n_purged == 0
+
+    def test_purge_with_4h_timeframe(self):
+        """Purge works correctly with 4h timeframe (#020)."""
+        from ai_trading.data.splitter import apply_purge
+
+        class _Cfg:
+            train_days = 180
+            test_days = 30
+            step_days = 30
+            val_frac_in_train = 0.2
+            embargo_bars = 4
+            min_samples_train = 1
+            min_samples_test = 1
+
+        ts = _make_timestamps("2024-01-01", days=730, freq="4h")
+        delta = timedelta(hours=4)
+        splitter = WalkForwardSplitter(splits_config=_Cfg(), timeframe="4h")
+        fold0 = splitter.split(ts)[0]
+        purged = apply_purge(fold0, ts, horizon_H_bars=4, embargo_bars=4, delta=delta)
+
+        # All kept samples must satisfy the formula
+        all_tv_idx = list(purged.train_indices) + list(purged.val_indices)
+        for idx in all_tv_idx:
+            t = ts[idx]
+            assert t + 4 * delta <= purged.purge_cutoff
+
+    def test_purge_empty_fold_raises_no_error(self):
+        """Purge on a fold with empty val doesn't crash (#020).
+
+        Edge: use a fold where val could be zero after purge.
+        """
+        from ai_trading.data.splitter import apply_purge
+
+        # Create a small scenario: val is very small, all purged
+        class _Cfg:
+            train_days = 10
+            test_days = 5
+            step_days = 5
+            val_frac_in_train = 0.2  # floor(10*0.2) = 2 days of val
+            embargo_bars = 4
+            min_samples_train = 1
+            min_samples_test = 1
+
+        ts = _make_timestamps("2024-01-01", days=100, freq="1h")
+        delta = timedelta(hours=1)
+        splitter = WalkForwardSplitter(splits_config=_Cfg(), timeframe="1h")
+        folds = splitter.split(ts)
+        assert len(folds) >= 1
+
+        # Apply purge with H large enough to potentially purge all val
+        # H=48 (2 days) with 2 days val → many val samples purged
+        purged = apply_purge(folds[0], ts, horizon_H_bars=48, embargo_bars=4, delta=delta)
+        # Should not crash; n_val may be 0
+        assert purged.n_val >= 0
+        assert purged.n_train >= 0
+
+
+# ---------------------------------------------------------------------------
+# Config-driven
+# ---------------------------------------------------------------------------
+
+
+class TestPurgeConfigDriven:
+    """embargo_bars and horizon_H_bars from config, not hardcoded (#020)."""
+
+    def test_different_embargo_bars_changes_cutoff(self):
+        """Changing embargo_bars changes purge_cutoff (#020)."""
+        from ai_trading.data.splitter import apply_purge
+
+        ts = _make_timestamps("2024-01-01", days=730, freq="1h")
+        delta = timedelta(hours=1)
+        splitter = WalkForwardSplitter(
+            splits_config=_make_mvp_splits_config(),
+            timeframe="1h",
+        )
+        fold0 = splitter.split(ts)[0]
+
+        purged_e4 = apply_purge(fold0, ts, horizon_H_bars=4, embargo_bars=4, delta=delta)
+        purged_e8 = apply_purge(fold0, ts, horizon_H_bars=4, embargo_bars=8, delta=delta)
+
+        assert purged_e4.purge_cutoff != purged_e8.purge_cutoff
+
+    def test_different_horizon_changes_purge_count(self):
+        """Changing horizon_H_bars changes number of purged samples (#020)."""
+        from ai_trading.data.splitter import apply_purge
+
+        ts = _make_timestamps("2024-01-01", days=730, freq="1h")
+        delta = timedelta(hours=1)
+        splitter = WalkForwardSplitter(
+            splits_config=_make_mvp_splits_config(),
+            timeframe="1h",
+        )
+        fold0 = splitter.split(ts)[0]
+
+        purged_h4 = apply_purge(fold0, ts, horizon_H_bars=4, embargo_bars=4, delta=delta)
+        purged_h2 = apply_purge(fold0, ts, horizon_H_bars=2, embargo_bars=4, delta=delta)
+
+        assert purged_h2.n_val > purged_h4.n_val

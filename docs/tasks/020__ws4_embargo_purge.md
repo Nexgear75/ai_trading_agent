@@ -1,6 +1,6 @@
 # Tâche — Embargo et purge
 
-Statut : TODO
+Statut : DONE
 Ordre : 020
 Workstream : WS-4
 Milestone : M2
@@ -40,28 +40,28 @@ Appliquer la règle de purge exacte de la spec §8.2 :
 - La purge produit le `purge_cutoff` pour chaque fold (stocké dans `FoldInfo`).
 
 ## Critères d'acceptation
-- [ ] Aucun label du train ne dépend d'un prix dans la zone test (vérifié sample par sample).
-- [ ] Gap d'au moins `embargo_bars` bougies entre le dernier label train/val et le premier timestamp test.
-- [ ] Formule respectée : pour tout sample t du train/val, `t + H × Δ <= purge_cutoff`.
-- [ ] **Test E2E** : pour chaque fold, `max(t + H × Δ for t in train_val_samples) < test_start`.
-- [ ] Pas de double embargo : gap entre `train_val_end` et `test_start` = `(embargo_bars + 1) × Δ` (convention bornes inclusives).
-- [ ] `embargo_bars` et `horizon_H_bars` lus depuis la config (pas hardcodés).
-- [ ] Exemple numérique du plan vérifié : avec les paramètres MVP, les ~3 derniers samples de val sont purgés.
-- [ ] Tests couvrent les scénarios nominaux + erreurs + bords.
-- [ ] Suite de tests verte après implémentation.
-- [ ] `ruff check` passe sans erreur.
+- [x] Aucun label du train ne dépend d'un prix dans la zone test (vérifié sample par sample).
+- [x] Gap d'au moins `embargo_bars` bougies entre le dernier label train/val et le premier timestamp test.
+- [x] Formule respectée : pour tout sample t du train/val, `t + H × Δ <= purge_cutoff`.
+- [x] **Test E2E** : pour chaque fold, `max(t + H × Δ for t in train_val_samples) < test_start`.
+- [x] Pas de double embargo : gap entre `train_val_end` et `test_start` = `(embargo_bars + 1) × Δ` (convention bornes inclusives).
+- [x] `embargo_bars` et `horizon_H_bars` lus depuis la config (pas hardcodés).
+- [x] Exemple numérique du plan vérifié : avec les paramètres MVP, exactement 3 derniers samples de val sont purgés.
+- [x] Tests couvrent les scénarios nominaux + erreurs + bords.
+- [x] Suite de tests verte après implémentation.
+- [x] `ruff check` passe sans erreur.
 
 ## Pré-condition de démarrage
 - **Tous les tests existants sont GREEN** avant de commencer.
 - **Créer une branche dédiée** `task/020-embargo-purge` depuis `Max6000i1`.
 
 ## Checklist de fin de tâche
-- [ ] Branche `task/020-embargo-purge` créée depuis `Max6000i1`.
-- [ ] Tests RED écrits avant implémentation.
-- [ ] **Commit RED** : `[WS-4] #020 RED: tests embargo et purge`.
-- [ ] Tests GREEN passants et reproductibles.
-- [ ] Critères d'acceptation tous satisfaits.
-- [ ] `ruff check ai_trading/ tests/` passe sans erreur.
-- [ ] Fichier de tâche mis à jour (statut DONE, critères cochés).
-- [ ] **Commit GREEN** : `[WS-4] #020 GREEN: embargo et purge`.
-- [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-4] #020 — Embargo et purge`.
+- [x] Branche `task/020-embargo-purge` créée depuis `Max6000i1`.
+- [x] Tests RED écrits avant implémentation.
+- [x] **Commit RED** : `[WS-4] #020 RED: tests embargo et purge`.
+- [x] Tests GREEN passants et reproductibles.
+- [x] Critères d'acceptation tous satisfaits.
+- [x] `ruff check ai_trading/ tests/` passe sans erreur.
+- [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
+- [x] **Commit GREEN** : `[WS-4] #020 GREEN: embargo et purge`.
+- [x] **Pull Request ouverte** vers `Max6000i1` : `[WS-4] #020 — Embargo et purge`.
