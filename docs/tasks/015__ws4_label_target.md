@@ -1,6 +1,6 @@
 # Tâche — Calcul de la cible y_t (label)
 
-Statut : TODO
+Statut : DONE
 Ordre : 015
 Workstream : WS-4
 Milestone : M2
@@ -39,28 +39,28 @@ Le choix est piloté par `config.label.target_type`. Les samples dont `t+1` ou `
 - Supporter les deux `target_type` via un branchement explicite.
 
 ## Critères d'acceptation
-- [ ] Valeurs numériques correctes pour `log_return_trade` sur données synthétiques.
-- [ ] Valeurs numériques correctes pour `log_return_close_to_close` sur données synthétiques.
-- [ ] Changement de `target_type` → valeurs différentes sur les mêmes données.
-- [ ] Sample invalidé si trou à `t+1` ou `t+H`.
-- [ ] `target_type` inconnu → `ValueError`.
-- [ ] `horizon_H_bars` et `target_type` lus depuis la config (pas hardcodés).
-- [ ] Anti-fuite (label) : masquer les prix `t > t+H` → `y_t` identique.
-- [ ] Tests couvrent les scénarios nominaux + erreurs + bords.
-- [ ] Suite de tests verte après implémentation.
-- [ ] `ruff check` passe sans erreur.
+- [x] Valeurs numériques correctes pour `log_return_trade` sur données synthétiques.
+- [x] Valeurs numériques correctes pour `log_return_close_to_close` sur données synthétiques.
+- [x] Changement de `target_type` → valeurs différentes sur les mêmes données.
+- [x] Sample invalidé si trou à `t+1` ou `t+H`.
+- [x] `target_type` inconnu → `ValueError`.
+- [x] `horizon_H_bars` et `target_type` lus depuis la config (pas hardcodés).
+- [x] Anti-fuite (label) : masquer les prix `t > t+H` → `y_t` identique.
+- [x] Tests couvrent les scénarios nominaux + erreurs + bords.
+- [x] Suite de tests verte après implémentation.
+- [x] `ruff check` passe sans erreur.
 
 ## Pré-condition de démarrage
 - **Tous les tests existants sont GREEN** avant de commencer.
 - **Créer une branche dédiée** `task/015-label-target` depuis `Max6000i1`.
 
 ## Checklist de fin de tâche
-- [ ] Branche `task/015-label-target` créée depuis `Max6000i1`.
-- [ ] Tests RED écrits avant implémentation.
-- [ ] **Commit RED** : `[WS-4] #015 RED: tests calcul label y_t`.
-- [ ] Tests GREEN passants et reproductibles.
-- [ ] Critères d'acceptation tous satisfaits.
-- [ ] `ruff check ai_trading/ tests/` passe sans erreur.
-- [ ] Fichier de tâche mis à jour (statut DONE, critères cochés).
-- [ ] **Commit GREEN** : `[WS-4] #015 GREEN: calcul label y_t`.
+- [x] Branche `task/015-label-target` créée depuis `Max6000i1`.
+- [x] Tests RED écrits avant implémentation.
+- [x] **Commit RED** : `[WS-4] #015 RED: tests calcul label y_t`.
+- [x] Tests GREEN passants et reproductibles.
+- [x] Critères d'acceptation tous satisfaits.
+- [x] `ruff check ai_trading/ tests/` passe sans erreur.
+- [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
+- [x] **Commit GREEN** : `[WS-4] #015 GREEN: calcul label y_t`.
 - [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-4] #015 — Calcul de la cible y_t`.
