@@ -10,3 +10,7 @@ from ai_trading.features import log_returns as _log_returns  # noqa: F401
 from ai_trading.features import rsi as _rsi  # noqa: F401
 from ai_trading.features import volatility as _volatility  # noqa: F401
 from ai_trading.features import volume as _volume  # noqa: F401
+from ai_trading.features.pipeline import compute_features, resolve_features
+from ai_trading.features.registry import FEATURE_REGISTRY
+
+__all__ = ["FEATURE_REGISTRY", "compute_features", "resolve_features"]

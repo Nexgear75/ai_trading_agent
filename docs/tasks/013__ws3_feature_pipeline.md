@@ -1,6 +1,6 @@
 # Tâche — Feature pipeline (assemblage et orchestration)
 
-Statut : TODO
+Statut : DONE
 Ordre : 013
 Workstream : WS-3
 Milestone : M2
@@ -44,28 +44,28 @@ Dépendances :
   - Exposer `compute_features` et `FEATURE_REGISTRY`.
 
 ## Critères d'acceptation
-- [ ] `compute_features(ohlcv, config)` produit un DataFrame de shape `(N_total, F=9)` avec les bonnes colonnes.
-- [ ] `feature_version` est lu depuis la config et tracé.
-- [ ] Le registre contient exactement les 9 features MVP après import du package `ai_trading.features`.
-- [ ] Feature inconnue dans `feature_list` → `ValueError` avec nom de la feature manquante.
-- [ ] Paramètre requis absent dans `config.features.params` → `ValueError` avec nom du paramètre.
-- [ ] Registre vide (pas d'import des modules) → erreur explicite.
-- [ ] Ordre des colonnes correspond à l'ordre de `feature_list`.
-- [ ] Tests couvrent les scénarios nominaux + erreurs + bords.
-- [ ] Suite de tests verte après implémentation.
-- [ ] `ruff check` passe sans erreur.
+- [x] `compute_features(ohlcv, config)` produit un DataFrame de shape `(N_total, F=9)` avec les bonnes colonnes.
+- [x] `feature_version` est lu depuis la config et tracé.
+- [x] Le registre contient exactement les 9 features MVP après import du package `ai_trading.features`.
+- [x] Feature inconnue dans `feature_list` → `ValueError` avec nom de la feature manquante.
+- [x] Paramètre requis absent dans `config.features.params` → `ValueError` avec nom du paramètre.
+- [x] Registre vide (pas d'import des modules) → erreur explicite.
+- [x] Ordre des colonnes correspond à l'ordre de `feature_list`.
+- [x] Tests couvrent les scénarios nominaux + erreurs + bords.
+- [x] Suite de tests verte après implémentation.
+- [x] `ruff check` passe sans erreur.
 
 ## Pré-condition de démarrage
 - **Tous les tests existants sont GREEN** avant de commencer.
 - **Créer une branche dédiée** `task/013-feature-pipeline` depuis `Max6000i1`.
 
 ## Checklist de fin de tâche
-- [ ] Branche `task/013-feature-pipeline` créée depuis `Max6000i1`.
-- [ ] Tests RED écrits avant implémentation.
-- [ ] **Commit RED** : `[WS-3] #013 RED: tests feature pipeline`.
-- [ ] Tests GREEN passants et reproductibles.
-- [ ] Critères d'acceptation tous satisfaits.
-- [ ] `ruff check ai_trading/ tests/` passe sans erreur.
-- [ ] Fichier de tâche mis à jour (statut DONE, critères cochés).
-- [ ] **Commit GREEN** : `[WS-3] #013 GREEN: feature pipeline`.
-- [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-3] #013 — Feature pipeline`.
+- [x] Branche `task/013-feature-pipeline` créée depuis `Max6000i1`.
+- [x] Tests RED écrits avant implémentation.
+- [x] **Commit RED** : `[WS-3] #013 RED: tests feature pipeline`.
+- [x] Tests GREEN passants et reproductibles.
+- [x] Critères d'acceptation tous satisfaits.
+- [x] `ruff check ai_trading/ tests/` passe sans erreur.
+- [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
+- [x] **Commit GREEN** : `[WS-3] #013 GREEN: feature pipeline`.
+- [x] **Pull Request ouverte** vers `Max6000i1` : `[WS-3] #013 — Feature pipeline`.
