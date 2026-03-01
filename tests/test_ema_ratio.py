@@ -152,8 +152,8 @@ class TestNumerical:
 
     def test_hand_computed_small_series(self, ema_instance, default_params):
         """Verify EMA ratio against hand-computed reference on a known series."""
-        np.random.seed(42)
-        close_values = list(100.0 + np.cumsum(np.random.randn(40) * 0.5))
+        rng = np.random.default_rng(42)
+        close_values = list(100.0 + np.cumsum(rng.standard_normal(40) * 0.5))
         ohlcv = _make_ohlcv(close_values)
 
         result = ema_instance.compute(ohlcv, default_params)
@@ -353,8 +353,8 @@ class TestCausality:
 
     def test_future_modification_no_effect(self, ema_instance, default_params):
         """Changing close prices after T doesn't affect ema_ratio at or before T."""
-        np.random.seed(123)
-        close_values = list(100.0 + np.cumsum(np.random.randn(60) * 0.5))
+        rng = np.random.default_rng(123)
+        close_values = list(100.0 + np.cumsum(rng.standard_normal(60) * 0.5))
         ohlcv_original = _make_ohlcv(close_values)
 
         result_original = ema_instance.compute(ohlcv_original, default_params)
@@ -453,16 +453,41 @@ class TestEdgeCases:
         valid = result.dropna()
         np.testing.assert_allclose(valid.to_numpy(), 0.0, atol=1e-14)
 
+    def test_min_fast_min_slow(self, ema_instance):
+        """ema_fast=1, ema_slow=1: ratio=0 everywhere, 0 NaN."""
+        close_values = [10.0, 20.0, 30.0, 25.0]
+        ohlcv = _make_ohlcv(close_values)
+        result = ema_instance.compute(ohlcv, {"ema_fast": 1, "ema_slow": 1})
+
+        assert not result.isna().any(), "No NaN expected when fast=slow=1"
+        np.testing.assert_allclose(result.to_numpy(), 0.0, atol=1e-14)
+
     def test_fast_greater_than_slow_raises(self, ema_instance):
         """ema_fast > ema_slow should raise ValueError."""
         ohlcv = _make_ohlcv([100.0] * 30)
         with pytest.raises(ValueError):
             ema_instance.compute(ohlcv, {"ema_fast": 30, "ema_slow": 10})
 
-    def test_zero_period_raises(self, ema_instance):
-        """ema_fast or ema_slow <= 0 should raise ValueError."""
+    def test_zero_fast_raises(self, ema_instance):
+        """ema_fast == 0 should raise ValueError."""
         ohlcv = _make_ohlcv([100.0] * 30)
         with pytest.raises(ValueError):
             ema_instance.compute(ohlcv, {"ema_fast": 0, "ema_slow": 26})
+
+    def test_zero_slow_raises(self, ema_instance):
+        """ema_slow == 0 should raise ValueError."""
+        ohlcv = _make_ohlcv([100.0] * 30)
         with pytest.raises(ValueError):
             ema_instance.compute(ohlcv, {"ema_fast": 12, "ema_slow": 0})
+
+    def test_negative_fast_raises(self, ema_instance):
+        """ema_fast < 0 should raise ValueError."""
+        ohlcv = _make_ohlcv([100.0] * 30)
+        with pytest.raises(ValueError):
+            ema_instance.compute(ohlcv, {"ema_fast": -1, "ema_slow": 26})
+
+    def test_negative_slow_raises(self, ema_instance):
+        """ema_slow < 0 should raise ValueError."""
+        ohlcv = _make_ohlcv([100.0] * 30)
+        with pytest.raises(ValueError):
+            ema_instance.compute(ohlcv, {"ema_fast": 12, "ema_slow": -5})

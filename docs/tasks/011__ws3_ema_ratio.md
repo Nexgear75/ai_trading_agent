@@ -33,7 +33,7 @@ Implémenter la feature `ema_ratio_12_26` :
 ## Évolutions proposées
 - Créer `ai_trading/features/ema.py` avec une classe `EmaRatio1226` décorée `@register_feature("ema_ratio_12_26")`.
 - `required_params = ["ema_fast", "ema_slow"]`.
-- `min_periods` retourne `ema_slow` (26) car l'EMA lente nécessite le plus de données.
+- `min_periods` retourne `ema_slow - 1` (25) car l'EMA lente produit sa première valeur à l'index `ema_slow - 1`.
 - L'EMA est calculée via `pd.Series.ewm(span=n, adjust=False)` ou implémentation manuelle avec initialisation SMA.
 
 ## Critères d'acceptation
@@ -41,7 +41,7 @@ Implémenter la feature `ema_ratio_12_26` :
 - [x] Tests numériques avec valeurs calculées à la main.
 - [x] Convergence vérifiée : série constante → ratio = 0 (tolérance `atol=1e-10`).
 - [x] `ema_fast` et `ema_slow` lus depuis params (pas hardcodés).
-- [x] NaN aux positions t < ema_slow (avant que l'EMA lente soit initialisée).
+- [x] NaN aux positions t < ema_slow - 1 (premier non-NaN à l'index `ema_slow - 1`).
 - [x] Causalité vérifiée : modifier `close[t > T]` ne modifie pas `ema_ratio[t <= T]`.
 - [x] Tests couvrent les scénarios nominaux + erreurs + bords.
 - [x] Suite de tests verte après implémentation.
