@@ -12,14 +12,11 @@ Covers:
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import numpy as np
 import pandas as pd
 import pytest
 
 from ai_trading.models.base import MODEL_REGISTRY, BaseModel, get_model_class
-
 
 # ---------------------------------------------------------------------------
 # Registry cleanup fixture
@@ -54,6 +51,8 @@ def _import_no_trade():
 
     import ai_trading.baselines.no_trade as mod
 
+    # Ensure key is absent before reload (reload re-executes @register_model)
+    MODEL_REGISTRY.pop("no_trade", None)
     importlib.reload(mod)
     return mod.NoTradeBaseline
 
