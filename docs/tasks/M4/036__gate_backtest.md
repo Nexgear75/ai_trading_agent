@@ -58,4 +58,4 @@ Dépendances :
 - [x] `ruff check ai_trading/ tests/` passe sans erreur.
 - [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
 - [x] **Commit GREEN** : `[WS-8] #036 GREEN: <résumé>`.
-- [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-8] #036 — Validation du gate G-Backtest`.
+- [x] **Pull Request ouverte** vers `Max6000i1` : `[WS-8] #036 — Validation du gate G-Backtest`.
