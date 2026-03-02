@@ -24,22 +24,35 @@ Effectuer une revue systématique et exigeante d'une Pull Request (ou d'une bran
 
 Tu dois :
 - auditer **tous les fichiers modifiés** de la PR/branche par rapport à `Max6000i1` ;
-- vérifier la conformité avec chaque règle du projet (voir grille ci-dessous) ;
-- produire un **rapport de revue structuré** avec verdict global ;
+- **lire le diff ligne par ligne** pour chaque fichier source modifié ;
+- **exécuter des scans automatisés** (grep) pour prouver factuellement chaque vérification ;
+- vérifier la conformité avec chaque règle du projet ;
+- produire un **rapport de revue structuré** avec verdict global et **annotations inline par fichier** ;
 - ne jamais approuver une PR qui viole une règle non négociable.
+
+> **Principe fondamental** : chaque `✅` du rapport DOIT être accompagné d'une **preuve d'exécution** (output grep, résultat pytest, diff lu). Un `✅` sans preuve = non vérifié = `❌`.
 
 ## Workflow de revue
 
-### 1. Identifier le périmètre
+Le workflow est organisé en deux phases. **Phase A** (compliance rapide) valide le processus TDD. Si elle échoue → REJECT immédiat sans passer à la Phase B. **Phase B** (code review adversariale) représente **80% du temps de la revue** et analyse le code en profondeur.
+
+---
+
+## PHASE A — Compliance rapide
+
+> But : valider le processus TDD, la tâche et le CI. Blocage ici = REJECT immédiat.
+
+### A1. Identifier le périmètre
 
 - Déterminer la branche source (`task/NNN-short-slug`).
 - Identifier la tâche associée dans `docs/tasks/<milestone>/NNN__slug.md`.
 - Lister les fichiers modifiés vs `Max6000i1` :
+  ```bash
+  git diff --name-only Max6000i1...HEAD
   ```
-  git diff --name-only Max6000i1...task/NNN-short-slug
-  ```
+- Capturer le nombre de fichiers source (`ai_trading/`), de tests (`tests/`), et de docs.
 
-### 2. Vérifier la structure de branche et commits
+### A2. Vérifier la structure de branche et commits
 
 - [ ] La branche suit la convention `task/NNN-short-slug`.
 - [ ] Il existe un commit RED au format `[WS-X] #NNN RED: <résumé>`.
@@ -48,7 +61,7 @@ Tu dois :
 - [ ] Le commit GREEN contient l'implémentation + mise à jour de la tâche.
 - [ ] Pas de commits parasites entre RED et GREEN (sauf refactoring mineur).
 
-### 3. Vérifier la tâche associée
+### A3. Vérifier la tâche associée
 
 - [ ] Le fichier `docs/tasks/<milestone>/NNN__slug.md` est modifié dans la PR.
 - [ ] `Statut` est passé à `DONE`.
@@ -56,71 +69,174 @@ Tu dois :
 - [ ] Toute la checklist de fin de tâche est cochée `[x]`.
 - [ ] Les critères cochés correspondent à des preuves vérifiables (code, tests, artefacts).
 
-### 4. Vérifier les tests
+### A4. Exécuter la suite de validation
+
+```bash
+pytest tests/ -v --tb=short
+ruff check ai_trading/ tests/
+```
+
+- [ ] **pytest GREEN** : NNN passed, 0 failed (noter le nombre exact).
+- [ ] **ruff clean** : 0 erreur.
+
+> Si pytest RED ou ruff erreurs → **REJECT** immédiat. Ne pas continuer en Phase B.
+
+---
+
+## PHASE B — Code review adversariale
+
+> But : analyse du code en profondeur (bugs, edge cases, anti-patterns, logique métier).
+> Cette phase représente **80% du temps** de la revue.
+
+### B1. Scan automatisé obligatoire (GREP)
+
+**Exécuter TOUTES les commandes ci-dessous** sur les fichiers modifiés et documenter les résultats dans le rapport. Aucun raccourci : même si « ça a l'air OK », exécuter le grep et noter le résultat.
+
+```bash
+# Fichiers modifiés (source + tests)
+CHANGED=$(git diff --name-only Max6000i1...HEAD | grep '\.py$')
+CHANGED_SRC=$(echo "$CHANGED" | grep '^ai_trading/')
+CHANGED_TEST=$(echo "$CHANGED" | grep '^tests/')
+
+# --- Anti-patterns code source ---
+# Fallbacks silencieux
+grep -n ' or \[\]\| or {}\| or ""\| or 0\b\| if .* else ' $CHANGED_SRC
+
+# Except trop large
+grep -n 'except:$\|except Exception:' $CHANGED_SRC
+
+# Print résiduel
+grep -n 'print(' $CHANGED_SRC
+
+# Shift négatif (look-ahead)
+grep -n '\.shift(-' $CHANGED_SRC
+
+# Legacy random API
+grep -n 'np\.random\.seed\|np\.random\.randn\|np\.random\.RandomState\|random\.seed' $CHANGED
+
+# TODO/FIXME orphelins
+grep -n 'TODO\|FIXME\|HACK\|XXX' $CHANGED
+
+# --- Anti-patterns tests ---
+# Chemins hardcodés OS-spécifiques
+grep -n '/tmp\|/var/tmp\|C:\\' $CHANGED_TEST
+
+# Imports absolus dans __init__.py
+grep -n 'from ai_trading\.' $(echo "$CHANGED" | grep '__init__.py')
+
+# Tests de registre : registration manuelle au lieu de importlib.reload
+grep -n 'register_model\|register_feature' $CHANGED_TEST
+
+# Mutable default arguments
+grep -n 'def .*=\[\]\|def .*={}' $CHANGED
+
+# open() sans context manager
+grep -n '\.read_text\|open(' $CHANGED_SRC
+```
+
+**Pour chaque match** : analyser en contexte (lire les lignes autour) et classer :
+- **BLOQUANT** si c'est un vrai problème
+- **WARNING** si risque potentiel
+- **Faux positif** si le pattern est utilisé correctement (noter dans le rapport)
+
+**Si aucun match** pour un pattern → noter « 0 occurrences (grep exécuté) » dans le rapport comme preuve d'exécution.
+
+### B2. Lecture du diff ligne par ligne (OBLIGATOIRE)
+
+Pour **CHAQUE fichier source modifié** (pas les docs/tâches), lire le diff complet :
+
+```bash
+git diff Max6000i1...HEAD -- <fichier>
+```
+
+Pour chaque hunk de diff, appliquer cette grille de lecture :
+
+1. **Type safety** : les valeurs lues depuis l'extérieur (JSON, YAML, fichiers, args) sont-elles validées en type ? Une valeur lue depuis un `json.loads()` ou `yaml.safe_load()` sans vérification de type est un **WARNING**.
+2. **Edge cases** : que se passe-t-il si l'entrée est `None`, vide, du mauvais type, très grande ?
+3. **Path handling** : si un paramètre `path` est manipulé, supporte-t-il tous les cas documentés par le contrat (directory ET fichier) ? Crée-t-il les parents si nécessaire ?
+4. **Return contract** : le type de retour est-il garanti en toute circonstance (shape, dtype, clés dict) ?
+5. **Resource cleanup** : fichiers ouverts, connections — sont-ils fermés en cas d'erreur ?
+6. **Cohérence doc/code** : la docstring correspond-elle au comportement réel ?
+
+Documenter **chaque observation** dans la section « Annotations par fichier » du rapport. Si un fichier n'a aucune observation, noter « RAS après lecture complète du diff (N lignes) ».
+
+### B3. Vérifier les tests
 
 - [ ] Les tests dans `tests/` suivent la convention du plan (`test_config.py`, `test_features.py`, `test_splitter.py`, etc.). L'ID tâche `#NNN` dans les docstrings, pas les noms de fichiers.
 - [ ] Chaque critère d'acceptation est couvert par au moins un test.
 - [ ] Les tests couvrent : cas nominaux, cas d'erreur, cas de bords.
 - [ ] **Boundary fuzzing mental** : pour chaque paramètre numérique d'entrée (`n`, `L`, `H`, taille, etc.), vérifier qu'il existe un test pour chacune de ces situations : `param = 0`, `param = 1`, `param > n` (dépassement), `param = n` (limite exacte). Si une combinaison critique manque, la signaler comme bloquante.
-- [ ] Exécuter `pytest` → **tous les tests GREEN**, 0 échec, 0 erreur.
-- [ ] Exécuter `ruff check ai_trading/ tests/` → 0 erreur.
 - [ ] Pas de test désactivé (`@pytest.mark.skip`, `xfail`) sans justification explicite.
 - [ ] Les tests sont déterministes (seeds fixées si aléatoire).
 - [ ] Les tests utilisent des données synthétiques (pas de dépendance réseau).
-- [ ] **Portabilité des chemins** : pas de chemin OS-spécifique hardcodé (`/tmp/...`). Tous les chemins temporaires utilisent la fixture pytest `tmp_path`.
-- [ ] **Tests de registre réalistes** : si un test vérifie l'enregistrement automatique dans un registre via décorateur, il doit utiliser `importlib.reload(module)` après nettoyage du registre — pas un appel manuel à `register_xxx()`. Comparer avec `mod.ClassName` (module rechargé).
+- [ ] **Portabilité des chemins** (prouvé par scan B1) : pas de chemin OS-spécifique hardcodé (`/tmp/...`). Tous les chemins temporaires utilisent la fixture pytest `tmp_path`.
+- [ ] **Tests de registre réalistes** (prouvé par scan B1) : si un test vérifie l'enregistrement automatique dans un registre via décorateur, il doit utiliser `importlib.reload(module)` après nettoyage du registre — pas un appel manuel à `register_xxx()`. Comparer avec `mod.ClassName` (module rechargé).
 - [ ] **Contrat ABC complètement testé** : si une méthode abstraite documente qu'elle accepte plusieurs types d'entrée (ex : `path` = directory ou fichier), les tests couvrent chaque variante.
 
-### 5. Audit du code — Règles non négociables
+### B4. Audit du code — Règles non négociables
 
-#### 5a. Strict code (no fallbacks)
-- [ ] Aucun fallback silencieux (`or default`, `value if value else default`).
-- [ ] Aucun `except` trop large qui continue l'exécution.
+#### B4a. Strict code (no fallbacks)
+- [ ] Aucun fallback silencieux (prouvé par scan B1).
+- [ ] Aucun `except` trop large qui continue l'exécution (prouvé par scan B1).
 - [ ] Aucun paramètre optionnel avec default implicite masquant une erreur.
 - [ ] Validation explicite aux frontières (entrées utilisateur, données externes).
 - [ ] Erreur explicite (`raise`) en cas d'entrée invalide ou manquante.
 
-#### 5a-bis. Revue défensive indexing / slicing
+#### B4a-bis. Revue défensive indexing / slicing
 - [ ] Pour tout `array[expr:]` ou `array[:expr]` : vérifier manuellement le comportement quand `expr` est **négatif**, **zéro**, ou **> len(array)**. En Python/NumPy, `array[-k:]` ne fait **pas** `array[0:]` — c'est un piège silencieux.
 - [ ] Pour tout `range(a, b)` ou `mask[lo : hi + 1]` : vérifier que `lo` et `hi` sont clampés (`max(0, ...)`, `min(n-1, ...)`) pour toutes les valeurs extrêmes des paramètres d'entrée.
 - [ ] Si un paramètre numérique peut dépasser la taille des données (ex. `H > N`), vérifier que le code produit un résultat correct (tout False, raise, etc.) et non un comportement silencieusement faux.
 
-#### 5b. Config-driven (pas de hardcoding)
+#### B4b. Config-driven (pas de hardcoding)
 - [ ] Tout paramètre modifiable est lu depuis `configs/default.yaml` via l'objet config Pydantic v2.
 - [ ] Aucune valeur magique ou constante significative hardcodée dans le code.
 - [ ] Les formules respectent celles de la spec (§6 features, §5 labels, §8 splits, §12 backtest).
 - [ ] Tout choix implementation-defined est explicite dans la config YAML.
 
-#### 5c. Anti-fuite (look-ahead)
+#### B4c. Anti-fuite (look-ahead)
 - [ ] Aucun accès à des données futures (point-in-time respecté).
 - [ ] Embargo respecté : `embargo_bars >= label.horizon_H_bars` (§8.2).
-- [ ] Pas de `.shift(-n)` ou équivalent sans justification temporelle correcte.
+- [ ] Pas de `.shift(-n)` (prouvé par scan B1) ou équivalent sans justification temporelle correcte.
 - [ ] Scaler fit sur train uniquement (pas de données val/test dans fit).
 - [ ] Splits walk-forward séquentiels (train < val < test).
 - [ ] θ calibré uniquement sur val, jamais sur test.
 - [ ] Features causales : backward-looking uniquement.
 
-#### 5d. Reproductibilité
+#### B4d. Reproductibilité
 - [ ] Seeds fixées et tracées via `utils/seed.py`.
+- [ ] Pas de legacy random API (prouvé par scan B1).
 - [ ] Hashes SHA-256 (données, config) si applicable.
 - [ ] Résultats reproductibles sur relance (test de déterminisme si pertinent).
 
-#### 5e. Float conventions
+#### B4e. Float conventions
 - [ ] Float32 pour tenseurs X_seq et y (mémoire).
 - [ ] Float64 pour calculs de métriques (précision).
 
-### 6. Qualité du code
+#### B4f. Anti-patterns Python / numpy / pandas
+
+Vérifier l'absence de ces anti-patterns courants dans les fichiers modifiés :
+
+- [ ] **Mutable default arguments** : pas de `def f(x=[])` ni `def f(x={})` (prouvé par scan B1).
+- [ ] **Données désérialisées non validées** : après `json.loads()`, `yaml.safe_load()` ou lecture de fichier, les valeurs sont validées en type (`isinstance`) avant utilisation. Un `data["key"]` utilisé directement sans vérification de type est un **WARNING**.
+- [ ] **Path incomplet** : si un paramètre `path` est documenté comme acceptant directory OU fichier, l'implémentation gère les deux cas. Un `path.write_text()` sans vérifier `path.is_dir()` est un bug potentiel.
+- [ ] **open() sans context manager** : tout `open()` utilise `with`. Les raccourcis `Path.read_text()` / `Path.write_text()` sont acceptés.
+- [ ] **Comparaison float avec ==** : pas de `==` sur des floats numpy. Utiliser `np.isclose`, `np.testing.assert_allclose`, ou `pytest.approx`.
+- [ ] **`.values` perdant l'index** : pas de `.values` implicite sur un DataFrame/Series pandas sans raison documentée.
+- [ ] **f-string ou format** : pas de `str + str` dans les messages d'erreur — utiliser f-string.
+- [ ] **Side-effects dans les paramètres par défaut** : pas de `datetime.now()`, `time.time()`, ou appel de fonction dans les valeurs par défaut de paramètres.
+
+### B5. Qualité du code
 
 - [ ] Nommage snake_case cohérent.
-- [ ] Pas de code mort, commenté ou TODO orphelin.
-- [ ] Pas de `print()` de debug restant (utiliser `logging` si nécessaire).
+- [ ] Pas de code mort, commenté ou TODO orphelin (prouvé par scan B1).
+- [ ] Pas de `print()` de debug restant (prouvé par scan B1).
 - [ ] Imports propres (pas d'imports inutilisés, pas d'imports `*`).
-- [ ] **Imports intra-package relatifs** : les `__init__.py` qui importent des sous-modules pour side-effect (peuplement de registres) doivent utiliser des imports relatifs (`from . import module`), jamais des imports absolus auto-référençants (`from ai_trading.package import module`).
+- [ ] **Imports intra-package relatifs** (prouvé par scan B1) : les `__init__.py` qui importent des sous-modules pour side-effect (peuplement de registres) doivent utiliser des imports relatifs (`from . import module`), jamais des imports absolus auto-référençants (`from ai_trading.package import module`).
 - [ ] Pas de fichiers générés ou temporaires inclus dans la PR.
 - [ ] `.gitignore` couvre les artefacts générés.
 - [ ] **DRY — pas de duplication de constantes/mappings** entre modules du même package. Si un dict, une constante ou un mapping est identique dans 2+ fichiers, exiger l'extraction vers un module partagé. Classer comme **bloquant** (risque de drift silencieux).
 
-### 6-bis. Bonnes pratiques métier (concepts de domaine)
+### B5-bis. Bonnes pratiques métier (concepts de domaine)
 
 - [ ] **Exactitude des concepts financiers** : les indicateurs techniques (RSI, EMA, volatilité, log-returns, etc.) sont implémentés conformément à leur définition canonique (formules standard de référence). Toute déviation par rapport à la formule standard doit être justifiée et documentée.
 - [ ] **Nommage métier cohérent** : les noms de variables, fonctions et classes reflètent fidèlement les concepts financiers qu'ils modélisent (ex. `log_return` et non `lr`, `equity_curve` et non `curve`). Pas d'abréviation ambiguë.
@@ -129,14 +245,14 @@ Tu dois :
 - [ ] **Cohérence des unités et échelles** : les grandeurs sont manipulées avec des unités cohérentes (returns en log vs arithmétique, prix en quote currency, timestamps en UTC). Pas de mélange implicite d'échelles.
 - [ ] **Patterns de calcul financier** : utilisation des bonnes pratiques pour les calculs numériques financiers (ex. `np.log` au lieu de `math.log` sur des Series, rolling windows via pandas natif, éviter les boucles Python sur les séries temporelles).
 
-### 7. Cohérence avec les specs
+### B6. Cohérence avec les specs
 
 - [ ] Le code est conforme à la spec v1.0 (sections référencées dans la tâche).
 - [ ] Le code est conforme au plan d'implémentation.
 - [ ] Pas d'exigence inventée hors des documents source.
 - [ ] **Formules doc vs code** : si la tâche ou un critère d'acceptation contient une formule mathématique (intervalles, bornes, indices), vérifier qu'elle correspond **exactement** à l'implémentation et aux tests. Un off-by-one entre la doc et le code est **bloquant** (ambiguïté potentiellement masquant un bug).
 
-### 8. Cohérence intermodule
+### B7. Cohérence intermodule
 
 Vérifier que les changements de la PR ne créent pas de divergence avec les modules existants.
 
@@ -164,53 +280,108 @@ Date : YYYY-MM-DD
 ## Résumé
 [2-3 phrases résumant les changements et le verdict]
 
-## Structure branche & commits
-| Critère | Verdict |
-|---|---|
-| Convention de branche | ✅/❌ |
-| Commit RED présent | ✅/❌ |
-| Commit GREEN présent | ✅/❌ |
-| Pas de commits parasites | ✅/❌ |
+---
 
-## Tâche
+## Phase A — Compliance
+
+### Structure branche & commits
+| Critère | Verdict | Preuve |
+|---|---|---|
+| Convention de branche | ✅/❌ | `git branch` output |
+| Commit RED présent | ✅/❌ | hash + `git show --stat` |
+| Commit GREEN présent | ✅/❌ | hash + `git show --stat` |
+| Pas de commits parasites | ✅/❌ | `git log --oneline` output |
+
+### Tâche
 | Critère | Verdict |
 |---|---|
 | Statut DONE | ✅/❌ |
-| Critères d'acceptation cochés | ✅/❌ |
-| Checklist cochée | ✅/❌ |
+| Critères d'acceptation cochés | ✅/❌ (N/N) |
+| Checklist cochée | ✅/❌ (N/N) |
 
-## Tests
-| Critère | Verdict |
+### CI
+| Check | Résultat |
 |---|---|
-| Couverture des critères | ✅/❌ |
-| Cas nominaux + erreurs + bords | ✅/❌ |
-| Tous GREEN | ✅/❌ |
-| Déterministes | ✅/❌ |
-| ruff clean | ✅/❌ |
+| `pytest tests/ -v --tb=short` | **NNN passed**, 0 failed |
+| `ruff check ai_trading/ tests/` | **All checks passed** / N erreurs |
 
-## Code — Règles non négociables
-| Règle | Verdict | Commentaire |
+---
+
+## Phase B — Code Review
+
+### Résultats du scan automatisé (B1)
+
+| Pattern recherché | Commande | Résultat |
 |---|---|---|
-| Strict code (no fallbacks) | ✅/❌ | |
+| Fallbacks silencieux | `grep 'or []\|or {}...'` | 0 occurrences / N matches (détail ci-dessous) |
+| Except trop large | `grep 'except:$...'` | 0 occurrences |
+| Print résiduel | `grep 'print('` | 0 occurrences |
+| Shift négatif | `grep '.shift(-'` | 0 occurrences |
+| Legacy random API | `grep 'np.random.seed...'` | 0 occurrences |
+| TODO/FIXME orphelins | `grep 'TODO\|FIXME...'` | 0 occurrences |
+| Chemins hardcodés | `grep '/tmp\|C:\\'` | 0 occurrences |
+| Imports absolus __init__ | `grep 'from ai_trading\.'` | 0 occurrences |
+| Registration manuelle tests | `grep 'register_model...'` | 0 occurrences / à analyser |
+| Mutable defaults | `grep 'def.*=[]\|def.*={}'` | 0 occurrences |
+
+> Chaque ligne DOIT montrer le résultat réel de la commande.
+
+### Annotations par fichier (B2)
+
+#### `ai_trading/<module>.py`
+
+- **L<N>** `<extrait de code>` : <observation>.
+  Sévérité : BLOQUANT / WARNING / MINEUR / RAS
+  Suggestion : <correction proposée>
+
+- **L<N>** `<extrait de code>` : <observation>.
+  ...
+
+> Si aucune observation : « RAS après lecture complète du diff (N lignes). »
+
+#### `tests/test_<module>.py`
+
+- **L<N>** `<extrait de code>` : <observation>.
+  ...
+
+### Tests (B3)
+| Critère | Verdict | Preuve |
+|---|---|---|
+| Couverture des critères | ✅/❌ | Mapping critère → test |
+| Cas nominaux + erreurs + bords | ✅/❌ | Liste des classes de test |
+| Boundary fuzzing | ✅/❌ | Params testés: N=0, N=1, ... |
+| Déterministes | ✅/❌ | Seeds listées |
+| Portabilité chemins | ✅/❌ | Scan B1: 0 `/tmp` |
+| Tests registre réalistes | ✅/❌ ou N/A | Scan B1 + vérification reload |
+| Contrat ABC complet | ✅/❌ ou N/A | Variantes testées |
+
+### Code — Règles non négociables (B4)
+| Règle | Verdict | Preuve |
+|---|---|---|
+| Strict code (no fallbacks) | ✅/❌ | Scan B1 + lecture diff B2 |
+| Defensive indexing | ✅/❌ | Expressions vérifiées |
 | Config-driven | ✅/❌ | |
-| Anti-fuite | ✅/❌ | |
-| Reproductibilité | ✅/❌ | |
+| Anti-fuite | ✅/❌ | Scan B1 (.shift) + lecture |
+| Reproductibilité | ✅/❌ | Scan B1 (legacy random) |
 | Float conventions | ✅/❌ | |
+| Anti-patterns Python | ✅/❌ | Scan B1 + lecture B2 |
 
-## Qualité du code
-| Critère | Verdict |
-|---|---|
-| Nommage et style | ✅/❌ |
-| Pas de code mort/debug | ✅/❌ |
-| Imports propres | ✅/❌ |
+### Qualité du code (B5)
+| Critère | Verdict | Preuve |
+|---|---|---|
+| Nommage et style | ✅/❌ | |
+| Pas de code mort/debug | ✅/❌ | Scan B1 |
+| Imports propres / relatifs | ✅/❌ | Scan B1 |
+| DRY | ✅/❌ | |
 
-## Conformité spec v1.0
+### Conformité spec v1.0 (B6)
 | Critère | Verdict |
 |---|---|
 | Spécification | ✅/❌ |
 | Plan d'implémentation | ✅/❌ |
+| Formules doc vs code | ✅/❌ |
 
-## Cohérence intermodule
+### Cohérence intermodule (B7)
 | Critère | Verdict | Commentaire |
 |---|---|---|
 | Signatures et types de retour | ✅/❌ | |
@@ -221,7 +392,7 @@ Date : YYYY-MM-DD
 | Conventions numériques | ✅/❌ | |
 | Imports croisés | ✅/❌ | |
 
-## Bonnes pratiques métier
+### Bonnes pratiques métier (B5-bis)
 | Critère | Verdict | Commentaire |
 |---|---|---|
 | Exactitude des concepts financiers | ✅/❌ | |
@@ -230,6 +401,8 @@ Date : YYYY-MM-DD
 | Invariants de domaine | ✅/❌ | |
 | Cohérence des unités/échelles | ✅/❌ | |
 | Patterns de calcul financier | ✅/❌ | |
+
+---
 
 ## Remarques mineures
 > **Toutes les remarques, même mineures ou cosmétiques, doivent figurer ici.**
@@ -257,10 +430,12 @@ Date : YYYY-MM-DD
 
 ## Principes de revue
 
-1. **Factuel** : chaque verdict basé sur des preuves concrètes (fichiers, lignes, exécution).
-2. **Exhaustif** : passer en revue tous les fichiers modifiés.
-3. **Constructif** : chaque blocage accompagné d'une action corrective claire.
-4. **Proportionné mais exhaustif** : ne pas **bloquer** pour du cosmétique, mais **toujours signaler** les points mineurs (style, nommage sous-optimal, opportunités de simplification, etc.) dans la section « Remarques mineures » du rapport. Aucune observation ne doit être omise sous prétexte qu'elle est mineure.
-5. **Exécuter les tests** : toujours lancer `pytest` et `ruff check` soi-même.
-6. **Adversarial** : ne pas se limiter aux tests existants. Pour chaque fonction modifiée, imaginer mentalement 2-3 inputs extrêmes (param > taille données, param = 0, tableaux vides) et vérifier que le code ou les tests les couvrent. Si non → bloquant.
-7. **Domain-aware** : vérifier que l'implémentation des concepts métier (indicateurs techniques, mécaniques de trading, calculs financiers) respecte les bonnes pratiques du domaine et les définitions canoniques. Une erreur de concept métier est **bloquante**.
+1. **Diff-centric** : le cœur de la revue est la lecture du diff ligne par ligne (B2). Ne jamais cocher un item sans avoir lu le code correspondant dans le diff.
+2. **Prouvé par exécution** : chaque `✅` dans le rapport est accompagné d'une preuve (output grep, résultat d'exécution, numéro de ligne). Un `✅` sans preuve est un `❌`.
+3. **Scan avant checklist** : toujours exécuter le scan automatisé (B1) AVANT d'évaluer les items du checklist. Le scan grep est la première ligne de défense — pas un complément optionnel.
+4. **Exhaustif** : passer en revue tous les fichiers modifiés, annoter chaque fichier source dans le rapport.
+5. **Constructif** : chaque blocage accompagné d'une action corrective claire avec le fichier et la ligne concernés.
+6. **Proportionné mais exhaustif** : ne pas **bloquer** pour du cosmétique, mais **toujours signaler** les points mineurs dans la section « Remarques mineures ». Aucune observation ne doit être omise.
+7. **Adversarial** : ne pas se limiter aux tests existants. Pour chaque fonction modifiée, imaginer 2-3 inputs extrêmes (param > taille données, param = 0, tableaux vides, type inattendu) et vérifier que le code ou les tests les couvrent. Si non → bloquant.
+8. **Domain-aware** : vérifier que l'implémentation des concepts métier (indicateurs techniques, mécaniques de trading, calculs financiers) respecte les bonnes pratiques du domaine. Une erreur de concept métier est **bloquante**.
+9. **Python-aware** : appliquer la grille des anti-patterns Python/numpy/pandas (B4f) à chaque fichier. Les bugs de type safety, path handling et mutable defaults sont des sources fréquentes de régressions silencieuses.
