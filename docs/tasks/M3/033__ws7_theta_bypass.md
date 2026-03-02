@@ -71,4 +71,4 @@ Implémenter la logique de bypass de la calibration θ quand `model.output_type 
 - [x] `ruff check ai_trading/ tests/` passe sans erreur.
 - [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
 - [x] **Commit GREEN** : `[WS-7] #033 GREEN: bypass calibration θ pour RL et baselines`.
-- [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-7] #033 — Bypass calibration θ pour RL et baselines`.
+- [x] **Pull Request ouverte** vers `Max6000i1` : `[WS-7] #033 — Bypass calibration θ pour RL et baselines`.
