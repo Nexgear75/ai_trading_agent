@@ -23,9 +23,9 @@ def y_hat_val() -> np.ndarray:
 
 
 @pytest.fixture()
-def default_config():
-    """Load default pipeline config."""
-    return load_config("configs/default.yaml")
+def default_config(default_config_path):
+    """Load default pipeline config via shared fixture path."""
+    return load_config(str(default_config_path))
 
 
 # ---------------------------------------------------------------------------
@@ -119,6 +119,27 @@ class TestComputeQuantileThresholdsErrors:
         with pytest.raises(ValueError, match="duplicates"):
             compute_quantile_thresholds(
                 np.arange(10, dtype=np.float64), [0.5, 0.7, 0.5]
+            )
+
+    def test_nan_in_q_grid_raises(self) -> None:
+        """NaN in q_grid raises ValueError."""
+        with pytest.raises(ValueError, match="finite"):
+            compute_quantile_thresholds(
+                np.arange(10, dtype=np.float64), [0.5, float("nan")]
+            )
+
+    def test_inf_in_q_grid_raises(self) -> None:
+        """inf in q_grid raises ValueError."""
+        with pytest.raises(ValueError, match="finite"):
+            compute_quantile_thresholds(
+                np.arange(10, dtype=np.float64), [float("inf")]
+            )
+
+    def test_neg_inf_in_q_grid_raises(self) -> None:
+        """-inf in q_grid raises ValueError."""
+        with pytest.raises(ValueError, match="finite"):
+            compute_quantile_thresholds(
+                np.arange(10, dtype=np.float64), [float("-inf")]
             )
 
 

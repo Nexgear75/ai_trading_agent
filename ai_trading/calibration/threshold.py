@@ -1,5 +1,7 @@
 """Quantile-grid threshold calibration (§11.2)."""
 
+import math
+
 import numpy as np
 from numpy.typing import NDArray
 
@@ -36,12 +38,17 @@ def compute_quantile_thresholds(
     if len(q_grid) != len(set(q_grid)):
         raise ValueError("q_grid must not contain duplicates")
     for q in q_grid:
+        if not math.isfinite(q):
+            raise ValueError(
+                f"q_grid values must be finite, got {q}"
+            )
         if q < 0.0 or q > 1.0:
             raise ValueError(
                 f"q_grid values must be in [0, 1], got {q}"
             )
 
-    return {q: float(np.quantile(y_hat_val, q)) for q in q_grid}
+    thresholds = np.quantile(y_hat_val, q_grid)
+    return dict(zip(q_grid, thresholds.tolist()))
 
 
 def apply_threshold(

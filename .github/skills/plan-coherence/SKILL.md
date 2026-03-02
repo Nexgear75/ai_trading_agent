@@ -127,17 +127,17 @@ Pour **chaque** incohérence I-N, créer une entrée TODO via `manage_todo_list`
 
 **Interdiction formelle** : ne pas chercher de contexte supplémentaire à cette étape. Se baser uniquement sur le contenu du rapport de cohérence.
 
-#### B3. Traiter chaque TODO via sous-agent isolé
+#### B3. Traiter chaque TODO via agent Plan-Corrector
 
-Pour chaque TODO, dans l'ordre du rapport, **lancer un sous-agent** (`runSubagent`) qui traite l'incohérence dans un contexte vierge. Le sous-agent est stateless : il ne voit ni le contexte des corrections précédentes, ni celui des suivantes.
+Pour chaque TODO, dans l'ordre du rapport, **lancer l'agent `Plan-Corrector`** (`runSubagent` avec `agentName: "Plan-Corrector"`) qui traite l'incohérence dans un contexte vierge. L'agent est stateless : il ne voit ni le contexte des corrections précédentes, ni celui des suivantes.
 
-##### Prompt du sous-agent
+> Les instructions détaillées de l'agent sont dans `.github/agents/plan-corrector.agent.md`.
 
-Construire le prompt du sous-agent avec ces éléments **exactement** :
+##### Prompt de l'agent
+
+Construire le prompt avec ces éléments :
 
 ```
-Tu dois corriger UNE incohérence dans le plan d'implémentation du projet AI Trading Pipeline.
-
 ## Incohérence à corriger
 
 <copier intégralement le bloc I-N depuis docs/review_coherence_implementation.md>
@@ -145,26 +145,6 @@ Tu dois corriger UNE incohérence dans le plan d'implémentation du projet AI Tr
 ## Milestones déjà implémentés
 
 <liste des milestones DONE identifiés en B0>
-
-## Règles
-
-1. Lis les sections du plan concernées par l'incohérence (`docs/plan/implementation.md`).
-2. Si la correction nécessite de comprendre l'impact sur les tâches existantes, lis les fichiers de tâches concernés (`docs/tasks/<milestone>/NNN__slug.md`).
-3. Si la correction nécessite de vérifier une référence spec, lis la section spec ciblée (`docs/specifications/Specification_Pipeline_Commun_AI_Trading_v1.0.md`).
-4. Ne charge que les fichiers strictement nécessaires à CETTE incohérence.
-5. Applique la correction dans `docs/plan/implementation.md`. La correction doit être minimale et ciblée.
-6. Ne modifie JAMAIS le code, les tests, ou les configs. Uniquement les documents de planification.
-7. Ne pas « améliorer » d'autres parties du plan par opportunisme.
-8. Après la correction, relis les sections immédiatement adjacentes pour vérifier que tu n'as pas créé de nouvelle incohérence. Si oui, corrige-la immédiatement.
-9. Pour les milestones déjà implémentés, aligne le plan sur ce qui a été livré (corrections cosmétiques uniquement).
-
-## Réponse attendue
-
-Retourne un rapport structuré :
-- **Statut** : RÉSOLU | NON RÉSOLU (si la correction nécessiterait de modifier du code)
-- **Modifications** : liste des fichiers et sections modifiés
-- **Vérification** : confirmation que les sections adjacentes restent cohérentes, ou description des corrections en cascade effectuées
-- **Note** : toute remarque pertinente pour le rapport final
 ```
 
 ##### Traitement du résultat
@@ -184,29 +164,29 @@ Une fois tous les TODOs traités, mettre à jour `docs/review_coherence_implemen
 Les corrections de la Phase B peuvent introduire de **nouvelles** incohérences (corrections en cascade, reformulations ambiguës, effets de bord entre sections). Le processus doit donc être **itéré** :
 
 1. **Versionner** le rapport précédent : renommer `docs/review_coherence_implementation.md` en `docs/review_coherence_implementation_vN.md` (N = numéro d'itération, ex : `_v1`, `_v2`, ...).
-2. **Lancer un sous-agent (`runSubagent`)** pour exécuter la Phase A complète sur le plan corrigé. Ce sous-agent :
-   - Démarre avec un contexte vierge (aucune connaissance des incohérences précédentes ni des corrections effectuées).
-   - Relit **intégralement** `docs/plan/implementation.md` depuis le début.
-   - Applique **tous** les axes d'analyse (A1 à A5) sans exception.
-   - Produit un nouveau `docs/review_coherence_implementation.md`.
-   - **Ne doit PAS** consulter les rapports versionnés (`_v1`, `_v2`, ...) ni vérifier si des corrections précédentes ont été appliquées. Son seul input est le plan tel qu'il est maintenant.
+2. **Lancer l'agent `Plan-Analyzer`** (`runSubagent` avec `agentName: "Plan-Analyzer"`) pour exécuter la Phase A complète sur le plan corrigé.
+   > Les instructions détaillées et interdictions de l'agent sont dans `.github/agents/plan-analyzer.agent.md`.
 3. Lire le nouveau rapport produit par le sous-agent.
 4. Si le rapport contient **au moins une incohérence** (quel que soit son type : nouvelle, résiduelle, ou réintroduite) → relancer la **Phase B** (B1 à B4), puis revenir à l'étape 1.
 5. Si le rapport ne contient **aucune incohérence** → le plan est convergent, le processus est terminé.
 
-**Interdictions pour le sous-agent Phase A** :
-- Ne **jamais** conclure « pas d'incohérence » sur la base du fait que des corrections ont été faites. L'analyse doit être un audit complet et indépendant.
-- Ne **jamais** lire les rapports d'itérations précédentes (`_v1`, `_v2`, ...).
-- Ne **jamais** présumer que les corrections de la Phase B sont correctes.
-
 **Garde-fou** : si après **3 itérations** le plan ne converge pas (des incohérences persistent ou oscillent), arrêter et signaler le problème à l'utilisateur avec la liste des incohérences résiduelles.
+
+## Agents workers
+
+| Agent | Fichier | Rôle |
+|---|---|---|
+| `Plan-Corrector` | `.github/agents/plan-corrector.agent.md` | Correction d'une incohérence (Phase B) |
+| `Plan-Analyzer` | `.github/agents/plan-analyzer.agent.md` | Analyse de cohérence complète (Phase A itérative) |
+
+> **Modèle** : par défaut, les agents héritent du modèle de la session principale. Pour forcer un modèle spécifique, décommenter la ligne `model:` dans le frontmatter de chaque agent.
 
 ## Contraintes opérationnelles
 
 ### Isolation des corrections
-Chaque incohérence est traitée par un **sous-agent indépendant** (`runSubagent`). L'isolation est structurelle, pas comportementale :
-- Le sous-agent démarre avec un contexte vierge (pas de mémoire des corrections précédentes).
-- Le sous-agent retourne un rapport unique, puis son contexte est détruit.
+Chaque incohérence est traitée par l'agent **`Plan-Corrector`** dans un contexte isolé. L'isolation est structurelle :
+- L'agent démarre avec un contexte vierge (pas de mémoire des corrections précédentes).
+- L'agent retourne un rapport unique, puis son contexte est détruit.
 - Chaque correction est vérifiable indépendamment.
 
 ### Périmètre strict
