@@ -18,7 +18,6 @@ Covers:
 from __future__ import annotations
 
 import importlib
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -174,7 +173,7 @@ class TestSmaRuleFit:
 class TestSmaRulePredict:
     """#039 — predict() must compute SMA crossover signals."""
 
-    def test_uptrend_produces_go_signals(self):
+    def test_uptrend_produces_go_signals(self, tmp_path):
         """Steady uptrend: after warmup, SMA_fast > SMA_slow → Go (1)."""
         cls = _import_sma_rule()
         model = cls()
@@ -182,7 +181,7 @@ class TestSmaRulePredict:
         model.fit(
             X_train=_X[:10], y_train=_Y[:10],
             X_val=_X_VAL, y_val=_Y_VAL,
-            config=config, run_dir=Path("/tmp/unused"),
+            config=config, run_dir=tmp_path,
         )
 
         # Strong uptrend: SMA_fast will be above SMA_slow after warmup
@@ -200,7 +199,7 @@ class TestSmaRulePredict:
         # All should be Go (1) in strong uptrend after warmup
         np.testing.assert_array_equal(signals, np.ones(len(sample_idx), dtype=np.float32))
 
-    def test_downtrend_produces_nogo_signals(self):
+    def test_downtrend_produces_nogo_signals(self, tmp_path):
         """Steady downtrend: SMA_fast < SMA_slow → No-Go (0)."""
         cls = _import_sma_rule()
         model = cls()
@@ -208,7 +207,7 @@ class TestSmaRulePredict:
         model.fit(
             X_train=_X[:10], y_train=_Y[:10],
             X_val=_X_VAL, y_val=_Y_VAL,
-            config=config, run_dir=Path("/tmp/unused"),
+            config=config, run_dir=tmp_path,
         )
 
         n = 100
@@ -223,7 +222,7 @@ class TestSmaRulePredict:
         # All should be No-Go (0) in steady downtrend
         np.testing.assert_array_equal(signals, np.zeros(len(sample_idx), dtype=np.float32))
 
-    def test_first_decisions_nogo_when_sma_slow_undefined(self):
+    def test_first_decisions_nogo_when_sma_slow_undefined(self, tmp_path):
         """Before slow window is complete, signal must be No-Go (0)."""
         cls = _import_sma_rule()
         model = cls()
@@ -231,7 +230,7 @@ class TestSmaRulePredict:
         model.fit(
             X_train=_X[:10], y_train=_Y[:10],
             X_val=_X_VAL, y_val=_Y_VAL,
-            config=config, run_dir=Path("/tmp/unused"),
+            config=config, run_dir=tmp_path,
         )
 
         n = 100
@@ -245,7 +244,7 @@ class TestSmaRulePredict:
         signals = model.predict(x_dummy, meta=meta, ohlcv=ohlcv)
         np.testing.assert_array_equal(signals, np.zeros(len(sample_idx), dtype=np.float32))
 
-    def test_signal_shape_and_dtype(self):
+    def test_signal_shape_and_dtype(self, tmp_path):
         """Signal must be float32 of shape (N,)."""
         cls = _import_sma_rule()
         model = cls()
@@ -253,7 +252,7 @@ class TestSmaRulePredict:
         model.fit(
             X_train=_X[:10], y_train=_Y[:10],
             X_val=_X_VAL, y_val=_Y_VAL,
-            config=config, run_dir=Path("/tmp/unused"),
+            config=config, run_dir=tmp_path,
         )
 
         n = 60
@@ -267,7 +266,7 @@ class TestSmaRulePredict:
         assert signals.dtype == np.float32
         assert signals.shape == (len(sample_idx),)
 
-    def test_signals_are_binary(self):
+    def test_signals_are_binary(self, tmp_path):
         """All signals must be 0.0 or 1.0."""
         cls = _import_sma_rule()
         model = cls()
@@ -275,7 +274,7 @@ class TestSmaRulePredict:
         model.fit(
             X_train=_X[:10], y_train=_Y[:10],
             X_val=_X_VAL, y_val=_Y_VAL,
-            config=config, run_dir=Path("/tmp/unused"),
+            config=config, run_dir=tmp_path,
         )
 
         n = 100
@@ -289,7 +288,7 @@ class TestSmaRulePredict:
         signals = model.predict(x_dummy, meta=meta, ohlcv=ohlcv)
         assert set(np.unique(signals)).issubset({0.0, 1.0})
 
-    def test_temporal_alignment_via_meta(self):
+    def test_temporal_alignment_via_meta(self, tmp_path):
         """predict() must return signals only for timestamps in meta['decision_time']."""
         cls = _import_sma_rule()
         model = cls()
@@ -297,7 +296,7 @@ class TestSmaRulePredict:
         model.fit(
             X_train=_X[:10], y_train=_Y[:10],
             X_val=_X_VAL, y_val=_Y_VAL,
-            config=config, run_dir=Path("/tmp/unused"),
+            config=config, run_dir=tmp_path,
         )
 
         n = 60
@@ -311,7 +310,7 @@ class TestSmaRulePredict:
         signals = model.predict(x_dummy, meta=meta, ohlcv=ohlcv)
         assert signals.shape == (len(sample_idx),)
 
-    def test_equal_sma_produces_nogo(self):
+    def test_equal_sma_produces_nogo(self, tmp_path):
         """When SMA_fast == SMA_slow exactly, signal must be No-Go (0).
 
         Condition is strict: Go only when SMA_fast > SMA_slow.
@@ -322,7 +321,7 @@ class TestSmaRulePredict:
         model.fit(
             X_train=_X[:10], y_train=_Y[:10],
             X_val=_X_VAL, y_val=_Y_VAL,
-            config=config, run_dir=Path("/tmp/unused"),
+            config=config, run_dir=tmp_path,
         )
 
         # Constant prices → SMA_fast == SMA_slow at all points after warmup
@@ -345,7 +344,7 @@ class TestSmaRulePredict:
 class TestSmaRuleConfig:
     """#039 — Config-driven parameters and validation."""
 
-    def test_fast_slow_from_config(self):
+    def test_fast_slow_from_config(self, tmp_path):
         """Model must read fast/slow from config.baselines.sma."""
         cls = _import_sma_rule()
         model = cls()
@@ -353,7 +352,7 @@ class TestSmaRuleConfig:
         model.fit(
             X_train=_X[:10], y_train=_Y[:10],
             X_val=_X_VAL, y_val=_Y_VAL,
-            config=config_3_7, run_dir=Path("/tmp/unused"),
+            config=config_3_7, run_dir=tmp_path,
         )
 
         # With fast=3, slow=7, uptrend: check that signal is Go after bar 6 (0-indexed)
@@ -368,7 +367,7 @@ class TestSmaRuleConfig:
         # Strong uptrend → all Go after slow warmup
         np.testing.assert_array_equal(signals, np.ones(len(sample_idx), dtype=np.float32))
 
-    def test_validation_fast_ge_slow_raises(self):
+    def test_validation_fast_ge_slow_raises(self, tmp_path):
         """fast >= slow must raise ValueError."""
         cls = _import_sma_rule()
         model = cls()
@@ -377,10 +376,10 @@ class TestSmaRuleConfig:
             model.fit(
                 X_train=_X[:10], y_train=_Y[:10],
                 X_val=_X_VAL, y_val=_Y_VAL,
-                config=config_bad, run_dir=Path("/tmp/unused"),
+                config=config_bad, run_dir=tmp_path,
             )
 
-    def test_validation_fast_eq_slow_raises(self):
+    def test_validation_fast_eq_slow_raises(self, tmp_path):
         """fast == slow must raise ValueError."""
         cls = _import_sma_rule()
         model = cls()
@@ -389,7 +388,7 @@ class TestSmaRuleConfig:
             model.fit(
                 X_train=_X[:10], y_train=_Y[:10],
                 X_val=_X_VAL, y_val=_Y_VAL,
-                config=config_eq, run_dir=Path("/tmp/unused"),
+                config=config_eq, run_dir=tmp_path,
             )
 
 
@@ -401,7 +400,7 @@ class TestSmaRuleConfig:
 class TestSmaRuleCausality:
     """#039 — Causality: modifying future prices must not change past signals."""
 
-    def test_future_modification_does_not_affect_past(self):
+    def test_future_modification_does_not_affect_past(self, tmp_path):
         """Modify prices after bar T; signals for t <= T must be identical."""
         cls = _import_sma_rule()
 
@@ -421,7 +420,7 @@ class TestSmaRuleCausality:
         model_a.fit(
             X_train=_X[:10], y_train=_Y[:10],
             X_val=_X_VAL, y_val=_Y_VAL,
-            config=config, run_dir=Path("/tmp/unused"),
+            config=config, run_dir=tmp_path,
         )
         sample_idx = np.arange(10, 61)  # up to and including bar 60
         x_dummy = _RNG.standard_normal((len(sample_idx), _L, _F)).astype(np.float32)
@@ -433,7 +432,7 @@ class TestSmaRuleCausality:
         model_b.fit(
             X_train=_X[:10], y_train=_Y[:10],
             X_val=_X_VAL, y_val=_Y_VAL,
-            config=config, run_dir=Path("/tmp/unused"),
+            config=config, run_dir=tmp_path,
         )
         meta_b = _make_meta(ohlcv_modified, sample_idx)
         signals_b = model_b.predict(x_dummy, meta=meta_b, ohlcv=ohlcv_modified)
@@ -482,7 +481,7 @@ class TestSmaRulePersistence:
 class TestSmaRuleEdgeCases:
     """#039 — Edge cases and boundary conditions."""
 
-    def test_predict_requires_ohlcv(self):
+    def test_predict_requires_ohlcv(self, tmp_path):
         """predict() without ohlcv must raise."""
         cls = _import_sma_rule()
         model = cls()
@@ -490,13 +489,13 @@ class TestSmaRuleEdgeCases:
         model.fit(
             X_train=_X[:10], y_train=_Y[:10],
             X_val=_X_VAL, y_val=_Y_VAL,
-            config=config, run_dir=Path("/tmp/unused"),
+            config=config, run_dir=tmp_path,
         )
         x_dummy = _RNG.standard_normal((5, _L, _F)).astype(np.float32)
         with pytest.raises((ValueError, TypeError)):
             model.predict(x_dummy)
 
-    def test_predict_requires_meta(self):
+    def test_predict_requires_meta(self, tmp_path):
         """predict() without meta must raise."""
         cls = _import_sma_rule()
         model = cls()
@@ -504,7 +503,7 @@ class TestSmaRuleEdgeCases:
         model.fit(
             X_train=_X[:10], y_train=_Y[:10],
             X_val=_X_VAL, y_val=_Y_VAL,
-            config=config, run_dir=Path("/tmp/unused"),
+            config=config, run_dir=tmp_path,
         )
         n = 30
         close = np.linspace(100, 200, n)
@@ -526,7 +525,7 @@ class TestSmaRuleEdgeCases:
         with pytest.raises((ValueError, AttributeError, RuntimeError)):
             model.predict(x_dummy, meta=meta, ohlcv=ohlcv)
 
-    def test_single_sample(self):
+    def test_single_sample(self, tmp_path):
         """predict() with a single sample must work."""
         cls = _import_sma_rule()
         model = cls()
@@ -534,7 +533,7 @@ class TestSmaRuleEdgeCases:
         model.fit(
             X_train=_X[:10], y_train=_Y[:10],
             X_val=_X_VAL, y_val=_Y_VAL,
-            config=config, run_dir=Path("/tmp/unused"),
+            config=config, run_dir=tmp_path,
         )
 
         n = 60

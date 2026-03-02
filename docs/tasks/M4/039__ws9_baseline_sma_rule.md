@@ -64,5 +64,5 @@ Implémenter la classe `SmaRuleBaseline(BaseModel)` enregistrée dans le `MODEL_
 - [x] Critères d'acceptation tous satisfaits.
 - [x] `ruff check ai_trading/ tests/` passe sans erreur.
 - [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
-- [ ] **Commit GREEN** : `[WS-9] #039 GREEN: <résumé>`.
+- [x] **Commit GREEN** : `[WS-9] #039 GREEN: <résumé>`.
 - [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-9] #039 — Baseline SMA rule`.
