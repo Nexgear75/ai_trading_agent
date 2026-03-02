@@ -92,7 +92,7 @@ Implémentation de `SmaRuleBaseline` avec calcul causal des SMA fast/slow sur `o
   - **L111-113** : `close.rolling(window=self._fast).mean()` et `.rolling(window=self._slow).mean()` — backward-looking by construction. Causal. ✅
   - **L116** : `(sma_fast > sma_slow).astype(np.float32)` — strict `>`, conforme spec « Go si SMA_fast(t) > SMA_slow(t) ». ✅
   - **L118** : `nan_mask = sma_fast.isna() | sma_slow.isna()` puis `raw_signal[nan_mask] = 0.0` — premières décisions NaN → No-Go. ✅
-  - **L121-122** : `raw_signal.loc[decision_times].values.astype(np.float32)` — temporal alignment via `meta["decision_time"]`. ✅
+  - **L121-122** : `raw_signal.loc[decision_times].values.astype(np.float32)` — temporal alignment via `meta["decision_time"]`. **ATTENTION** : `decision_time` est close_time (`open_time + interval`, cf. `build_meta` L314 de `dataset.py`), mais `raw_signal` est indexé par `ohlcv.index` (open_time). Un mapping `open_times = decision_times - interval` est nécessaire pour aligner correctement. Bug corrigé dans PR-FIX sur branche `task/039-sma-pr-fix`.
   - **Return** : `np.ndarray` float32 de shape `(N,)`. Conforme contract `BaseModel.predict()`. ✅
 
 RAS après lecture complète du diff (126 lignes).
