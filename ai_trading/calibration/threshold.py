@@ -104,8 +104,12 @@ def compute_max_drawdown(equity: NDArray[np.floating]) -> float:
     Raises
     ------
     ValueError
-        If equity is empty.
+        If equity is not 1D or is empty.
     """
+    if equity.ndim != 1:
+        raise ValueError(
+            f"equity must be 1D, got shape {equity.shape}"
+        )
     if equity.size == 0:
         raise ValueError("equity must not be empty")
 

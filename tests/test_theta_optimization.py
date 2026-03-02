@@ -91,6 +91,11 @@ class TestComputeMaxDrawdown:
         with pytest.raises(ValueError, match="empty"):
             compute_max_drawdown(np.array([]))
 
+    def test_2d_equity_raises(self) -> None:
+        """2D equity raises ValueError."""
+        with pytest.raises(ValueError, match="1D"):
+            compute_max_drawdown(np.array([[1.0, 2.0], [3.0, 4.0]]))
+
     def test_drawdown_after_recovery(self) -> None:
         """MDD picks the worst drawdown even after recovery."""
         # Peak=10 at idx 3, trough=5 at idx 4 → dd=0.5
