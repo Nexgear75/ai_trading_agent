@@ -14,6 +14,8 @@ Task #026 — WS-8.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 
@@ -128,3 +130,125 @@ def _execute_standard(
             exit_idx = close_idx
 
     return trades
+
+
+# ---------------------------------------------------------------------------
+# Equity curve (§12.4)
+# ---------------------------------------------------------------------------
+
+_REQUIRED_TRADE_KEYS = frozenset({"entry_time", "exit_time", "r_net"})
+
+
+def build_equity_curve(
+    trades: list[dict],
+    ohlcv: pd.DataFrame,
+    initial_equity: float,
+    position_fraction: float,
+) -> pd.DataFrame:
+    """Build per-candle equity curve from enriched trades.
+
+    Parameters
+    ----------
+    trades:
+        Enriched trade dicts (from :func:`apply_cost_model`), each must
+        contain ``entry_time``, ``exit_time``, and ``r_net``.
+    ohlcv:
+        OHLCV DataFrame with a :class:`~pandas.DatetimeIndex`.
+    initial_equity:
+        Starting equity value (``config.backtest.initial_equity``).
+    position_fraction:
+        Fraction of equity allocated per trade (``config.backtest.position_fraction``).
+
+    Returns
+    -------
+    pd.DataFrame
+        Columns: ``time_utc``, ``equity``, ``in_trade``.
+    """
+    if len(ohlcv) == 0:
+        raise ValueError("ohlcv must not be empty")
+    if initial_equity <= 0:
+        raise ValueError(
+            f"initial_equity must be > 0, got {initial_equity}"
+        )
+    if position_fraction <= 0 or position_fraction > 1:
+        raise ValueError(
+            f"position_fraction must be in (0, 1], got {position_fraction}"
+        )
+
+    n = len(ohlcv)
+    timestamps = ohlcv.index
+    # Build a fast lookup from timestamp → positional index
+    ts_to_idx: dict[pd.Timestamp, int] = {ts: i for i, ts in enumerate(timestamps)}
+
+    # Validate trades and resolve positional indices
+    trade_ranges: list[tuple[int, int, float]] = []
+    exit_events: dict[int, float] = {}
+    for i, trade in enumerate(trades):
+        for key in _REQUIRED_TRADE_KEYS:
+            if key not in trade:
+                raise ValueError(
+                    f"trade[{i}] is missing required key '{key}'"
+                )
+        entry_time = trade["entry_time"]
+        exit_time = trade["exit_time"]
+        if entry_time not in ts_to_idx:
+            raise ValueError(
+                f"entry_time {entry_time} not found in ohlcv index"
+            )
+        if exit_time not in ts_to_idx:
+            raise ValueError(
+                f"exit_time {exit_time} not found in ohlcv index"
+            )
+        entry_pos = ts_to_idx[entry_time]
+        exit_pos = ts_to_idx[exit_time]
+        if exit_pos < entry_pos:
+            raise ValueError(
+                f"trade[{i}]: exit_pos ({exit_pos}) < entry_pos ({entry_pos})"
+            )
+        if exit_pos in exit_events:
+            raise ValueError(
+                f"trade[{i}]: duplicate exit at position {exit_pos} "
+                f"(overlapping trades are not allowed)"
+            )
+        exit_events[exit_pos] = trade["r_net"]
+        trade_ranges.append((entry_pos, exit_pos, trade["r_net"]))
+
+    # Build equity and in_trade arrays
+    equity = np.full(n, np.nan, dtype=np.float64)
+    in_trade = np.zeros(n, dtype=bool)
+
+    current_equity = float(initial_equity)
+    equity[0] = current_equity
+
+    # Mark in_trade ranges (vectorized slice assignment)
+    for entry_pos, exit_pos, _r_net in trade_ranges:
+        in_trade[entry_pos : exit_pos + 1] = True
+
+    # Walk forward candle by candle
+    for t in range(n):
+        equity[t] = current_equity
+        if t in exit_events:
+            r_net = exit_events[t]
+            current_equity = current_equity * (1 + position_fraction * r_net)
+            equity[t] = current_equity
+
+    return pd.DataFrame(
+        {
+            "time_utc": timestamps,
+            "equity": equity,
+            "in_trade": in_trade,
+        }
+    )
+
+
+def save_equity_curve_csv(equity_curve: pd.DataFrame, path: Path) -> None:
+    """Save equity curve DataFrame to CSV.
+
+    Parameters
+    ----------
+    equity_curve:
+        DataFrame with columns ``time_utc``, ``equity``, ``in_trade``.
+    path:
+        Destination file path.
+    """
+    equity_curve.to_csv(path, index=False)

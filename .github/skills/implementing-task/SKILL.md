@@ -175,12 +175,18 @@ git add docs/tasks/<milestone>/<NNN>/
 git commit -m "[WS-X] #NNN REVIEW: rapports de revue v1..v<review_iteration>"
 ```
 
-2. **Push et création de la PR** :
+2. **Mettre à jour la checklist procédurale de la tâche** :
+Ouvrir `docs/tasks/<milestone>/NNN__slug.md` et cocher les items restants de la checklist qui sont désormais complétés (commit GREEN, commit RED, etc.). Amender le dernier commit si nécessaire ou inclure dans le commit REVIEW.
+
+3. **Push et création de la PR** :
 ```bash
 git push -u origin task/NNN-short-slug
 ```
 - Titre de la PR : `[WS-X] #NNN — <titre de la tâche>`
 - Description : résumé des changements, lien vers la tâche, nombre d'itérations de revue effectuées.
+
+4. **Cocher l'item PR dans la checklist** :
+Mettre à jour le fichier de tâche pour cocher l'item « Pull Request ouverte ». Commiter et pousser l'update.
 
 ---
 
