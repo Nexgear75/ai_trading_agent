@@ -77,4 +77,4 @@ Pour chaque `θ` dans les candidats (issus de WS-7.1) :
 - [x] `ruff check ai_trading/ tests/` passe sans erreur.
 - [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
 - [x] **Commit GREEN** : `[WS-7] #031 GREEN: objectif d'optimisation et sélection θ`.
-- [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-7] #031 — Objectif d'optimisation et sélection du seuil θ`.
+- [x] **Pull Request ouverte** vers `Max6000i1` : `[WS-7] #031 — Objectif d'optimisation et sélection du seuil θ`.
