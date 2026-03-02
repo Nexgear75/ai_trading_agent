@@ -166,6 +166,15 @@ class TestNoTradePredict:
         y_hat = model.predict(_X)
         assert y_hat.shape == (_N,)
 
+    def test_predict_empty_input(self):
+        """predict with N=0 must return shape (0,)."""
+        cls = _import_no_trade()
+        model = cls()
+        x_empty = np.zeros((0, _L, _F), dtype=np.float32)
+        y_hat = model.predict(x_empty)
+        assert y_hat.shape == (0,)
+        assert y_hat.dtype == np.float32
+
     def test_predict_single_sample(self):
         """predict works with N=1."""
         cls = _import_no_trade()
@@ -219,6 +228,18 @@ class TestNoTradeSaveLoad:
         model.save(tmp_path)
         files = list(tmp_path.iterdir())
         assert len(files) >= 1
+
+    def test_save_load_roundtrip_file_path(self, tmp_path):
+        """save/load with an explicit file path (not directory)."""
+        cls = _import_no_trade()
+        model = cls()
+        file_path = tmp_path / "model.json"
+        model.save(file_path)
+        assert file_path.exists()
+
+        model2 = cls()
+        model2.load(file_path)
+        np.testing.assert_array_equal(model.predict(_X), model2.predict(_X))
 
     def test_load_nonexistent_raises(self, tmp_path):
         """load() from a nonexistent path must raise FileNotFoundError."""
