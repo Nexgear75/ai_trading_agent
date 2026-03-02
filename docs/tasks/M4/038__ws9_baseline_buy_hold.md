@@ -61,4 +61,4 @@ Implémenter la classe `BuyHoldBaseline(BaseModel)` enregistrée dans le `MODEL_
 - [x] `ruff check ai_trading/ tests/` passe sans erreur.
 - [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
 - [x] **Commit GREEN** : `[WS-9] #038 GREEN: BuyHoldBaseline with single_trade mode, permanent Go signal, backtest integration`.
-- [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-9] #038 — Baseline buy & hold`.
+- [x] **Pull Request ouverte** vers `Max6000i1` : `[WS-9] #038 — Baseline buy & hold`.
