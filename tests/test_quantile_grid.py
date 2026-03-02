@@ -12,7 +12,6 @@ import pytest
 from ai_trading.calibration.threshold import apply_threshold, compute_quantile_thresholds
 from ai_trading.config import load_config
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -26,7 +25,7 @@ def y_hat_val() -> np.ndarray:
 @pytest.fixture()
 def default_config():
     """Load default pipeline config."""
-    return load_config()
+    return load_config("configs/default.yaml")
 
 
 # ---------------------------------------------------------------------------
