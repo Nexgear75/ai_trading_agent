@@ -80,8 +80,8 @@ class RSI14(BaseFeature):
         losses = np.maximum(-deltas, 0.0)
 
         # SMA initialisation over first n periods (indices 0..n-1)
-        ag = np.mean(gains[:n])
-        al = np.mean(losses[:n])
+        ag: float = float(np.mean(gains[:n]))
+        al: float = float(np.mean(losses[:n]))
 
         # RSI at bar n (first valid value)
         result[n] = _rsi_from_ag_al(ag, al, epsilon)
