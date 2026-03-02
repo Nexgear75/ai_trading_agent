@@ -1,6 +1,6 @@
 # Tâche — Fold trainer (orchestration fit/predict par fold)
 
-Statut : TODO
+Statut : DONE
 Ordre : 028
 Workstream : WS-6
 Milestone : M3
@@ -48,29 +48,29 @@ Implémenter le module `ai_trading/training/trainer.py` qui orchestre le workflo
 - Le trainer retourne un objet/dict contenant : `y_hat_val`, `y_hat_test`, `artifacts` (retour de `model.fit()`), `scaler` (pour traçabilité)
 
 ## Critères d'acceptation
-- [ ] Le trainer orchestre correctement le workflow complet (scale → fit → predict → save) avec DummyModel sans crash
-- [ ] Scaling : `scaler.fit()` appelé sur `X_train` uniquement — vérifiable par inspection ou mock
-- [ ] Scaling : `scaler.transform()` appliqué à train, val et test
-- [ ] `model.fit()` reçoit les bons arguments, y compris `meta_train`, `meta_val`, `ohlcv`
-- [ ] Prédictions `y_hat_val` et `y_hat_test` retournées avec shapes correctes `(N_val,)` et `(N_test,)`
-- [ ] Paramètre `patience` configurable et transmis au modèle via config
-- [ ] `model.save()` appelé après le fit
-- [ ] Anti-fuite : test vérifiant que le scaler n'est PAS fit sur val ou test (perturbation test)
-- [ ] Tests couvrent les scénarios nominaux + erreurs + bords
-- [ ] Suite de tests verte après implémentation
-- [ ] `ruff check` passe sans erreur
+- [x] Le trainer orchestre correctement le workflow complet (scale → fit → predict → save) avec DummyModel sans crash
+- [x] Scaling : `scaler.fit()` appelé sur `X_train` uniquement — vérifiable par inspection ou mock
+- [x] Scaling : `scaler.transform()` appliqué à train, val et test
+- [x] `model.fit()` reçoit les bons arguments, y compris `meta_train`, `meta_val`, `ohlcv`
+- [x] Prédictions `y_hat_val` et `y_hat_test` retournées avec shapes correctes `(N_val,)` et `(N_test,)`
+- [x] Paramètre `patience` configurable et transmis au modèle via config
+- [x] `model.save()` appelé après le fit
+- [x] Anti-fuite : test vérifiant que le scaler n'est PAS fit sur val ou test (perturbation test)
+- [x] Tests couvrent les scénarios nominaux + erreurs + bords
+- [x] Suite de tests verte après implémentation
+- [x] `ruff check` passe sans erreur
 
 ## Pré-condition de démarrage
 - **Tous les tests existants sont GREEN** avant de commencer.
 - **Créer une branche dédiée** `task/028-fold-trainer` depuis `Max6000i1`.
 
 ## Checklist de fin de tâche
-- [ ] Branche `task/028-fold-trainer` créée depuis `Max6000i1`.
-- [ ] Tests RED écrits avant implémentation.
-- [ ] **Commit RED** : `[WS-6] #028 RED: tests fold trainer scale/fit/predict/save` (fichiers de tests uniquement).
-- [ ] Tests GREEN passants et reproductibles.
-- [ ] Critères d'acceptation tous satisfaits.
-- [ ] `ruff check ai_trading/ tests/` passe sans erreur.
-- [ ] Fichier de tâche mis à jour (statut DONE, critères cochés).
-- [ ] **Commit GREEN** : `[WS-6] #028 GREEN: fold trainer orchestration`.
-- [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-6] #028 — Fold trainer (orchestration fit/predict par fold)`.
+- [x] Branche `task/028-fold-trainer` créée depuis `Max6000i1`.
+- [x] Tests RED écrits avant implémentation.
+- [x] **Commit RED** : `[WS-6] #028 RED: tests fold trainer scale/fit/predict/save` (fichiers de tests uniquement).
+- [x] Tests GREEN passants et reproductibles.
+- [x] Critères d'acceptation tous satisfaits.
+- [x] `ruff check ai_trading/ tests/` passe sans erreur.
+- [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
+- [x] **Commit GREEN** : `[WS-6] #028 GREEN: fold trainer orchestration`.
+- [x] **Pull Request ouverte** vers `Max6000i1` : `[WS-6] #028 — Fold trainer (orchestration fit/predict par fold)`.
