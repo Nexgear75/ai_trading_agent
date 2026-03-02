@@ -82,5 +82,5 @@ Dépendances :
 - [x] Critères d'acceptation tous satisfaits.
 - [x] `ruff check ai_trading/ tests/` passe sans erreur.
 - [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
-- [ ] **Commit GREEN** : `[WS-6] #034 GREEN: pré-gate G-Doc validé`.
-- [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-6] #034 — Pré-gate G-Doc (vérification structurelle M3)`.
+- [x] **Commit GREEN** : `[WS-6] #034 GREEN: pré-gate G-Doc validé`.
+- [x] **Pull Request ouverte** vers `Max6000i1` : `[WS-6] #034 — Pré-gate G-Doc (vérification structurelle M3)`.
