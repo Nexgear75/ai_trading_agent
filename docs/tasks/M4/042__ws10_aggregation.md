@@ -67,5 +67,5 @@ Implémenter le module `metrics/aggregation.py` calculant les métriques agrég�
 - [x] Critères d'acceptation tous satisfaits.
 - [x] `ruff check ai_trading/ tests/` passe sans erreur.
 - [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
-- [ ] **Commit GREEN** : `[WS-10] #042 GREEN: <résumé>`.
-- [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-10] #042 — Agrégation inter-fold`.
+- [x] **Commit GREEN** : `[WS-10] #042 GREEN: aggregation module`.
+- [x] **Pull Request ouverte** vers `Max6000i1` : `[WS-10] #042 — Agrégation inter-fold`.
