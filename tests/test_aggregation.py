@@ -338,8 +338,8 @@ class TestStitchEquityCurves:
 
     def test_export_csv(self, tmp_path):
         """AC: equity curve exportable to CSV with correct columns."""
-        ec0 = _make_equity_df([1.0, 1.1], start="2024-01-01")
-        ec1 = _make_equity_df([1.0, 1.2], start="2024-02-01")
+        ec0 = _make_equity_df([1.0, 1.1], start="2024-01-01 00:00", freq="1h")
+        ec1 = _make_equity_df([1.0, 1.2], start="2024-01-01 02:00", freq="1h")
 
         stitched = stitch_equity_curves([ec0, ec1])
         csv_path = tmp_path / "equity_curve.csv"
@@ -350,8 +350,8 @@ class TestStitchEquityCurves:
         assert len(loaded) == 4
 
     def test_gap_detection_warning(self, caplog):
-        """AC: gaps inter-fold → warning emitted and equity constant during gap."""
-        # Fold 0 ends 2024-01-03, fold 1 starts 2024-01-10 → gap
+        """AC: real gaps inter-fold → warning + constant-equity gap rows inserted."""
+        # Fold 0 ends 2024-01-02, fold 1 starts 2024-01-10 → 7-day gap
         ec0 = _make_equity_df([1.0, 1.2], start="2024-01-01", freq="1D")
         ec1 = _make_equity_df([1.0, 1.1], start="2024-01-10", freq="1D")
 
@@ -361,10 +361,46 @@ class TestStitchEquityCurves:
         # Warning should be emitted
         assert any("gap" in msg.lower() for msg in caplog.messages)
 
-        # Gap rows should have constant equity = E_end[fold0]
+        # Gap rows: 2024-01-03 .. 2024-01-09 = 7 rows at 1D interval
+        gap_rows = stitched[
+            (stitched["time_utc"] > pd.Timestamp("2024-01-02", tz="UTC"))
+            & (stitched["time_utc"] < pd.Timestamp("2024-01-10", tz="UTC"))
+        ]
+        assert len(gap_rows) == 7
+
+        # Constant equity = E_end[fold0] = 1.2
         fold0_end = stitched[stitched["fold"] == 0]["equity"].iloc[-1]
-        fold1_start = stitched[stitched["fold"] == 1]["equity"].iloc[0]
-        assert fold1_start == pytest.approx(fold0_end)
+        assert fold0_end == pytest.approx(1.2)
+        for _, row in gap_rows.iterrows():
+            assert row["equity"] == pytest.approx(fold0_end)
+            assert row["in_trade"] is False or row["in_trade"] == False  # noqa: E712
+            assert row["fold"] == 0  # gap rows belong to previous fold
+
+        # Fold 1 start equity still matches fold 0 end (continuation)
+        fold1 = stitched[stitched["fold"] == 1]
+        assert fold1["equity"].iloc[0] == pytest.approx(fold0_end)
+
+    def test_contiguous_folds_no_gap_warning(self, caplog):
+        """Contiguous folds (delta == interval) → no gap warning."""
+        # Fold 0: 00:00, 01:00. Fold 1: 02:00, 03:00. delta = 1h = interval
+        ec0 = _make_equity_df([1.0, 1.1], start="2024-01-01 00:00", freq="1h")
+        ec1 = _make_equity_df([1.0, 1.2], start="2024-01-01 02:00", freq="1h")
+
+        with caplog.at_level(logging.WARNING):
+            stitched = stitch_equity_curves([ec0, ec1])
+
+        assert not any("gap" in msg.lower() for msg in caplog.messages)
+        assert len(stitched) == 4  # no gap rows inserted
+
+    def test_empty_fold_dataframe_raises(self):
+        """Empty fold DataFrame (0 rows) → ValueError."""
+        ec_empty = pd.DataFrame({
+            "time_utc": pd.DatetimeIndex([], dtype="datetime64[ns, UTC]"),
+            "equity": pd.array([], dtype="float64"),
+            "in_trade": pd.array([], dtype="bool"),
+        })
+        with pytest.raises(ValueError, match="empty"):
+            stitch_equity_curves([ec_empty])
 
     def test_empty_folds_list_raises(self):
         """Empty fold equities list → ValueError."""

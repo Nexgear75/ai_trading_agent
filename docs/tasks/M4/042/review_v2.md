@@ -2,7 +2,7 @@
 
 Branche : `task/042-aggregation`
 Tâche : `docs/tasks/M4/042__ws10_aggregation.md`
-Date : 2025-03-02
+Date : 2026-03-02
 Itération : v2 (re-review après corrections v1)
 
 ## Verdict global : ✅ CLEAN

@@ -109,6 +109,18 @@ def aggregate_fold_metrics(
 # ---------------------------------------------------------------------------
 
 
+def _infer_candle_interval(ec: pd.DataFrame) -> pd.Timedelta | None:
+    """Infer candle interval from ``time_utc`` column (median diff).
+
+    Returns ``None`` when fewer than 2 rows are available.
+    """
+    if len(ec) < 2:
+        return None
+    diffs = ec["time_utc"].diff().dropna()
+    median: pd.Timedelta = diffs.median()  # type: ignore[assignment]
+    return median
+
+
 def stitch_equity_curves(
     fold_equities: list[pd.DataFrame],
 ) -> pd.DataFrame:
@@ -140,6 +152,8 @@ def stitch_equity_curves(
 
     required_cols = {"time_utc", "equity", "in_trade"}
     for i, ec in enumerate(fold_equities):
+        if len(ec) == 0:
+            raise ValueError(f"fold_equities[{i}] is empty (0 rows).")
         missing = required_cols - set(ec.columns)
         if missing:
             raise ValueError(
@@ -155,18 +169,38 @@ def stitch_equity_curves(
         original_equity = ec_copy["equity"].to_numpy(dtype=np.float64)
 
         if carry_equity is not None:
-            # Detect gap between folds by comparing timestamps.
-            if len(parts) > 0:
-                prev_last_time = parts[-1]["time_utc"].iloc[-1]
-                curr_first_time = ec_copy["time_utc"].iloc[0]
-                if curr_first_time > prev_last_time:
-                    # Check for a gap (more than expected).
-                    # We emit a warning for any gap.
-                    logger.warning(
-                        "Gap detected between fold %d and fold %d "
-                        "(last=%s, next=%s). Equity held constant during gap.",
-                        k - 1, k, prev_last_time, curr_first_time,
-                    )
+            # Detect real gap between folds using inferred candle interval.
+            prev_last_time = parts[-1]["time_utc"].iloc[-1]
+            curr_first_time = ec_copy["time_utc"].iloc[0]
+            time_delta = curr_first_time - prev_last_time
+
+            interval = _infer_candle_interval(parts[-1])
+            if interval is None:
+                interval = _infer_candle_interval(ec_copy)
+
+            if (
+                interval is not None
+                and time_delta > interval * 1.5
+            ):
+                logger.warning(
+                    "Gap detected between fold %d and fold %d "
+                    "(last=%s, next=%s). Inserting constant-equity rows.",
+                    k - 1, k, prev_last_time, curr_first_time,
+                )
+                gap_times = pd.date_range(
+                    start=prev_last_time + interval,
+                    end=curr_first_time,
+                    freq=interval,
+                    inclusive="left",
+                )
+                if len(gap_times) > 0:
+                    gap_df = pd.DataFrame({
+                        "time_utc": gap_times,
+                        "equity": carry_equity,
+                        "in_trade": False,
+                        "fold": k - 1,
+                    })
+                    parts.append(gap_df)
 
             # Rescale: multiply by (carry / original_start).
             original_start = original_equity[0]
