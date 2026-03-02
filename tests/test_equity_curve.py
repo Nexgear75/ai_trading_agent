@@ -270,15 +270,15 @@ class TestInTradeColumn:
 
         # Before entry: all False
         for i in range(entry_idx):
-            assert curve["in_trade"].iloc[i] is np.bool_(False), f"idx={i}"
+            assert curve["in_trade"].iloc[i] == False, f"idx={i}"  # noqa: E712
 
         # Entry to exit inclusive: True
         for i in range(entry_idx, exit_idx + 1):
-            assert curve["in_trade"].iloc[i] is np.bool_(True), f"idx={i}"
+            assert curve["in_trade"].iloc[i] == True, f"idx={i}"  # noqa: E712
 
         # After exit: False
         for i in range(exit_idx + 1, len(ohlcv)):
-            assert curve["in_trade"].iloc[i] is np.bool_(False), f"idx={i}"
+            assert curve["in_trade"].iloc[i] == False, f"idx={i}"  # noqa: E712
 
     def test_in_trade_multi_trade(self) -> None:
         ohlcv = _make_ohlcv(30)
@@ -288,11 +288,11 @@ class TestInTradeColumn:
 
         # Gap between trades — not in trade
         for i in range(7, 11):
-            assert curve["in_trade"].iloc[i] is np.bool_(False), f"gap idx={i}"
+            assert curve["in_trade"].iloc[i] == False, f"gap idx={i}"  # noqa: E712
 
         # t2 entry to exit
         for i in range(11, 15):
-            assert curve["in_trade"].iloc[i] is np.bool_(True), f"t2 idx={i}"
+            assert curve["in_trade"].iloc[i] == True, f"t2 idx={i}"  # noqa: E712
 
 
 # ---------------------------------------------------------------------------

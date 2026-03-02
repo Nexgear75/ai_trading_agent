@@ -82,5 +82,5 @@ Construire la courbe d'équité normalisée avec résolution par bougie, conform
 - [x] Critères d'acceptation tous satisfaits.
 - [x] `ruff check ai_trading/ tests/` passe sans erreur.
 - [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
-- [ ] **Commit GREEN** : `[WS-8] #029 GREEN: courbe d'équité`.
-- [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-8] #029 — Courbe d'équité (equity curve)`.
+- [x] **Commit GREEN** : `[WS-8] #029 GREEN: courbe d'équité`.
+- [x] **Pull Request ouverte** vers `Max6000i1` : `[WS-8] #029 — Courbe d'équité (equity curve)`.

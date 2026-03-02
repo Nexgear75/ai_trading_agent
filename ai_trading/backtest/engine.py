@@ -182,6 +182,7 @@ def build_equity_curve(
 
     # Validate trades and resolve positional indices
     trade_ranges: list[tuple[int, int, float]] = []
+    exit_events: dict[int, float] = {}
     for i, trade in enumerate(trades):
         for key in _REQUIRED_TRADE_KEYS:
             if key not in trade:
@@ -200,6 +201,16 @@ def build_equity_curve(
             )
         entry_pos = ts_to_idx[entry_time]
         exit_pos = ts_to_idx[exit_time]
+        if exit_pos < entry_pos:
+            raise ValueError(
+                f"trade[{i}]: exit_pos ({exit_pos}) < entry_pos ({entry_pos})"
+            )
+        if exit_pos in exit_events:
+            raise ValueError(
+                f"trade[{i}]: duplicate exit at position {exit_pos} "
+                f"(overlapping trades are not allowed)"
+            )
+        exit_events[exit_pos] = trade["r_net"]
         trade_ranges.append((entry_pos, exit_pos, trade["r_net"]))
 
     # Build equity and in_trade arrays
@@ -209,12 +220,9 @@ def build_equity_curve(
     current_equity = float(initial_equity)
     equity[0] = current_equity
 
-    # Mark in_trade ranges and record exit events
-    exit_events: dict[int, float] = {}
-    for entry_pos, exit_pos, r_net in trade_ranges:
-        for j in range(entry_pos, exit_pos + 1):
-            in_trade[j] = True
-        exit_events[exit_pos] = r_net
+    # Mark in_trade ranges (vectorized slice assignment)
+    for entry_pos, exit_pos, _r_net in trade_ranges:
+        in_trade[entry_pos : exit_pos + 1] = True
 
     # Walk forward candle by candle
     for t in range(n):
