@@ -16,7 +16,6 @@ from ai_trading.metrics.prediction import (
     compute_spearman_ic,
 )
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -375,9 +374,12 @@ class TestComputePredictionMetrics:
             compute_prediction_metrics(y_true, y_hat, output_type="invalid")
 
     def test_da_none_propagated(self):
-        """DA=None propagated when all samples excluded."""
-        y_true = np.array([0.0, 0.0, 0.0], dtype=np.float64)
-        y_hat = np.array([1.0, 2.0, 3.0], dtype=np.float64)
+        """DA=None propagated when all y_true samples are zero (excluded from DA)."""
+        # y_true has zeros mixed with non-zeros: zeros excluded from DA only
+        y_true = np.array([0.0, 0.0, 1.0, -1.0], dtype=np.float64)
+        y_hat = np.array([1.0, 2.0, 0.0, 0.0], dtype=np.float64)
+        # DA: eligible = idx 2 (y=1, ŷ=0 → excluded), idx 3 (y=-1, ŷ=0 → excluded)
+        # idx 0, 1: y=0 → excluded. All excluded → DA = None
         result = compute_prediction_metrics(y_true, y_hat, output_type="regression")
         assert result["mae"] is not None
         assert result["rmse"] is not None
