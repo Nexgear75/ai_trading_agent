@@ -1,6 +1,6 @@
 # Tâche — Interface abstraite BaseModel et registre MODEL_REGISTRY
 
-Statut : TODO
+Statut : DONE
 Ordre : 024
 Workstream : WS-6
 Milestone : M3
@@ -52,30 +52,30 @@ Implémenter la classe abstraite `BaseModel(ABC)` dans `ai_trading/models/base.p
 - Note : les imports des baselines (`no_trade.py`, `buy_hold.py`, `sma_rule.py`) ne sont ajoutés qu'à M4
 
 ## Critères d'acceptation
-- [ ] Classe abstraite `BaseModel(ABC)` importable depuis `ai_trading.models.base`
-- [ ] Un modèle qui n'implémente pas les méthodes abstraites lève `TypeError` à l'instanciation
-- [ ] `output_type` est un attribut de classe obligatoire, vérifié à l'instanciation ou par convention ABC
-- [ ] `execution_mode` a la valeur par défaut `"standard"` dans `BaseModel`
-- [ ] `MODEL_REGISTRY` résout un nom enregistré vers la classe modèle correspondante
-- [ ] Un nom inconnu dans le registre lève `ValueError`
-- [ ] `@register_model("name")` enregistre correctement une sous-classe
-- [ ] Signature `fit()` accepte `meta_train`, `meta_val` et `ohlcv` optionnels
-- [ ] Docstring du contrat exhaustive (shapes, types, anti-fuite)
-- [ ] Tests couvrent les scénarios nominaux + erreurs + bords
-- [ ] Suite de tests verte après implémentation
-- [ ] `ruff check` passe sans erreur
+- [x] Classe abstraite `BaseModel(ABC)` importable depuis `ai_trading.models.base`
+- [x] Un modèle qui n'implémente pas les méthodes abstraites lève `TypeError` à l'instanciation
+- [x] `output_type` est un attribut de classe obligatoire, vérifié à l'instanciation ou par convention ABC
+- [x] `execution_mode` a la valeur par défaut `"standard"` dans `BaseModel`
+- [x] `MODEL_REGISTRY` résout un nom enregistré vers la classe modèle correspondante
+- [x] Un nom inconnu dans le registre lève `ValueError`
+- [x] `@register_model("name")` enregistre correctement une sous-classe
+- [x] Signature `fit()` accepte `meta_train`, `meta_val` et `ohlcv` optionnels
+- [x] Docstring du contrat exhaustive (shapes, types, anti-fuite)
+- [x] Tests couvrent les scénarios nominaux + erreurs + bords
+- [x] Suite de tests verte après implémentation
+- [x] `ruff check` passe sans erreur
 
 ## Pré-condition de démarrage
 - **Tous les tests existants sont GREEN** avant de commencer.
 - **Créer une branche dédiée** `task/024-base-model-registry` depuis `Max6000i1`.
 
 ## Checklist de fin de tâche
-- [ ] Branche `task/024-base-model-registry` créée depuis `Max6000i1`.
-- [ ] Tests RED écrits avant implémentation.
-- [ ] **Commit RED** : `[WS-6] #024 RED: tests BaseModel ABC et MODEL_REGISTRY` (fichiers de tests uniquement).
-- [ ] Tests GREEN passants et reproductibles.
-- [ ] Critères d'acceptation tous satisfaits.
-- [ ] `ruff check ai_trading/ tests/` passe sans erreur.
-- [ ] Fichier de tâche mis à jour (statut DONE, critères cochés).
-- [ ] **Commit GREEN** : `[WS-6] #024 GREEN: BaseModel ABC et MODEL_REGISTRY`.
-- [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-6] #024 — Interface abstraite BaseModel et registre MODEL_REGISTRY`.
+- [x] Branche `task/024-base-model-registry` créée depuis `Max6000i1`.
+- [x] Tests RED écrits avant implémentation.
+- [x] **Commit RED** : `[WS-6] #024 RED: tests BaseModel ABC et MODEL_REGISTRY` (fichiers de tests uniquement).
+- [x] Tests GREEN passants et reproductibles.
+- [x] Critères d'acceptation tous satisfaits.
+- [x] `ruff check ai_trading/ tests/` passe sans erreur.
+- [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
+- [x] **Commit GREEN** : `[WS-6] #024 GREEN: BaseModel ABC et MODEL_REGISTRY`.
+- [x] **Pull Request ouverte** vers `Max6000i1` : `[WS-6] #024 — Interface abstraite BaseModel et registre MODEL_REGISTRY` (PR #37).
