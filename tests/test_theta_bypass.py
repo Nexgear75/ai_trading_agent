@@ -21,7 +21,6 @@ import pytest
 from ai_trading.calibration.threshold import calibrate_threshold
 from ai_trading.models.base import BaseModel
 
-
 # ---------------------------------------------------------------------------
 # Helpers — signal model stub
 # ---------------------------------------------------------------------------
@@ -37,9 +36,9 @@ class _SignalModelStub(BaseModel):
 
     def fit(
         self,
-        X_train: np.ndarray,
+        X_train: np.ndarray,  # noqa: N803
         y_train: np.ndarray,
-        X_val: np.ndarray,
+        X_val: np.ndarray,  # noqa: N803
         y_val: np.ndarray,
         config: Any,
         run_dir: Path,
@@ -51,7 +50,7 @@ class _SignalModelStub(BaseModel):
 
     def predict(
         self,
-        X: np.ndarray,
+        X: np.ndarray,  # noqa: N803
         meta: Any = None,
         ohlcv: Any = None,
     ) -> np.ndarray:
@@ -397,8 +396,8 @@ class TestSignalModelStubIntegration:
         """Signal model stub returns binary predictions unchanged."""
         preds = np.array([0, 1, 1, 0], dtype=np.float32)
         model = _SignalModelStub(preds)
-        X_dummy = np.zeros((4, 5, 3), dtype=np.float32)
-        y_hat = model.predict(X_dummy)
+        x_dummy = np.zeros((4, 5, 3), dtype=np.float32)
+        y_hat = model.predict(x_dummy)
         np.testing.assert_array_equal(y_hat, preds)
 
 
@@ -409,5 +408,5 @@ class TestDummyModelRegressionCalibration:
         """DummyModel declares output_type='regression'."""
         from ai_trading.models.dummy import DummyModel
 
-        model = DummyModel(seed=42)
-        assert model.output_type == "regression"
+        model = DummyModel()
+        assert model.__class__.__dict__["output_type"] == "regression"

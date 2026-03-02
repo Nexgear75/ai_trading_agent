@@ -1,6 +1,6 @@
 # Tâche — Bypass calibration θ pour RL et baselines
 
-Statut : TODO
+Statut : DONE
 Ordre : 033
 Workstream : WS-7
 Milestone : M3
@@ -47,28 +47,28 @@ Implémenter la logique de bypass de la calibration θ quand `model.output_type 
 - **SMA exception** : la SMA est explicitement paramétrée via `config.baselines.sma`, mais ne passe PAS par la calibration θ
 
 ## Critères d'acceptation
-- [ ] `output_type == "signal"` → calibration θ totalement bypassée (pas de quantiles, pas de backtest calibration)
-- [ ] `output_type == "regression"` → calibration normale (pas de régression)
-- [ ] Retour de calibration pour bypass : `method = "none"`, `theta = None`
-- [ ] Les signaux binaires (0/1) sont passés directement au backtest sans transformation
-- [ ] Aucun branchement sur `strategy.name` — uniquement sur `output_type`
-- [ ] Test avec un modèle factice `output_type = "signal"` : calibration bypassée, signaux utilisés directement
-- [ ] Test avec DummyModel (`output_type = "regression"`) : calibration normale exécutée
-- [ ] Tests couvrent les scénarios nominaux + erreurs + bords
-- [ ] Suite de tests verte après implémentation
-- [ ] `ruff check` passe sans erreur
+- [x] `output_type == "signal"` → calibration θ totalement bypassée (pas de quantiles, pas de backtest calibration)
+- [x] `output_type == "regression"` → calibration normale (pas de régression)
+- [x] Retour de calibration pour bypass : `method = "none"`, `theta = None`
+- [x] Les signaux binaires (0/1) sont passés directement au backtest sans transformation
+- [x] Aucun branchement sur `strategy.name` — uniquement sur `output_type`
+- [x] Test avec un modèle factice `output_type = "signal"` : calibration bypassée, signaux utilisés directement
+- [x] Test avec DummyModel (`output_type = "regression"`) : calibration normale exécutée
+- [x] Tests couvrent les scénarios nominaux + erreurs + bords
+- [x] Suite de tests verte après implémentation
+- [x] `ruff check` passe sans erreur
 
 ## Pré-condition de démarrage
 - **Tous les tests existants sont GREEN** avant de commencer.
 - **Créer une branche dédiée** `task/033-theta-bypass` depuis `Max6000i1`.
 
 ## Checklist de fin de tâche
-- [ ] Branche `task/033-theta-bypass` créée depuis `Max6000i1`.
-- [ ] Tests RED écrits avant implémentation.
-- [ ] **Commit RED** : `[WS-7] #033 RED: tests bypass calibration θ pour signal models` (fichiers de tests uniquement).
-- [ ] Tests GREEN passants et reproductibles.
-- [ ] Critères d'acceptation tous satisfaits.
-- [ ] `ruff check ai_trading/ tests/` passe sans erreur.
-- [ ] Fichier de tâche mis à jour (statut DONE, critères cochés).
-- [ ] **Commit GREEN** : `[WS-7] #033 GREEN: bypass calibration θ pour RL et baselines`.
+- [x] Branche `task/033-theta-bypass` créée depuis `Max6000i1`.
+- [x] Tests RED écrits avant implémentation.
+- [x] **Commit RED** : `[WS-7] #033 RED: tests bypass calibration θ pour signal models` (fichiers de tests uniquement).
+- [x] Tests GREEN passants et reproductibles.
+- [x] Critères d'acceptation tous satisfaits.
+- [x] `ruff check ai_trading/ tests/` passe sans erreur.
+- [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
+- [x] **Commit GREEN** : `[WS-7] #033 GREEN: bypass calibration θ pour RL et baselines`.
 - [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-7] #033 — Bypass calibration θ pour RL et baselines`.
