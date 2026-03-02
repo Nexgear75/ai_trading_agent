@@ -7,10 +7,8 @@ return, la cohérence avec l'équité finale, et les cas limites.
 
 from __future__ import annotations
 
-import math
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 import pytest
 
@@ -441,8 +439,7 @@ class TestEntryPriceValidation:
     """entry_price must be > 0 (gross_return computation requires it)."""
 
     def test_zero_entry_price_raises(self, tmp_path: Path) -> None:
-        trade = _make_enriched_trade(entry_price=0.0, exit_price=100.0)
-        # Force entry_price to 0 (helper computes derived fields with s)
+        trade = _make_enriched_trade()
         trade["entry_price"] = 0.0
         with pytest.raises(ValueError, match="entry_price"):
             export_trade_journal([trade], tmp_path / "t.csv", F, S)
