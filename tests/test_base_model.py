@@ -31,7 +31,6 @@ from ai_trading.models.base import (
     register_model,
 )
 
-
 # ---------------------------------------------------------------------------
 # Registry cleanup fixture (mirrors FEATURE_REGISTRY pattern)
 # ---------------------------------------------------------------------------
