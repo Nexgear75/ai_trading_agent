@@ -100,7 +100,7 @@ class SmaRuleBaseline(BaselinePersistenceMixin, BaseModel):
             If *ohlcv* or *meta* is ``None``, or if ``fit()`` has not been called.
         """
         if self._fast is None or self._slow is None:
-            raise RuntimeError(
+            raise ValueError(
                 "SmaRuleBaseline.predict() called before fit(). "
                 "Call fit() first to configure SMA parameters."
             )
@@ -119,8 +119,16 @@ class SmaRuleBaseline(BaselinePersistenceMixin, BaseModel):
         nan_mask = sma_fast.isna() | sma_slow.isna()
         raw_signal[nan_mask] = 0.0
 
-        # Temporal alignment: select signals at decision_time timestamps
+        # Temporal alignment: decision_time is close_time (open_time + interval).
+        # raw_signal is indexed by ohlcv.index (open_time), so we must map
+        # decision_times back to open_times before indexing.
         decision_times = meta["decision_time"]
-        aligned = raw_signal.loc[decision_times].values.astype(np.float32)
+        if len(ohlcv.index) < 2:
+            raise ValueError(
+                "Cannot infer bar interval from ohlcv index with fewer than 2 bars."
+            )
+        interval = ohlcv.index[1] - ohlcv.index[0]
+        open_times = decision_times - interval
+        aligned = raw_signal.loc[open_times].values.astype(np.float32)
 
         return aligned
