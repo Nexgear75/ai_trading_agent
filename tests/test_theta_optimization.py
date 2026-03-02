@@ -283,18 +283,16 @@ class TestCalibrateThresholdEquityReset:
     """#031 — Equity must be reset to E_0 for each candidate."""
 
     def test_equity_independent_per_candidate(self) -> None:
-        """Details show each candidate evaluated from initial_equity=1.0,
-        not accumulated from a previous candidate."""
+        """Candidate metrics are identical whether evaluated alone or
+        alongside other candidates (no cross-contamination)."""
         n = 200
         ohlcv = _make_ohlcv(n)
         y_hat_val = _make_y_hat_val(n)
 
         q_grid = [0.3, 0.5, 0.7]
-
-        result = calibrate_threshold(
+        common_kwargs = dict(
             y_hat_val=y_hat_val,
             ohlcv_val=ohlcv,
-            q_grid=q_grid,
             horizon=HORIZON,
             fee_rate_per_side=0.0005,
             slippage_rate_per_side=0.00025,
@@ -305,17 +303,20 @@ class TestCalibrateThresholdEquityReset:
             min_trades=0,
         )
 
-        # Running the same candidate alone should give the same result
-        # (no cross-contamination between candidates).
-        # The candidate net_pnl should be deterministic regardless of
-        # position in q_grid order.
-        for detail in result["details"]:
-            assert "net_pnl" in detail
-            assert "mdd" in detail
-            assert "n_trades" in detail
-            assert isinstance(detail["net_pnl"], float)
-            assert isinstance(detail["mdd"], float)
-            assert isinstance(detail["n_trades"], int)
+        # Run with all candidates together
+        result_all = calibrate_threshold(q_grid=q_grid, **common_kwargs)
+        metrics_all = {
+            d["quantile"]: (d["net_pnl"], d["mdd"], d["n_trades"])
+            for d in result_all["details"]
+        }
+
+        # Run each candidate in isolation and compare
+        for q in q_grid:
+            result_solo = calibrate_threshold(q_grid=[q], **common_kwargs)
+            solo_detail = result_solo["details"][0]
+            assert solo_detail["net_pnl"] == pytest.approx(metrics_all[q][0])
+            assert solo_detail["mdd"] == pytest.approx(metrics_all[q][1])
+            assert solo_detail["n_trades"] == metrics_all[q][2]
 
 
 # ---------------------------------------------------------------------------
