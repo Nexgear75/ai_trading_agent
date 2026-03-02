@@ -67,6 +67,9 @@ Tu dois :
 - [ ] Pas de test désactivé (`@pytest.mark.skip`, `xfail`) sans justification explicite.
 - [ ] Les tests sont déterministes (seeds fixées si aléatoire).
 - [ ] Les tests utilisent des données synthétiques (pas de dépendance réseau).
+- [ ] **Portabilité des chemins** : pas de chemin OS-spécifique hardcodé (`/tmp/...`). Tous les chemins temporaires utilisent la fixture pytest `tmp_path`.
+- [ ] **Tests de registre réalistes** : si un test vérifie l'enregistrement automatique dans un registre via décorateur, il doit utiliser `importlib.reload(module)` après nettoyage du registre — pas un appel manuel à `register_xxx()`. Comparer avec `mod.ClassName` (module rechargé).
+- [ ] **Contrat ABC complètement testé** : si une méthode abstraite documente qu'elle accepte plusieurs types d'entrée (ex : `path` = directory ou fichier), les tests couvrent chaque variante.
 
 ### 5. Audit du code — Règles non négociables
 
@@ -112,6 +115,7 @@ Tu dois :
 - [ ] Pas de code mort, commenté ou TODO orphelin.
 - [ ] Pas de `print()` de debug restant (utiliser `logging` si nécessaire).
 - [ ] Imports propres (pas d'imports inutilisés, pas d'imports `*`).
+- [ ] **Imports intra-package relatifs** : les `__init__.py` qui importent des sous-modules pour side-effect (peuplement de registres) doivent utiliser des imports relatifs (`from . import module`), jamais des imports absolus auto-référençants (`from ai_trading.package import module`).
 - [ ] Pas de fichiers générés ou temporaires inclus dans la PR.
 - [ ] `.gitignore` couvre les artefacts générés.
 - [ ] **DRY — pas de duplication de constantes/mappings** entre modules du même package. Si un dict, une constante ou un mapping est identique dans 2+ fichiers, exiger l'extraction vers un module partagé. Classer comme **bloquant** (risque de drift silencieux).
