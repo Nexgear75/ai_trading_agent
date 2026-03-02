@@ -120,7 +120,7 @@ class TestCalibrateThresholdSingleFeasible:
             objective="max_net_pnl_with_mdd_cap",
             mdd_cap=1.0,  # very permissive
             min_trades=1,
-        output_type="regression",
+            output_type="regression",
         )
 
         # Result must be a dict with expected keys
@@ -166,7 +166,7 @@ class TestCalibrateThresholdBestPnl:
             objective="max_net_pnl_with_mdd_cap",
             mdd_cap=1.0,  # very permissive
             min_trades=0,
-        output_type="regression",
+            output_type="regression",
         )
 
         # Among feasible candidates, the selected one must have the best net_pnl
@@ -220,7 +220,7 @@ class TestCalibrateThresholdTiebreaker:
             objective="max_net_pnl_with_mdd_cap",
             mdd_cap=1.0,
             min_trades=0,
-        output_type="regression",
+            output_type="regression",
         )
 
         # All θ identical → all net_pnl identical → tiebreaker = highest quantile
@@ -253,7 +253,7 @@ class TestCalibrateThresholdNoFeasible:
             objective="max_net_pnl_with_mdd_cap",
             mdd_cap=0.01,  # very tight
             min_trades=10000,  # impossible
-        output_type="regression",
+            output_type="regression",
         )
 
         # Fallback applies: either relaxed or θ = +∞
@@ -293,7 +293,7 @@ class TestCalibrateThresholdEquityReset:
             objective="max_net_pnl_with_mdd_cap",
             mdd_cap=1.0,
             min_trades=0,
-            output_type="regression",
+                output_type="regression",
         )
 
         # Run with all candidates together
@@ -339,7 +339,7 @@ class TestCalibrateThresholdAntiLeak:
             objective="max_net_pnl_with_mdd_cap",
             mdd_cap=1.0,
             min_trades=0,
-        output_type="regression",
+            output_type="regression",
         )
         result2 = calibrate_threshold(
             y_hat_val=y_hat_val,
@@ -353,7 +353,7 @@ class TestCalibrateThresholdAntiLeak:
             objective="max_net_pnl_with_mdd_cap",
             mdd_cap=1.0,
             min_trades=0,
-        output_type="regression",
+            output_type="regression",
         )
 
         assert result1["theta"] == result2["theta"]
@@ -403,7 +403,7 @@ class TestCalibrateThresholdConstraints:
             objective="max_net_pnl_with_mdd_cap",
             mdd_cap=1.0,
             min_trades=0,
-        output_type="regression",
+            output_type="regression",
         )
 
         if result["theta"] is not None:
@@ -427,7 +427,7 @@ class TestCalibrateThresholdConstraints:
             objective="max_net_pnl_with_mdd_cap",
             mdd_cap=1.0,
             min_trades=1,
-        output_type="regression",
+            output_type="regression",
         )
 
         if result["theta"] is not None:
@@ -570,7 +570,7 @@ class TestCalibrateThresholdDetails:
             objective="max_net_pnl_with_mdd_cap",
             mdd_cap=1.0,
             min_trades=0,
-        output_type="regression",
+            output_type="regression",
         )
 
         for detail in result["details"]:
@@ -600,7 +600,7 @@ class TestCalibrateThresholdDetails:
             objective="max_net_pnl_with_mdd_cap",
             mdd_cap=1.0,
             min_trades=0,
-        output_type="regression",
+            output_type="regression",
         )
 
         assert len(result["details"]) == len(q_grid)
@@ -633,7 +633,7 @@ class TestCalibrateThresholdZeroTrades:
             objective="max_net_pnl_with_mdd_cap",
             mdd_cap=1.0,
             min_trades=0,
-        output_type="regression",
+            output_type="regression",
         )
 
         # With min_trades=0, the theta is feasible even with 0 trades
@@ -688,7 +688,7 @@ class TestCalibrateThresholdFallbackRelax:
             objective="max_net_pnl_with_mdd_cap",
             mdd_cap=1.0,  # permissive → all θ satisfy mdd_cap
             min_trades=10000,  # impossible → triggers fallback
-        output_type="regression",
+            output_type="regression",
         )
 
         # Must select a θ (not None) via fallback relaxation
@@ -718,7 +718,7 @@ class TestCalibrateThresholdFallbackRelax:
             objective="max_net_pnl_with_mdd_cap",
             mdd_cap=1.0,
             min_trades=10000,  # impossible → fallback
-        output_type="regression",
+            output_type="regression",
         )
 
         assert result["quantile"] == 0.9
@@ -770,7 +770,7 @@ class TestCalibrateThresholdFallbackRelax:
             objective="max_net_pnl_with_mdd_cap",
             mdd_cap=0.50,  # moderate: some pass, some don't
             min_trades=10000,  # impossible → triggers fallback
-        output_type="regression",
+            output_type="regression",
         )
 
         assert result["method"] == "fallback_relax_min_trades"
@@ -810,7 +810,7 @@ class TestCalibrateThresholdFallbackRelax:
             objective="max_net_pnl_with_mdd_cap",
             mdd_cap=1.0,
             min_trades=10000,
-        output_type="regression",
+            output_type="regression",
         )
 
         assert len(result["details"]) == len(q_grid)
@@ -845,7 +845,7 @@ class TestCalibrateThresholdFallbackNoTrade:
             objective="max_net_pnl_with_mdd_cap",
             mdd_cap=0.001,  # impossibly tight for crashing prices
             min_trades=1,
-        output_type="regression",
+            output_type="regression",
         )
 
         assert result["theta"] == float("inf")
@@ -899,7 +899,7 @@ class TestCalibrateThresholdFallbackNoTrade:
             objective="max_net_pnl_with_mdd_cap",
             mdd_cap=0.001,
             min_trades=1,
-        output_type="regression",
+            output_type="regression",
         )
 
         # Fold is present (theta is not None, it's +∞)
@@ -929,7 +929,7 @@ class TestCalibrateThresholdFallbackNoTrade:
             objective="max_net_pnl_with_mdd_cap",
             mdd_cap=0.001,
             min_trades=1,
-        output_type="regression",
+            output_type="regression",
         )
 
         assert result["quantile"] is None
@@ -962,7 +962,7 @@ class TestCalibrateThresholdFallbackNoRegression:
             objective="max_net_pnl_with_mdd_cap",
             mdd_cap=1.0,  # permissive
             min_trades=0,
-        output_type="regression",
+            output_type="regression",
         )
 
         assert result["method"] == "quantile_grid"

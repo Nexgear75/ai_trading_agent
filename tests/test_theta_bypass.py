@@ -334,8 +334,8 @@ class TestCalibrateThetaOutputTypeValidation:
                 output_type="invalid_type",
             )
 
-    def test_default_output_type_is_regression(self) -> None:
-        """When output_type not provided, TypeError is raised (mandatory param)."""
+    def test_output_type_is_mandatory(self) -> None:
+        """Omitting output_type raises TypeError (mandatory parameter)."""
         n = 50
         rng = np.random.default_rng(123)
         y_hat = rng.standard_normal(n).astype(np.float64)
