@@ -1,6 +1,6 @@
 # Tâche — Courbe d'équité (equity curve)
 
-Statut : TODO
+Statut : DONE
 Ordre : 029
 Workstream : WS-8
 Milestone : M3
@@ -55,32 +55,32 @@ Construire la courbe d'équité normalisée avec résolution par bougie, conform
 - Note : les métriques elles-mêmes sont en M4 (WS-10), mais l'equity curve doit fournir les données nécessaires
 
 ## Critères d'acceptation
-- [ ] Equity initialisée à `E_0 = config.backtest.initial_equity`
-- [ ] Equity constante hors position (pas de changement entre les trades)
-- [ ] Equity constante pendant un trade ouvert (pas de mark-to-market)
-- [ ] Equity mise à jour uniquement à la bougie de sortie : `E_exit = E_entry × (1 + w × r_net)`
-- [ ] `E_final = E_0 × Π(1 + w × r_net_i)` à `atol=1e-8`
-- [ ] Colonne `in_trade` correcte (False à décision, True de l'entrée à la sortie)
-- [ ] Format CSV conforme : colonnes `(time_utc, equity, in_trade)`
-- [ ] Test avec `w < 1.0` : impact du trade réduit proportionnellement
-- [ ] Exemple numérique vérifié : `E_before=1.0`, `w=1.0`, `f=0.001`, `s=0.0003`, `Open=100`, `Close=102` → `E_exit ≈ 1.0174`
-- [ ] Mode `single_trade` : un seul trade, equity constante jusqu'à la dernière bougie
-- [ ] Un trade avec drawdown intra-marché → equity constante (MDD ne capture pas le drawdown intra-trade)
-- [ ] Tests couvrent les scénarios nominaux + erreurs + bords
-- [ ] Suite de tests verte après implémentation
-- [ ] `ruff check` passe sans erreur
+- [x] Equity initialisée à `E_0 = config.backtest.initial_equity`
+- [x] Equity constante hors position (pas de changement entre les trades)
+- [x] Equity constante pendant un trade ouvert (pas de mark-to-market)
+- [x] Equity mise à jour uniquement à la bougie de sortie : `E_exit = E_entry × (1 + w × r_net)`
+- [x] `E_final = E_0 × Π(1 + w × r_net_i)` à `atol=1e-8`
+- [x] Colonne `in_trade` correcte (False à décision, True de l'entrée à la sortie)
+- [x] Format CSV conforme : colonnes `(time_utc, equity, in_trade)`
+- [x] Test avec `w < 1.0` : impact du trade réduit proportionnellement
+- [x] Exemple numérique vérifié : `E_before=1.0`, `w=1.0`, `f=0.001`, `s=0.0003`, `Open=100`, `Close=102` → `E_exit ≈ 1.0174`
+- [x] Mode `single_trade` : un seul trade, equity constante jusqu'à la dernière bougie
+- [x] Un trade avec drawdown intra-marché → equity constante (MDD ne capture pas le drawdown intra-trade)
+- [x] Tests couvrent les scénarios nominaux + erreurs + bords
+- [x] Suite de tests verte après implémentation
+- [x] `ruff check` passe sans erreur
 
 ## Pré-condition de démarrage
 - **Tous les tests existants sont GREEN** avant de commencer.
 - **Créer une branche dédiée** `task/029-equity-curve` depuis `Max6000i1`.
 
 ## Checklist de fin de tâche
-- [ ] Branche `task/029-equity-curve` créée depuis `Max6000i1`.
-- [ ] Tests RED écrits avant implémentation.
-- [ ] **Commit RED** : `[WS-8] #029 RED: tests courbe d'équité` (fichiers de tests uniquement).
-- [ ] Tests GREEN passants et reproductibles.
-- [ ] Critères d'acceptation tous satisfaits.
-- [ ] `ruff check ai_trading/ tests/` passe sans erreur.
-- [ ] Fichier de tâche mis à jour (statut DONE, critères cochés).
+- [x] Branche `task/029-equity-curve` créée depuis `Max6000i1`.
+- [x] Tests RED écrits avant implémentation.
+- [x] **Commit RED** : `[WS-8] #029 RED: tests courbe d'équité` (fichiers de tests uniquement).
+- [x] Tests GREEN passants et reproductibles.
+- [x] Critères d'acceptation tous satisfaits.
+- [x] `ruff check ai_trading/ tests/` passe sans erreur.
+- [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
 - [ ] **Commit GREEN** : `[WS-8] #029 GREEN: courbe d'équité`.
 - [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-8] #029 — Courbe d'équité (equity curve)`.

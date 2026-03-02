@@ -265,7 +265,6 @@ class TestInTradeColumn:
         trade = _make_enriched_trade(ohlcv, signal_idx=5, horizon=HORIZON)
         curve = build_equity_curve([trade], ohlcv, 1.0, 1.0)
 
-        signal_idx = 5
         entry_idx = 6
         exit_idx = 9
 
@@ -324,7 +323,9 @@ class TestCsvRoundtrip:
 
         loaded = pd.read_csv(csv_path)
         np.testing.assert_allclose(
-            loaded["equity"].values, curve["equity"].values, atol=1e-12
+            np.asarray(loaded["equity"].values),
+            np.asarray(curve["equity"].values),
+            atol=1e-12,
         )
 
 
@@ -339,7 +340,7 @@ class TestNoTrades:
     def test_no_trades_equity_constant(self) -> None:
         ohlcv = _make_ohlcv(20)
         curve = build_equity_curve([], ohlcv, 1.0, 1.0)
-        np.testing.assert_allclose(curve["equity"].values, 1.0)
+        np.testing.assert_allclose(np.asarray(curve["equity"].values), 1.0)
 
     def test_no_trades_in_trade_all_false(self) -> None:
         ohlcv = _make_ohlcv(20)
@@ -566,6 +567,6 @@ class TestOutputShape:
     def test_time_utc_matches_ohlcv_index(self) -> None:
         ohlcv = _make_ohlcv(20)
         curve = build_equity_curve([], ohlcv, 1.0, 1.0)
-        pd.testing.assert_index_equal(
-            pd.DatetimeIndex(curve["time_utc"]), ohlcv.index
+        np.testing.assert_array_equal(
+            pd.DatetimeIndex(curve["time_utc"]).values, ohlcv.index.values
         )
