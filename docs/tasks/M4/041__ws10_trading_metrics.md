@@ -1,6 +1,6 @@
 # Tâche — Métriques de trading
 
-Statut : TODO
+Statut : DONE
 Ordre : 041
 Workstream : WS-10
 Milestone : M4
@@ -45,33 +45,33 @@ Implémenter le module `metrics/trading.py` calculant toutes les métriques de t
 - Créer `tests/test_trading_metrics.py`.
 
 ## Critères d'acceptation
-- [ ] `net_pnl` et `net_return` corrects sur equity synthétique.
-- [ ] `max_drawdown` ∈ [0, 1], test numérique sur courbe avec drawdown connu.
-- [ ] `sharpe` calculé sur toute la grille test (y compris r_t = 0 hors trade), avec epsilon.
-- [ ] `profit_factor` : 0 trades → null, que gagnants → null, que perdants → 0.0, cas normal → ratio correct.
-- [ ] `hit_rate` : ratio wins/total, test numérique.
-- [ ] `n_trades` : comptage correct.
-- [ ] `avg_trade_return` et `median_trade_return` : tests numériques.
-- [ ] `exposure_time_frac` : correct pour standard et single_trade modes.
-- [ ] `sharpe_per_trade` : calculé sur r_net des trades uniquement, null si 0 trades.
-- [ ] Cas `n_trades == 0` : toutes les métriques conformes aux valeurs spécifiées.
-- [ ] Sharpe annualisé calculé si `config.metrics.sharpe_annualized == true`.
-- [ ] Métriques en float64.
-- [ ] Tests couvrent les scénarios nominaux + erreurs + bords.
-- [ ] Suite de tests verte après implémentation.
-- [ ] `ruff check` passe sans erreur.
+- [x] `net_pnl` et `net_return` corrects sur equity synthétique.
+- [x] `max_drawdown` ∈ [0, 1], test numérique sur courbe avec drawdown connu.
+- [x] `sharpe` calculé sur toute la grille test (y compris r_t = 0 hors trade), avec epsilon.
+- [x] `profit_factor` : 0 trades → null, que gagnants → null, que perdants → 0.0, cas normal → ratio correct.
+- [x] `hit_rate` : ratio wins/total, test numérique.
+- [x] `n_trades` : comptage correct.
+- [x] `avg_trade_return` et `median_trade_return` : tests numériques.
+- [x] `exposure_time_frac` : correct pour standard et single_trade modes.
+- [x] `sharpe_per_trade` : calculé sur r_net des trades uniquement, null si 0 trades.
+- [x] Cas `n_trades == 0` : toutes les métriques conformes aux valeurs spécifiées.
+- [x] Sharpe annualisé calculé si `config.metrics.sharpe_annualized == true`.
+- [x] Métriques en float64.
+- [x] Tests couvrent les scénarios nominaux + erreurs + bords.
+- [x] Suite de tests verte après implémentation.
+- [x] `ruff check` passe sans erreur.
 
 ## Pré-condition de démarrage
 - **Tous les tests existants sont GREEN** avant de commencer.
 - **Créer une branche dédiée** `task/041-trading-metrics` depuis `Max6000i1`.
 
 ## Checklist de fin de tâche
-- [ ] Branche `task/041-trading-metrics` créée depuis `Max6000i1`.
-- [ ] Tests RED écrits avant implémentation.
-- [ ] **Commit RED** : `[WS-10] #041 RED: <résumé>` (fichiers de tests uniquement).
-- [ ] Tests GREEN passants et reproductibles.
-- [ ] Critères d'acceptation tous satisfaits.
-- [ ] `ruff check ai_trading/ tests/` passe sans erreur.
-- [ ] Fichier de tâche mis à jour (statut DONE, critères cochés).
-- [ ] **Commit GREEN** : `[WS-10] #041 GREEN: <résumé>`.
-- [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-10] #041 — Métriques de trading`.
+- [x] Branche `task/041-trading-metrics` créée depuis `Max6000i1`.
+- [x] Tests RED écrits avant implémentation.
+- [x] **Commit RED** : `[WS-10] #041 RED: <résumé>` (fichiers de tests uniquement).
+- [x] Tests GREEN passants et reproductibles.
+- [x] Critères d'acceptation tous satisfaits.
+- [x] `ruff check ai_trading/ tests/` passe sans erreur.
+- [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
+- [x] **Commit GREEN** : `[WS-10] #041 GREEN: trading metrics module`.
+- [x] **Pull Request ouverte** vers `Max6000i1` : `[WS-10] #041 — Métriques de trading`.
