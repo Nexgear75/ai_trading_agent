@@ -11,6 +11,7 @@ from numpy.typing import NDArray
 
 from ai_trading.backtest.costs import apply_cost_model
 from ai_trading.backtest.engine import build_equity_curve, execute_trades
+from ai_trading.models.base import VALID_OUTPUT_TYPES
 
 logger = logging.getLogger(__name__)
 
@@ -125,8 +126,6 @@ def compute_max_drawdown(equity: NDArray[np.floating]) -> float:
     return float(np.max(drawdowns))
 
 
-_VALID_OUTPUT_TYPES = frozenset({"regression", "signal"})
-
 
 def calibrate_threshold(
     y_hat_val: NDArray[np.floating],
@@ -140,7 +139,7 @@ def calibrate_threshold(
     objective: str,
     mdd_cap: float,
     min_trades: int,
-    output_type: str = "regression",
+    output_type: str,
 ) -> dict:
     """Calibrate threshold θ on validation data (§11.3).
 
@@ -164,7 +163,7 @@ def calibrate_threshold(
     objective : Optimization objective name.
     mdd_cap : Maximum allowed drawdown.
     min_trades : Minimum number of trades required.
-    output_type : Model output type — ``"regression"`` (default) runs full
+    output_type : Model output type — ``"regression"`` runs full
         calibration, ``"signal"`` bypasses calibration entirely.
 
     Returns
@@ -174,9 +173,9 @@ def calibrate_threshold(
         details=None.
     """
     # --- Validate output_type ---
-    if output_type not in _VALID_OUTPUT_TYPES:
+    if output_type not in VALID_OUTPUT_TYPES:
         raise ValueError(
-            f"output_type must be one of {sorted(_VALID_OUTPUT_TYPES)}, "
+            f"output_type must be one of {sorted(VALID_OUTPUT_TYPES)}, "
             f"got '{output_type}'"
         )
 
