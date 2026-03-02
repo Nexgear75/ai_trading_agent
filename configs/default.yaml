@@ -94,11 +94,6 @@ scaling:
 strategy:
   strategy_type: model            # model | baseline
   name: xgboost_reg              # xgboost_reg | cnn1d_reg | gru_reg | lstm_reg | patchtst_reg | rl_ppo | no_trade | buy_hold | sma_rule
-  # NOTE : framework est AUTO-DÉRIVÉ de strategy.name par l'orchestrateur (WS-12.2).
-  # La valeur ci-dessous est purement informative et sera écrasée dans le manifest.
-  # Mapping : xgboost_reg→xgboost, cnn1d/gru/lstm/patchtst/rl_ppo→pytorch, baselines→rule_based.
-  # Un warning est émis si cette valeur diffère de la dérivation automatique.
-  framework: xgboost
 
 # --- Thresholding (calibration θ) -------------------------------------------
 thresholding:

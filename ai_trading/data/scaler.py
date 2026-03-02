@@ -88,8 +88,8 @@ class StandardScaler:
         n, seq_len, f = x_train.shape
         flat = x_train.reshape(n * seq_len, f)
 
-        mean = flat.mean(axis=0).astype(np.float32)
-        std = flat.std(axis=0).astype(np.float32)
+        mean = flat.mean(axis=0).astype(np.float64)
+        std = flat.std(axis=0).astype(np.float64)
         self.mean_ = mean
         self.std_ = std
 
@@ -250,18 +250,18 @@ class RobustScaler:
         n, seq_len, f = x_train.shape
         flat = x_train.reshape(n * seq_len, f)
 
-        median = np.median(flat, axis=0).astype(np.float32)
-        q_low = np.quantile(flat, self._quantile_low, axis=0).astype(np.float32)
-        q_high = np.quantile(flat, self._quantile_high, axis=0).astype(np.float32)
-        iqr = (q_high - q_low).astype(np.float32)
+        median = np.median(flat, axis=0).astype(np.float64)
+        q_low = np.quantile(flat, self._quantile_low, axis=0).astype(np.float64)
+        q_high = np.quantile(flat, self._quantile_high, axis=0).astype(np.float64)
+        iqr = (q_high - q_low).astype(np.float64)
 
         self.median_ = median
         self.iqr_ = iqr
 
         # Compute clip bounds in *scaled* space: (q - median) / (iqr + eps)
         denom = iqr + self._epsilon
-        self.clip_low_ = ((q_low - median) / denom).astype(np.float32)
-        self.clip_high_ = ((q_high - median) / denom).astype(np.float32)
+        self.clip_low_ = ((q_low - median) / denom).astype(np.float64)
+        self.clip_high_ = ((q_high - median) / denom).astype(np.float64)
 
         # Guard: warn about constant features
         constant_mask = iqr < CONSTANT_FEATURE_SIGMA_THRESHOLD

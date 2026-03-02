@@ -89,6 +89,14 @@ class TestNominal:
         x_val_scaled = scaler.transform(x_val_3d)
         assert x_val_scaled.shape == x_val_3d.shape
 
+    def test_params_stored_in_float64(self, x_train_3d, config_epsilon):
+        """#021 — Scaler params (mean_, std_) must be float64 (convention P-02)."""
+        scaler = StandardScaler(epsilon=config_epsilon)
+        scaler.fit(x_train_3d)
+
+        assert scaler.mean_.dtype == np.float64
+        assert scaler.std_.dtype == np.float64
+
     def test_transform_preserves_float32(self, x_train_3d, x_val_3d, config_epsilon):
         """#021 — Transform output must be float32."""
         scaler = StandardScaler(epsilon=config_epsilon)
@@ -372,14 +380,14 @@ class TestSaveLoad:
 # ===========================================================================
 
 class TestFloat32:
-    """#021 — Verify float32 consistency in stats and output."""
+    """#021 — Verify float64 params and float32 output."""
 
-    def test_mean_std_are_float32(self, x_train_3d, config_epsilon):
-        """Fitted mean_ and std_ must be float32."""
+    def test_mean_std_are_float64(self, x_train_3d, config_epsilon):
+        """Fitted mean_ and std_ must be float64 (convention P-02)."""
         scaler = StandardScaler(epsilon=config_epsilon)
         scaler.fit(x_train_3d)
-        assert scaler.mean_.dtype == np.float32
-        assert scaler.std_.dtype == np.float32
+        assert scaler.mean_.dtype == np.float64
+        assert scaler.std_.dtype == np.float64
 
 
 # ===========================================================================

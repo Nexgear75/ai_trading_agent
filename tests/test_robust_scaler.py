@@ -114,6 +114,23 @@ class TestRobustNominal:
         x_val_scaled = scaler.transform(x_val_3d)
         assert x_val_scaled.shape == x_val_3d.shape
 
+    def test_params_stored_in_float64(
+        self, x_train_3d, config_epsilon,
+        config_quantile_low, config_quantile_high
+    ):
+        """#022 — Scaler params must be float64 (convention P-02)."""
+        scaler = RobustScaler(
+            epsilon=config_epsilon,
+            quantile_low=config_quantile_low,
+            quantile_high=config_quantile_high,
+        )
+        scaler.fit(x_train_3d)
+
+        assert scaler.median_.dtype == np.float64
+        assert scaler.iqr_.dtype == np.float64
+        assert scaler.clip_low_.dtype == np.float64
+        assert scaler.clip_high_.dtype == np.float64
+
     def test_transform_preserves_float32(
         self, x_train_3d, x_val_3d, config_epsilon,
         config_quantile_low, config_quantile_high
@@ -187,7 +204,9 @@ class TestRobustClipping:
         x_scaled = scaler.transform(x_test)
         # The clipped value should not exceed the quantile bounds computed from train
         assert scaler.clip_high_ is not None
-        assert x_scaled[0, 0, 0] == scaler.clip_high_[0]
+        np.testing.assert_allclose(
+            x_scaled[0, 0, 0], scaler.clip_high_[0], rtol=1e-6
+        )
 
     def test_values_within_bounds_unchanged(
         self, config_epsilon, config_quantile_low, config_quantile_high
@@ -233,10 +252,10 @@ class TestRobustAntiLeak:
         scaler.fit(x_train_3d)
 
         flat = x_train_3d.reshape(-1, x_train_3d.shape[-1])
-        expected_median = np.median(flat, axis=0).astype(np.float32)
-        q_low = np.quantile(flat, config_quantile_low, axis=0).astype(np.float32)
-        q_high = np.quantile(flat, config_quantile_high, axis=0).astype(np.float32)
-        expected_iqr = (q_high - q_low).astype(np.float32)
+        expected_median = np.median(flat, axis=0).astype(np.float64)
+        q_low = np.quantile(flat, config_quantile_low, axis=0).astype(np.float64)
+        q_high = np.quantile(flat, config_quantile_high, axis=0).astype(np.float64)
+        expected_iqr = (q_high - q_low).astype(np.float64)
 
         assert scaler.median_ is not None
         assert scaler.iqr_ is not None
@@ -555,9 +574,9 @@ class TestRobustSaveLoad:
 
 
 class TestRobustFloat32:
-    """#022 — Verify float32 consistency in stats and output."""
+    """#022 — Verify float64 params and float32 output."""
 
-    def test_median_iqr_are_float32(
+    def test_median_iqr_are_float64(
         self, x_train_3d, config_epsilon, config_quantile_low, config_quantile_high
     ):
         scaler = RobustScaler(
@@ -568,8 +587,8 @@ class TestRobustFloat32:
         scaler.fit(x_train_3d)
         assert scaler.median_ is not None
         assert scaler.iqr_ is not None
-        assert scaler.median_.dtype == np.float32
-        assert scaler.iqr_.dtype == np.float32
+        assert scaler.median_.dtype == np.float64
+        assert scaler.iqr_.dtype == np.float64
 
 
 # ===========================================================================

@@ -146,7 +146,6 @@ class ScalingConfig(_StrictBase):
 class StrategyConfig(_StrictBase):
     strategy_type: str
     name: str
-    framework: str
 
 
 class ThresholdingConfig(_StrictBase):
