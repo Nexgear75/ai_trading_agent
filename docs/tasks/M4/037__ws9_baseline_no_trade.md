@@ -58,4 +58,4 @@ Implémenter la classe `NoTradeBaseline(BaseModel)` enregistrée dans le `MODEL_
 - [x] `ruff check ai_trading/ tests/` passe sans erreur.
 - [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
 - [x] **Commit GREEN** : `[WS-9] #037 GREEN: <résumé>`.
-- [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-9] #037 — Baseline no-trade`.
+- [x] **Pull Request ouverte** vers `Max6000i1` : `[WS-9] #037 — Baseline no-trade`.
