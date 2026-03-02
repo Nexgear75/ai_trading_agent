@@ -20,6 +20,7 @@ import pytest
 from ai_trading.backtest.costs import apply_cost_model
 from ai_trading.backtest.engine import build_equity_curve, execute_trades
 from ai_trading.backtest.journal import export_trade_journal
+from tests.conftest import make_ohlcv_random
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -52,22 +53,6 @@ EXPECTED_JOURNAL_COLUMNS = [
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-
-def _make_ohlcv(n: int, seed: int = 42) -> pd.DataFrame:
-    """Build synthetic OHLCV with deterministic prices."""
-    rng = np.random.default_rng(seed)
-    idx = pd.date_range("2024-01-01", periods=n, freq="1h")
-    close = 100.0 + np.cumsum(rng.standard_normal(n) * 0.5)
-    close = np.abs(close) + 50.0  # ensure positive
-    open_ = close + rng.uniform(-0.3, 0.3, n)
-    high = np.maximum(open_, close) + rng.uniform(0, 0.5, n)
-    low = np.minimum(open_, close) - rng.uniform(0, 0.5, n)
-    volume = rng.uniform(100, 5000, n)
-    return pd.DataFrame(
-        {"open": open_, "high": high, "low": low, "close": close, "volume": volume},
-        index=idx,
-    )
 
 
 def _make_sparse_signals(n: int, go_indices: list[int]) -> np.ndarray:
@@ -117,7 +102,7 @@ class TestDeterminism:
 
     def test_trades_csv_sha256_identical(self, tmp_path):
         """Two runs with same inputs → trades.csv files have identical SHA-256."""
-        ohlcv = _make_ohlcv(50, seed=99)
+        ohlcv = make_ohlcv_random(50, seed=99)
         signals = _make_sparse_signals(50, [2, 10, 20, 30])
 
         _run_full_pipeline(ohlcv, signals, tmp_path, run_id="a")
@@ -131,7 +116,7 @@ class TestDeterminism:
 
     def test_equity_curve_identical(self, tmp_path):
         """Two runs → equity values match at atol=1e-10."""
-        ohlcv = _make_ohlcv(50, seed=99)
+        ohlcv = make_ohlcv_random(50, seed=99)
         signals = _make_sparse_signals(50, [2, 10, 20, 30])
 
         _, eq1, _ = _run_full_pipeline(ohlcv, signals, tmp_path, run_id="c")
@@ -145,8 +130,8 @@ class TestDeterminism:
 
     def test_determinism_with_different_seed_differs(self, tmp_path):
         """Sanity: different OHLCV data produces different results."""
-        ohlcv_a = _make_ohlcv(50, seed=1)
-        ohlcv_b = _make_ohlcv(50, seed=2)
+        ohlcv_a = make_ohlcv_random(50, seed=1)
+        ohlcv_b = make_ohlcv_random(50, seed=2)
         signals = _make_sparse_signals(50, [2, 10, 20])
 
         _, eq_a, _ = _run_full_pipeline(ohlcv_a, signals, tmp_path, run_id="e")
@@ -169,7 +154,7 @@ class TestEquityTradeCoherence:
 
     def test_equity_final_matches_product_formula(self, tmp_path):
         """E_final computed from equity curve == manual product of trade returns."""
-        ohlcv = _make_ohlcv(60, seed=77)
+        ohlcv = make_ohlcv_random(60, seed=77)
         signals = _make_sparse_signals(60, [0, 8, 18, 30, 42])
 
         enriched, equity_df, _ = _run_full_pipeline(
@@ -186,7 +171,7 @@ class TestEquityTradeCoherence:
 
     def test_coherence_single_trade(self, tmp_path):
         """Single trade: E_final = E_0 * (1 + w * r_net)."""
-        ohlcv = _make_ohlcv(30, seed=55)
+        ohlcv = make_ohlcv_random(30, seed=55)
         signals = _make_sparse_signals(30, [5])
 
         enriched, equity_df, _ = _run_full_pipeline(
@@ -200,7 +185,7 @@ class TestEquityTradeCoherence:
 
     def test_coherence_no_trades(self, tmp_path):
         """No trades: equity stays at initial value."""
-        ohlcv = _make_ohlcv(30, seed=55)
+        ohlcv = make_ohlcv_random(30, seed=55)
         signals = np.zeros(30, dtype=int)
 
         enriched, equity_df, _ = _run_full_pipeline(
@@ -214,7 +199,7 @@ class TestEquityTradeCoherence:
 
     def test_coherence_multiple_trades(self, tmp_path):
         """Multiple trades: cumulative product matches equity curve final value."""
-        ohlcv = _make_ohlcv(80, seed=33)
+        ohlcv = make_ohlcv_random(80, seed=33)
         # Space signals far enough apart to avoid overlap (HORIZON=4)
         signals = _make_sparse_signals(80, [2, 12, 22, 32, 42, 55, 65])
 
@@ -237,12 +222,12 @@ class TestEquityTradeCoherence:
 
 
 class TestOneAtATime:
-    """#036 — Dense signals: no overlapping trades under one_at_a_time mode."""
+    """#036 — Dense signals: no overlapping trades under standard execution mode."""
 
     def test_dense_signals_no_overlap(self):
         """All-ones signal vector: trades must not overlap in time."""
         n = 40
-        ohlcv = _make_ohlcv(n, seed=11)
+        ohlcv = make_ohlcv_random(n, seed=11)
         signals = np.ones(n, dtype=int)  # all Go
 
         trades = execute_trades(signals, ohlcv, HORIZON, "standard")
@@ -259,7 +244,7 @@ class TestOneAtATime:
     def test_consecutive_signals_skip_while_in_position(self):
         """Consecutive Go signals while in position are ignored."""
         n = 20
-        ohlcv = _make_ohlcv(n, seed=22)
+        ohlcv = make_ohlcv_random(n, seed=22)
         # Signal at every bar
         signals = np.ones(n, dtype=int)
 
@@ -273,7 +258,7 @@ class TestOneAtATime:
     def test_no_overlap_with_alternating_signals(self):
         """Alternating 1/0 pattern also produces no overlap."""
         n = 30
-        ohlcv = _make_ohlcv(n, seed=33)
+        ohlcv = make_ohlcv_random(n, seed=33)
         signals = np.array([1 if i % 2 == 0 else 0 for i in range(n)], dtype=int)
 
         trades = execute_trades(signals, ohlcv, HORIZON, "standard")
@@ -363,7 +348,7 @@ class TestTradesCSVConformity:
 
     def test_csv_parseable_and_columns_match(self, tmp_path):
         """CSV file is valid and column order matches §12.6."""
-        ohlcv = _make_ohlcv(30, seed=44)
+        ohlcv = make_ohlcv_random(30, seed=44)
         signals = _make_sparse_signals(30, [2, 12])
 
         _, _, journal_df = _run_full_pipeline(ohlcv, signals, tmp_path, run_id="csv1")
@@ -376,7 +361,7 @@ class TestTradesCSVConformity:
 
     def test_csv_row_count_matches_trades(self, tmp_path):
         """Number of CSV rows == number of trades."""
-        ohlcv = _make_ohlcv(50, seed=44)
+        ohlcv = make_ohlcv_random(50, seed=44)
         signals = _make_sparse_signals(50, [2, 12, 25, 38])
 
         enriched, _, _ = _run_full_pipeline(ohlcv, signals, tmp_path, run_id="csv2")
@@ -387,7 +372,7 @@ class TestTradesCSVConformity:
 
     def test_csv_numeric_columns_finite(self, tmp_path):
         """All numeric columns contain finite values."""
-        ohlcv = _make_ohlcv(50, seed=44)
+        ohlcv = make_ohlcv_random(50, seed=44)
         signals = _make_sparse_signals(50, [2, 12, 25])
 
         _run_full_pipeline(ohlcv, signals, tmp_path, run_id="csv3")
@@ -406,7 +391,7 @@ class TestTradesCSVConformity:
 
     def test_csv_fee_slippage_columns_match_config(self, tmp_path):
         """f and s columns in CSV match the configured rates."""
-        ohlcv = _make_ohlcv(30, seed=44)
+        ohlcv = make_ohlcv_random(30, seed=44)
         signals = _make_sparse_signals(30, [2])
 
         _run_full_pipeline(ohlcv, signals, tmp_path, run_id="csv4")
@@ -414,12 +399,12 @@ class TestTradesCSVConformity:
         csv_path = tmp_path / "trades_csv4.csv"
         parsed = pd.read_csv(csv_path)
 
-        assert (parsed["f"] == FEE).all()
-        assert (parsed["s"] == SLIPPAGE).all()
+        assert np.allclose(np.asarray(parsed["f"].values, dtype=np.float64), FEE)
+        assert np.allclose(np.asarray(parsed["s"].values, dtype=np.float64), SLIPPAGE)
 
     def test_empty_trades_produces_empty_csv(self, tmp_path):
         """No trades → CSV has header only, 0 rows."""
-        ohlcv = _make_ohlcv(30, seed=44)
+        ohlcv = make_ohlcv_random(30, seed=44)
         signals = np.zeros(30, dtype=int)
 
         _run_full_pipeline(ohlcv, signals, tmp_path, run_id="csv5")
@@ -439,16 +424,16 @@ class TestAntiLeak:
     """#036 — Perturbing future prices does not change past trade decisions."""
 
     def test_future_price_perturbation_preserves_past_trades(self):
-        """Modifying prices after bar K doesn't change trades with signal_time <= K."""
+        """Modifying prices from bar K onwards doesn't change trades with signal_time <= K."""
         n = 60
-        ohlcv_orig = _make_ohlcv(n, seed=88)
+        ohlcv_orig = make_ohlcv_random(n, seed=88)
         # Signals well-spaced: bars 2, 15, 30, 45
         signals = _make_sparse_signals(n, [2, 15, 30, 45])
 
         trades_orig = execute_trades(signals, ohlcv_orig, HORIZON, "standard")
         assert len(trades_orig) >= 3
 
-        # Perturbation point: after bar 25 (between signal 15 and signal 30)
+        # Perturbation point: from bar 25 onwards (between signal 15 and signal 30)
         k = 25
         ohlcv_perturbed = ohlcv_orig.copy()
         rng = np.random.default_rng(999)
@@ -481,12 +466,12 @@ class TestAntiLeak:
     def test_past_entry_prices_unchanged_if_within_perturbation_boundary(self):
         """Trades fully before perturbation point have identical prices."""
         n = 60
-        ohlcv_orig = _make_ohlcv(n, seed=88)
+        ohlcv_orig = make_ohlcv_random(n, seed=88)
         signals = _make_sparse_signals(n, [2, 15])
 
         trades_orig = execute_trades(signals, ohlcv_orig, HORIZON, "standard")
 
-        # Perturbation after bar 30 — both trades (signal 2, signal 15) are
+        # Perturbation from bar 30 onwards — both trades (signal 2, signal 15) are
         # fully contained before bar 30 (entry <= 16, exit <= 19).
         k = 30
         ohlcv_perturbed = ohlcv_orig.copy()
@@ -510,8 +495,8 @@ class TestAntiLeak:
     def test_signal_decisions_independent_of_future_data(self):
         """Demonstrate trade decisions only depend on signal[t] and position state."""
         n = 40
-        ohlcv_a = _make_ohlcv(n, seed=10)
-        ohlcv_b = _make_ohlcv(n, seed=20)  # completely different prices
+        ohlcv_a = make_ohlcv_random(n, seed=10)
+        ohlcv_b = make_ohlcv_random(n, seed=20)  # completely different prices
         signals = _make_sparse_signals(n, [3, 15, 28])
 
         trades_a = execute_trades(signals, ohlcv_a, HORIZON, "standard")
