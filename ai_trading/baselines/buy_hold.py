@@ -1,10 +1,11 @@
-"""NoTradeBaseline — zero-signal baseline for backtest comparison.
+"""BuyHoldBaseline — permanent Go signal for buy & hold backtest.
 
-Always predicts 0 (no-go), producing zero trades, flat equity, and zero PnL.
-Serves as the lower performance bound for Go/No-Go comparison.
+Always predicts 1 (Go), combined with ``execution_mode = "single_trade"``
+to produce a single trade: entry at ``Open[first_bar]``, exit at
+``Close[last_bar]``.  Serves as an upper-activity baseline.
 
-Task #037 — WS-9.
-Spec reference: §13.1.
+Task #038 — WS-9.
+Spec reference: §12.5, §13.2.
 """
 
 from __future__ import annotations
@@ -18,14 +19,14 @@ from ai_trading.baselines._base import BaselinePersistenceMixin
 from ai_trading.models.base import BaseModel, register_model
 
 
-@register_model("no_trade")
-class NoTradeBaseline(BaselinePersistenceMixin, BaseModel):
-    """Baseline that never trades — predict() always returns zeros."""
+@register_model("buy_hold")
+class BuyHoldBaseline(BaselinePersistenceMixin, BaseModel):
+    """Baseline that always goes long — predict() always returns ones."""
 
     output_type = "signal"
-    execution_mode = "standard"
-    _model_filename = "no_trade_baseline.json"
-    _model_name = "no_trade"
+    execution_mode = "single_trade"
+    _model_filename = "buy_hold_baseline.json"
+    _model_name = "buy_hold"
 
     def fit(
         self,
@@ -39,7 +40,7 @@ class NoTradeBaseline(BaselinePersistenceMixin, BaseModel):
         meta_val: Any = None,
         ohlcv: Any = None,
     ) -> dict:
-        """No-op — NoTradeBaseline has nothing to learn."""
+        """No-op — BuyHoldBaseline has nothing to learn."""
         return {}
 
     def predict(
@@ -48,7 +49,7 @@ class NoTradeBaseline(BaselinePersistenceMixin, BaseModel):
         meta: Any = None,
         ohlcv: Any = None,
     ) -> np.ndarray:
-        """Return all-zero signals: no trade is ever triggered.
+        """Return all-one signals: permanent Go.
 
         Parameters
         ----------
@@ -58,7 +59,7 @@ class NoTradeBaseline(BaselinePersistenceMixin, BaseModel):
         Returns
         -------
         np.ndarray
-            Zeros of shape ``(N,)``, dtype float32.
+            Ones of shape ``(N,)``, dtype float32.
         """
         n = X.shape[0]
-        return np.zeros(n, dtype=np.float32)
+        return np.ones(n, dtype=np.float32)
