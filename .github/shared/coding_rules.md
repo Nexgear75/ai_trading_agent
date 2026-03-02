@@ -53,9 +53,11 @@
 - [ ] **Path creation** : si un paramètre `path`/`run_dir` est reçu et utilisé pour I/O (écriture de fichiers, sous-répertoires), il doit être créé avant usage (`mkdir(parents=True, exist_ok=True)`) ou le contrat exige explicitement qu'il préexiste. **Un `run_dir / "model"` sans `run_dir.mkdir()` préalable est un bug latent — BLOQUANT.**
 - [ ] **open() sans context manager** : tout `open()` utilise `with`. Les raccourcis `Path.read_text()` / `Path.write_text()` sont acceptés.
 - [ ] **Comparaison float avec ==** : pas de `==` sur des floats numpy. Utiliser `np.isclose`, `np.testing.assert_allclose`, ou `pytest.approx`.
+- [ ] **Comparaison booléenne par identité** : ne jamais utiliser `is np.bool_(...)`, `is True`, ou `is False` sur des valeurs numpy/pandas. L'identité d'objet (`is`) n'est pas garantie entre versions numpy. Utiliser `==` pour les booléens numpy/pandas, ou convertir avec `bool()` avant `is`.
 - [ ] **`.values` perdant l'index** : pas de `.values` implicite sur un DataFrame/Series pandas sans raison documentée.
 - [ ] **f-string ou format** : pas de `str + str` dans les messages d'erreur — utiliser f-string.
 - [ ] **Side-effects dans les paramètres par défaut** : pas de `datetime.now()`, `time.time()`, ou appel de fonction dans les valeurs par défaut de paramètres.
+- [ ] **Dict keyed par valeur calculée — collision silencieuse** : quand un `dict` est construit dans une boucle avec des clés calculées (ex : `d[computed_key] = value`), vérifier qu'une clé dupliquée ne peut pas écraser silencieusement une entrée précédente. Si la duplication est possible et constituerait une perte de données → valider avec `if key in d: raise ValueError(...)` **avant** l'assignation. Pattern typique : dict indexé par position, timestamp, ou identifiant dérivé — **BLOQUANT** si écrasement silencieux.
 
 ## §R7 — Qualité du code
 
@@ -97,12 +99,14 @@ Une incohérence intermodule est **bloquante** — elle provoque des bugs silenc
 - [ ] **Invariants de domaine respectés** : les invariants financiers sont vérifiés explicitement (prix > 0, volume >= 0, equity curve monotone sur un trade, etc.).
 - [ ] **Cohérence des unités et échelles** : grandeurs manipulées avec unités cohérentes (returns log vs arithmétique, prix en quote currency, timestamps UTC). Pas de mélange implicite.
 - [ ] **Patterns de calcul financier** : bonnes pratiques numériques (`np.log` vs `math.log`, rolling windows pandas natif, pas de boucles Python sur séries temporelles).
+- [ ] **Vectorisation numpy** : quand une opération sur un array numpy peut être exprimée par un slice assignment (`arr[a:b] = val`) ou une opération vectorisée, ne pas utiliser de boucle Python `for j in range(...)`. Les boucles Python sur des arrays numpy sont un anti-pattern de performance — **MINEUR** si fonctionnellement correct, **WARNING** sur des hot paths (backtest, features).
 
 ## §R10 — Defensive indexing / slicing
 
 - [ ] Pour tout `array[expr:]` ou `array[:expr]` : vérifier manuellement le comportement quand `expr` est **négatif**, **zéro**, ou **> len(array)**. En Python/NumPy, `array[-k:]` ne fait **pas** `array[0:]` — c'est un piège silencieux.
 - [ ] Pour tout `range(a, b)` ou `mask[lo : hi + 1]` : vérifier que `lo` et `hi` sont clampés (`max(0, ...)`, `min(n-1, ...)`) pour toutes les valeurs extrêmes des paramètres d'entrée.
 - [ ] Si un paramètre numérique peut dépasser la taille des données (ex. `H > N`), vérifier que le code produit un résultat correct (tout False, raise, etc.) et non un comportement silencieusement faux.
+- [ ] **Invariants amont non validés** : quand une fonction reçoit des données produites par un autre module (ex : liste de trades de `execute_trades`, enrichie par `apply_cost_model`), ne pas supposer que les invariants amont sont toujours respectés. Valider explicitement les propriétés critiques (ex : `exit_pos >= entry_pos`, pas de chevauchement de trades). Un invariant supposé sans validation est un bug latent — **WARNING** sur des fonctions internes, **BLOQUANT** sur des fonctions publiques.
 
 ---
 
@@ -152,6 +156,15 @@ grep -n 'def .*=\[\]\|def .*={}' $CHANGED
 
 # §R6 — open() sans context manager
 grep -n '\.read_text\|open(' $CHANGED_SRC
+
+# §R6 — Comparaison booléenne par identité numpy/pandas
+grep -n 'is np\.bool_\|is True\|is False' $CHANGED
+
+# §R6 — Dict collision silencieuse (boucle + assignation dict sans guard)
+grep -n '\[.*\] = .*' $CHANGED_SRC | grep -v 'def \|#\|"""'
+
+# §R9 — Boucle Python sur array numpy (vectorisation manquante)
+grep -n 'for .* in range(.*):' $CHANGED_SRC
 ```
 
 **Pour chaque match** : analyser en contexte (lire les lignes autour) et classer :
