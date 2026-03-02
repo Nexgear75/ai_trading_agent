@@ -147,28 +147,32 @@ class BaseModel(ABC):
         # --- output_type: must be explicitly declared in the subclass ---
         if "output_type" not in cls.__dict__:
             raise TypeError(
-                f"{cls.__name__} must explicitly declare 'output_type' "
-                f"(Literal['regression', 'signal']). "
-                f"Inheriting the base default silently is not allowed."
+                f"{cls.__name__} must declare 'output_type' with a value "
+                f"(e.g. output_type = 'regression'), not just a type annotation."
             )
 
-        # --- output_type: validate value ---
+        # --- output_type: validate type and value ---
         ot = cls.__dict__["output_type"]
-        # Handle annotated class variables with defaults
-        if isinstance(ot, str):
-            pass  # direct string value
-        elif hasattr(ot, "__default__"):
-            ot = ot.__default__
-        if isinstance(ot, str) and ot not in _VALID_OUTPUT_TYPES:
+        if not isinstance(ot, str):
+            raise TypeError(
+                f"{cls.__name__}: output_type must be a string, "
+                f"got {type(ot).__name__}."
+            )
+        if ot not in _VALID_OUTPUT_TYPES:
             raise ValueError(
                 f"{cls.__name__}: output_type must be one of {sorted(_VALID_OUTPUT_TYPES)}, "
                 f"got '{ot}'."
             )
 
-        # --- execution_mode: validate value if overridden ---
+        # --- execution_mode: validate type and value if overridden ---
         if "execution_mode" in cls.__dict__:
             em = cls.__dict__["execution_mode"]
-            if isinstance(em, str) and em not in _VALID_EXECUTION_MODES:
+            if not isinstance(em, str):
+                raise TypeError(
+                    f"{cls.__name__}: execution_mode must be a string, "
+                    f"got {type(em).__name__}."
+                )
+            if em not in _VALID_EXECUTION_MODES:
                 raise ValueError(
                     f"{cls.__name__}: execution_mode must be one of "
                     f"{sorted(_VALID_EXECUTION_MODES)}, got '{em}'."

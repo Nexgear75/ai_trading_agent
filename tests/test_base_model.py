@@ -141,6 +141,46 @@ class TestOutputType:
                 def load(self, path):
                     pass
 
+    def test_output_type_non_string_raises_type_error(self):
+        """output_type with a non-string value raises TypeError at class creation."""
+        with pytest.raises(TypeError, match="output_type must be a string"):
+
+            class _IntOutputType(BaseModel):
+                output_type = 42
+
+                def fit(self, X_train, y_train, X_val, y_val, config, run_dir,
+                        meta_train=None, meta_val=None, ohlcv=None):
+                    return {}
+
+                def predict(self, X, meta=None, ohlcv=None):
+                    return X[:, 0, 0]
+
+                def save(self, path):
+                    pass
+
+                def load(self, path):
+                    pass
+
+    def test_output_type_none_raises_type_error(self):
+        """output_type = None raises TypeError at class creation."""
+        with pytest.raises(TypeError, match="output_type must be a string"):
+
+            class _NoneOutputType(BaseModel):
+                output_type = None
+
+                def fit(self, X_train, y_train, X_val, y_val, config, run_dir,
+                        meta_train=None, meta_val=None, ohlcv=None):
+                    return {}
+
+                def predict(self, X, meta=None, ohlcv=None):
+                    return X[:, 0, 0]
+
+                def save(self, path):
+                    pass
+
+                def load(self, path):
+                    pass
+
 
 # ---------------------------------------------------------------------------
 # Tests — execution_mode
@@ -185,6 +225,27 @@ class TestExecutionMode:
             class _BadExecMode(BaseModel):
                 output_type: Literal["regression", "signal"] = "regression"
                 execution_mode = "batch"
+
+                def fit(self, X_train, y_train, X_val, y_val, config, run_dir,
+                        meta_train=None, meta_val=None, ohlcv=None):
+                    return {}
+
+                def predict(self, X, meta=None, ohlcv=None):
+                    return X[:, 0, 0]
+
+                def save(self, path):
+                    pass
+
+                def load(self, path):
+                    pass
+
+    def test_execution_mode_non_string_raises_type_error(self):
+        """execution_mode with a non-string value raises TypeError at class creation."""
+        with pytest.raises(TypeError, match="execution_mode must be a string"):
+
+            class _IntExecMode(BaseModel):
+                output_type: Literal["regression", "signal"] = "regression"
+                execution_mode = 42
 
                 def fit(self, X_train, y_train, X_val, y_val, config, run_dir,
                         meta_train=None, meta_val=None, ohlcv=None):
