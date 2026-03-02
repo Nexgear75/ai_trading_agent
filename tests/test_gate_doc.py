@@ -130,12 +130,14 @@ class TestCriterion4Docstrings:
     def test_fit_docstring_mentions_shapes(self) -> None:
         """fit() docstring must mention shapes (N, L, F) and dtypes."""
         doc = BaseModel.fit.__doc__
+        assert doc is not None
         assert "N" in doc
         assert "float32" in doc
 
     def test_predict_docstring_mentions_shapes(self) -> None:
         """predict() docstring must mention shapes and output types."""
         doc = BaseModel.predict.__doc__
+        assert doc is not None
         assert "N" in doc
         assert "float32" in doc
 
