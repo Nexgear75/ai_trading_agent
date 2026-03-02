@@ -63,5 +63,5 @@ Implémenter le module `metrics/prediction.py` calculant MAE, RMSE, Directional 
 - [x] Critères d'acceptation tous satisfaits.
 - [x] `ruff check ai_trading/ tests/` passe sans erreur.
 - [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
-- [ ] **Commit GREEN** : `[WS-10] #040 GREEN: <résumé>`.
-- [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-10] #040 — Métriques de prédiction`.
+- [x] **Commit GREEN** : `[WS-10] #040 GREEN: prediction metrics (MAE, RMSE, DA, Spearman IC)`.
+- [x] **Pull Request ouverte** vers `Max6000i1` : `[WS-10] #040 — Métriques de prédiction`.
