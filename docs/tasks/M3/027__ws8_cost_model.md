@@ -68,4 +68,4 @@ Formules conformes à §12.3 :
 - [x] `ruff check ai_trading/ tests/` passe sans erreur.
 - [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
 - [x] **Commit GREEN** : `[WS-8] #027 GREEN: modèle de coûts de transaction`.
-- [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-8] #027 — Modèle de coûts de transaction`.
+- [x] **Pull Request ouverte** vers `Max6000i1` : `[WS-8] #027 — Modèle de coûts de transaction`.

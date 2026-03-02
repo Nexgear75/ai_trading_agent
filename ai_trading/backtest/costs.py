@@ -22,9 +22,9 @@ def apply_cost_model(
         List of trade dicts (from :func:`execute_trades`), each must
         contain at least ``entry_price`` and ``exit_price``.
     fee_rate_per_side:
-        Fee rate applied on each side of the trade (>= 0).
+        Fee rate applied on each side of the trade, in [0, 1).
     slippage_rate_per_side:
-        Slippage rate applied on each side of the trade (>= 0).
+        Slippage rate applied on each side of the trade, in [0, 1).
 
     Returns
     -------
@@ -35,16 +35,16 @@ def apply_cost_model(
     Raises
     ------
     ValueError
-        If parameters are negative, required keys are missing, or
-        ``entry_price <= 0``.
+        If parameters are out of range [0, 1), required keys are
+        missing, or ``entry_price <= 0``.
     """
-    if fee_rate_per_side < 0:
+    if fee_rate_per_side < 0 or fee_rate_per_side >= 1:
         raise ValueError(
-            f"fee_rate_per_side must be >= 0, got {fee_rate_per_side}"
+            f"fee_rate_per_side must be in [0, 1), got {fee_rate_per_side}"
         )
-    if slippage_rate_per_side < 0:
+    if slippage_rate_per_side < 0 or slippage_rate_per_side >= 1:
         raise ValueError(
-            f"slippage_rate_per_side must be >= 0, got {slippage_rate_per_side}"
+            f"slippage_rate_per_side must be in [0, 1), got {slippage_rate_per_side}"
         )
 
     fee_factor_sq = (1 - fee_rate_per_side) ** 2

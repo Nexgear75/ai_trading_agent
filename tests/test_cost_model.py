@@ -180,11 +180,35 @@ class TestValidation:
         with pytest.raises(ValueError, match="fee_rate_per_side"):
             apply_cost_model(trades, fee_rate_per_side=-0.001, slippage_rate_per_side=0.0)
 
+    def test_fee_rate_ge_one_raises(self):
+        """fee_rate_per_side >= 1 raises ValueError (nonsensical fee)."""
+        trades = [_make_trade(100.0, 102.0)]
+        with pytest.raises(ValueError, match="fee_rate_per_side"):
+            apply_cost_model(trades, fee_rate_per_side=1.0, slippage_rate_per_side=0.0)
+
+    def test_fee_rate_above_one_raises(self):
+        """fee_rate_per_side > 1 raises ValueError."""
+        trades = [_make_trade(100.0, 102.0)]
+        with pytest.raises(ValueError, match="fee_rate_per_side"):
+            apply_cost_model(trades, fee_rate_per_side=2.0, slippage_rate_per_side=0.0)
+
     def test_negative_slippage_rate_raises(self):
         """Negative slippage_rate_per_side raises ValueError."""
         trades = [_make_trade(100.0, 102.0)]
         with pytest.raises(ValueError, match="slippage_rate_per_side"):
             apply_cost_model(trades, fee_rate_per_side=0.0, slippage_rate_per_side=-0.001)
+
+    def test_slippage_rate_ge_one_raises(self):
+        """slippage_rate_per_side >= 1 raises ValueError (nonsensical slippage)."""
+        trades = [_make_trade(100.0, 102.0)]
+        with pytest.raises(ValueError, match="slippage_rate_per_side"):
+            apply_cost_model(trades, fee_rate_per_side=0.0, slippage_rate_per_side=1.0)
+
+    def test_slippage_rate_above_one_raises(self):
+        """slippage_rate_per_side > 1 raises ValueError."""
+        trades = [_make_trade(100.0, 102.0)]
+        with pytest.raises(ValueError, match="slippage_rate_per_side"):
+            apply_cost_model(trades, fee_rate_per_side=0.0, slippage_rate_per_side=1.5)
 
     def test_missing_entry_price_key_raises(self):
         """Trade missing 'entry_price' key raises ValueError."""
