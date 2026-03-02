@@ -48,7 +48,7 @@ def compute_quantile_thresholds(
             )
 
     thresholds = np.quantile(y_hat_val, q_grid)
-    return dict(zip(q_grid, thresholds.tolist()))
+    return dict(zip(q_grid, thresholds.tolist(), strict=True))
 
 
 def apply_threshold(
