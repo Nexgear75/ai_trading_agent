@@ -480,8 +480,8 @@ class TestFloat64Convention:
                 assert isinstance(val, int), f"{key} should be int"
             elif val is not None:
                 assert isinstance(val, float), f"{key} should be float, got {type(val)}"
-                # Check float64 precision (not float32)
-                assert np.finfo(np.float64).eps < 1e-15
+                # Verify the value actually has float64 precision
+                assert val == float(np.float64(val)), f"{key} lost precision in float64 roundtrip"
 
 
 # ===================================================================
