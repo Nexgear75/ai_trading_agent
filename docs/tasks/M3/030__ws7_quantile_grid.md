@@ -62,4 +62,4 @@ Implémenter le calcul de la grille de quantiles dans `ai_trading/calibration/th
 - [x] `ruff check ai_trading/ tests/` passe sans erreur.
 - [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
 - [x] **Commit GREEN** : `[WS-7] #030 GREEN: grille de quantiles pour calibration θ`.
-- [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-7] #030 — Grille de quantiles pour calibration θ`.
+- [x] **Pull Request ouverte** vers `Max6000i1` : `[WS-7] #030 — Grille de quantiles pour calibration θ`.
