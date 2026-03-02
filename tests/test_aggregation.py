@@ -215,7 +215,9 @@ class TestAggregateFoldMetrics:
         result = aggregate_fold_metrics(folds)
         assert result["net_pnl_mean"] == pytest.approx(0.15)
         # std with ddof=1 on 1 element is NaN
-        assert math.isnan(result["net_pnl_std"])
+        net_pnl_std = result["net_pnl_std"]
+        assert net_pnl_std is not None
+        assert math.isnan(net_pnl_std)
 
     def test_single_non_none_among_nones(self):
         """One non-None value among Nones: mean = value, std = NaN."""
@@ -226,7 +228,9 @@ class TestAggregateFoldMetrics:
         ]
         result = aggregate_fold_metrics(folds)
         assert result["sharpe_mean"] == pytest.approx(2.5)
-        assert math.isnan(result["sharpe_std"])
+        sharpe_std = result["sharpe_std"]
+        assert sharpe_std is not None
+        assert math.isnan(sharpe_std)
 
     def test_float64_precision(self):
         """Results are float64."""
