@@ -190,7 +190,11 @@ class StandardScaler:
 class RobustScaler:
     """Per-feature robust scaler for 3D tensors (N, L, F).
 
-    Centres by median and scales by IQR (quantile_high − quantile_low).
+    Centres by median and scales by the inter-quantile range (IQR)
+    defined as ``quantile_high − quantile_low``.  Note: the spec §9.2
+    refers to "IQR" but specifies configurable quantiles (default 0.5%
+    and 99.5%), not the traditional Q25–Q75.  The quantile bounds are
+    config-driven via ``robust_quantile_low`` / ``robust_quantile_high``.
     After centering/scaling, values are clipped to the quantile bounds
     estimated on train.  If IQR < ``CONSTANT_FEATURE_SIGMA_THRESHOLD``
     for a feature, the feature is set to 0.0 (same guard as StandardScaler).
