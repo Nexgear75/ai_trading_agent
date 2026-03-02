@@ -1,6 +1,6 @@
 # Tâche — Modèle de coûts de transaction
 
-Statut : TODO
+Statut : DONE
 Ordre : 027
 Workstream : WS-8
 Milestone : M3
@@ -43,29 +43,29 @@ Formules conformes à §12.3 :
 - Chaque trade enrichi avec `r_net` et les prix effectifs
 
 ## Critères d'acceptation
-- [ ] Formule `M_net = (1 - f)² × (p_exit_eff / p_entry_eff)` implémentée exactement
-- [ ] `p_entry_eff = p_entry × (1 + s)` et `p_exit_eff = p_exit × (1 - s)` corrects
-- [ ] `r_net = M_net - 1` retourné pour chaque trade
-- [ ] Test numérique : calcul à la main vs implémentation (exemple : `f=0.001`, `s=0.0003`, `Open=100`, `Close=102` → `r_net ≈ 0.0174`)
-- [ ] Coûts symétriques : slippage à l'achat et à la vente
-- [ ] Paramètres lus depuis `config.costs` — pas de valeurs hardcodées
-- [ ] Cas bord : trade avec `p_entry == p_exit` → `r_net` négatif (coûts seuls)
-- [ ] Cas bord : coûts à zéro (`f=0, s=0`) → `r_net = (p_exit / p_entry) - 1`
-- [ ] Tests couvrent les scénarios nominaux + erreurs + bords
-- [ ] Suite de tests verte après implémentation
-- [ ] `ruff check` passe sans erreur
+- [x] Formule `M_net = (1 - f)² × (p_exit_eff / p_entry_eff)` implémentée exactement
+- [x] `p_entry_eff = p_entry × (1 + s)` et `p_exit_eff = p_exit × (1 - s)` corrects
+- [x] `r_net = M_net - 1` retourné pour chaque trade
+- [x] Test numérique : calcul à la main vs implémentation (exemple : `f=0.001`, `s=0.0003`, `Open=100`, `Close=102` → `r_net ≈ 0.0174`)
+- [x] Coûts symétriques : slippage à l'achat et à la vente
+- [x] Paramètres lus depuis `config.costs` — pas de valeurs hardcodées
+- [x] Cas bord : trade avec `p_entry == p_exit` → `r_net` négatif (coûts seuls)
+- [x] Cas bord : coûts à zéro (`f=0, s=0`) → `r_net = (p_exit / p_entry) - 1`
+- [x] Tests couvrent les scénarios nominaux + erreurs + bords
+- [x] Suite de tests verte après implémentation
+- [x] `ruff check` passe sans erreur
 
 ## Pré-condition de démarrage
 - **Tous les tests existants sont GREEN** avant de commencer.
 - **Créer une branche dédiée** `task/027-cost-model` depuis `Max6000i1`.
 
 ## Checklist de fin de tâche
-- [ ] Branche `task/027-cost-model` créée depuis `Max6000i1`.
-- [ ] Tests RED écrits avant implémentation.
-- [ ] **Commit RED** : `[WS-8] #027 RED: tests modèle de coûts de transaction` (fichiers de tests uniquement).
-- [ ] Tests GREEN passants et reproductibles.
-- [ ] Critères d'acceptation tous satisfaits.
-- [ ] `ruff check ai_trading/ tests/` passe sans erreur.
-- [ ] Fichier de tâche mis à jour (statut DONE, critères cochés).
-- [ ] **Commit GREEN** : `[WS-8] #027 GREEN: modèle de coûts de transaction`.
+- [x] Branche `task/027-cost-model` créée depuis `Max6000i1`.
+- [x] Tests RED écrits avant implémentation.
+- [x] **Commit RED** : `[WS-8] #027 RED: tests modèle de coûts de transaction` (fichiers de tests uniquement).
+- [x] Tests GREEN passants et reproductibles.
+- [x] Critères d'acceptation tous satisfaits.
+- [x] `ruff check ai_trading/ tests/` passe sans erreur.
+- [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
+- [x] **Commit GREEN** : `[WS-8] #027 GREEN: modèle de coûts de transaction`.
 - [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-8] #027 — Modèle de coûts de transaction`.
