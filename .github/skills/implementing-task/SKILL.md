@@ -163,6 +163,13 @@ Après la Partie C, **reboucler sur la Partie B** (nouvelle itération de revue)
 
 Quand la Partie B retourne un verdict CLEAN :
 
+1. **Commiter les fichiers de revue** :
+```bash
+git add docs/tasks/<milestone>/<NNN>/
+git commit -m "[WS-X] #NNN REVIEW: rapports de revue v1..v<review_iteration>"
+```
+
+2. **Push et création de la PR** :
 ```bash
 git push -u origin task/NNN-short-slug
 ```
