@@ -2,7 +2,7 @@
 
 Branche : `task/037-baseline-no-trade`
 Tâche : `docs/tasks/M4/037__ws9_baseline_no_trade.md`
-Date : 2025-03-02
+Date : 2026-03-02
 Itération : v1
 
 ## Verdict global : ⚠️ REQUEST CHANGES

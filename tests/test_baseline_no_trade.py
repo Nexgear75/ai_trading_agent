@@ -348,6 +348,6 @@ class TestBaselinesInit:
 
     def test_import_from_baselines_package(self):
         """NoTradeBaseline should be importable from ai_trading.baselines."""
-        from ai_trading.baselines.no_trade import NoTradeBaseline
+        from ai_trading.baselines import NoTradeBaseline
 
         assert issubclass(NoTradeBaseline, BaseModel)
