@@ -1,9 +1,15 @@
-"""Quantile-grid threshold calibration (§11.2)."""
+"""Quantile-grid threshold calibration (§11.2, §11.3)."""
+
+from __future__ import annotations
 
 import math
 
 import numpy as np
+import pandas as pd
 from numpy.typing import NDArray
+
+from ai_trading.backtest.costs import apply_cost_model
+from ai_trading.backtest.engine import build_equity_curve, execute_trades
 
 
 def compute_quantile_thresholds(
@@ -76,3 +82,183 @@ def apply_threshold(
             f"y_hat must be 1D, got shape {y_hat.shape}"
         )
     return (y_hat > theta).astype(np.int32)
+
+
+_VALID_OBJECTIVES = frozenset({"max_net_pnl_with_mdd_cap"})
+
+
+def compute_max_drawdown(equity: NDArray[np.floating]) -> float:
+    """Compute maximum drawdown from an equity curve array.
+
+    MDD = max_t( (peak_t - E_t) / peak_t )  (spec §14.2 glossary).
+
+    Parameters
+    ----------
+    equity : 1D array of equity values.
+
+    Returns
+    -------
+    float
+        Max drawdown in [0, 1]. 0 means no drawdown.
+
+    Raises
+    ------
+    ValueError
+        If equity is not 1D or is empty.
+    """
+    if equity.ndim != 1:
+        raise ValueError(
+            f"equity must be 1D, got shape {equity.shape}"
+        )
+    if equity.size == 0:
+        raise ValueError("equity must not be empty")
+
+    running_max = np.maximum.accumulate(equity)
+    drawdowns = np.where(
+        running_max > 0,
+        (running_max - equity) / running_max,
+        0.0,
+    )
+    return float(np.max(drawdowns))
+
+
+def calibrate_threshold(
+    y_hat_val: NDArray[np.floating],
+    ohlcv_val: pd.DataFrame,
+    q_grid: list[float],
+    horizon: int,
+    fee_rate_per_side: float,
+    slippage_rate_per_side: float,
+    initial_equity: float,
+    position_fraction: float,
+    objective: str,
+    mdd_cap: float,
+    min_trades: int,
+) -> dict:
+    """Calibrate threshold θ on validation data (§11.3).
+
+    For each quantile in q_grid, compute θ, generate signals, run backtest,
+    compute metrics, filter by constraints, and select the θ that maximizes
+    net P&L. Tiebreaker: prefer highest quantile (most conservative).
+
+    Parameters
+    ----------
+    y_hat_val : 1D validation predictions.
+    ohlcv_val : Validation OHLCV DataFrame with DatetimeIndex.
+    q_grid : Quantile levels for threshold candidates.
+    horizon : Trade horizon in bars (label.horizon_H_bars).
+    fee_rate_per_side : Per-side fee rate.
+    slippage_rate_per_side : Per-side slippage rate.
+    initial_equity : Starting equity (backtest.initial_equity).
+    position_fraction : Fraction per trade (backtest.position_fraction).
+    objective : Optimization objective name.
+    mdd_cap : Maximum allowed drawdown.
+    min_trades : Minimum number of trades required.
+
+    Returns
+    -------
+    dict with keys: theta, quantile, method, net_pnl, mdd, n_trades, details.
+    """
+    # --- Input validation ---
+    if y_hat_val.ndim != 1:
+        raise ValueError(
+            f"y_hat_val must be 1D, got shape {y_hat_val.shape}"
+        )
+    if y_hat_val.size == 0:
+        raise ValueError("y_hat_val must not be empty")
+    if len(y_hat_val) != len(ohlcv_val):
+        raise ValueError(
+            f"y_hat_val length ({len(y_hat_val)}) must match "
+            f"ohlcv_val length ({len(ohlcv_val)})"
+        )
+    if len(q_grid) == 0:
+        raise ValueError("q_grid must not be empty")
+    if objective not in _VALID_OBJECTIVES:
+        raise ValueError(
+            f"objective must be one of {sorted(_VALID_OBJECTIVES)}, "
+            f"got '{objective}'"
+        )
+
+    # --- Compute θ candidates from quantile grid ---
+    thresholds = compute_quantile_thresholds(y_hat_val, q_grid)
+
+    # --- Evaluate each candidate ---
+    details: list[dict] = []
+
+    for q in q_grid:
+        theta = thresholds[q]
+        signals = apply_threshold(y_hat_val, theta)
+
+        # Execute trades on validation
+        trades = execute_trades(
+            signals=signals,
+            ohlcv=ohlcv_val,
+            horizon=horizon,
+            execution_mode="standard",
+        )
+
+        # Apply cost model
+        enriched_trades = apply_cost_model(
+            trades=trades,
+            fee_rate_per_side=fee_rate_per_side,
+            slippage_rate_per_side=slippage_rate_per_side,
+        )
+
+        # Build equity curve (reset to initial_equity for each candidate)
+        if len(enriched_trades) == 0:
+            # No trades: equity stays flat
+            net_pnl = 0.0
+            mdd = 0.0
+            n_trades = 0
+        else:
+            equity_df = build_equity_curve(
+                trades=enriched_trades,
+                ohlcv=ohlcv_val,
+                initial_equity=initial_equity,
+                position_fraction=position_fraction,
+            )
+            equity_array = equity_df["equity"].to_numpy(dtype=np.float64)
+            final_equity = float(equity_array[-1])
+            net_pnl = final_equity - initial_equity
+            mdd = compute_max_drawdown(equity_array)
+            n_trades = len(enriched_trades)
+
+        feasible = (mdd <= mdd_cap) and (n_trades >= min_trades)
+
+        details.append({
+            "quantile": q,
+            "theta": theta,
+            "net_pnl": net_pnl,
+            "mdd": mdd,
+            "n_trades": n_trades,
+            "feasible": feasible,
+        })
+
+    # --- Select best feasible θ ---
+    feasible_candidates = [d for d in details if d["feasible"]]
+
+    if len(feasible_candidates) == 0:
+        return {
+            "theta": None,
+            "quantile": None,
+            "method": "quantile_grid",
+            "net_pnl": None,
+            "mdd": None,
+            "n_trades": None,
+            "details": details,
+        }
+
+    # Sort by (-net_pnl, -quantile) to get best P&L first,
+    # then highest quantile as tiebreaker
+    feasible_candidates.sort(key=lambda d: (-d["net_pnl"], -d["quantile"]))
+    best = feasible_candidates[0]
+
+    return {
+        "theta": best["theta"],
+        "quantile": best["quantile"],
+        "method": "quantile_grid",
+        "net_pnl": best["net_pnl"],
+        "mdd": best["mdd"],
+        "n_trades": best["n_trades"],
+        "details": details,
+    }

@@ -1,8 +1,8 @@
 ---
 name: TDD-Reviewer
 description: "Agent de revue de code pour le projet AI Trading Pipeline. Effectue un audit complet d'une branche task/ selon la grille d'audit pr-reviewer."
-user-invokable: false
-tools: ['read', 'search', 'terminal']
+user-invocable: false
+tools: [vscode, execute, read, agent, edit, search, web, browser, 'pylance-mcp-server/*', ms-python.python/getPythonEnvironmentInfo, ms-python.python/getPythonExecutableCommand, ms-python.python/installPythonPackage, ms-python.python/configurePythonEnvironment, todo]
 # Pour forcer un modèle spécifique, décommenter la ligne ci-dessous :
 # model: ['Claude Opus 4.6 (copilot)']
 ---

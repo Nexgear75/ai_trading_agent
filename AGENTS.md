@@ -92,7 +92,7 @@ Les skills `.github/skills/*/SKILL.md` fournissent des workflows spécialisés i
 
 ## Custom Agents (workers)
 
-Les agents `.github/agents/*.agent.md` sont des workers invocables comme subagents par les skills orchestrateurs. Ils ne sont pas visibles directement dans le dropdown Copilot (`user-invokable: false`).
+Les agents `.github/agents/*.agent.md` sont des workers invocables comme subagents par les skills orchestrateurs. Ils ne sont pas visibles directement dans le dropdown Copilot (`user-invocable: false`).
 
 > **Modèle** : par défaut, chaque agent hérite du modèle sélectionné dans la session principale. Pour forcer un modèle spécifique, décommenter la ligne `model:` dans le frontmatter de l'agent (ex : `model: ['Claude Opus 4.6 (copilot)']`).
 

@@ -1,8 +1,7 @@
 ---
 name: Plan-Corrector
 description: "Agent de correction ponctuelle d'une incohérence dans le plan d'implémentation AI Trading Pipeline. Contexte vierge, une seule incohérence par invocation."
-user-invokable: false
-tools: ['read', 'edit', 'search']
+tools: [vscode, execute, read, agent, edit, search, web, browser, 'pylance-mcp-server/*', ms-python.python/getPythonEnvironmentInfo, ms-python.python/getPythonExecutableCommand, ms-python.python/installPythonPackage, ms-python.python/configurePythonEnvironment, todo]
 # Pour forcer un modèle spécifique, décommenter la ligne ci-dessous :
 # model: ['Claude Opus 4.6 (copilot)']
 ---
