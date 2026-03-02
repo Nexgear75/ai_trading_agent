@@ -12,8 +12,6 @@ Covers 6 criteria:
 from __future__ import annotations
 
 import inspect
-from pathlib import Path
-from typing import Any
 
 import numpy as np
 
@@ -22,45 +20,6 @@ from ai_trading.config import VALID_STRATEGIES
 from ai_trading.models.base import MODEL_REGISTRY, BaseModel
 from ai_trading.models.dummy import DummyModel
 from tests.conftest import make_calibration_ohlcv
-
-# ---------------------------------------------------------------------------
-# Helpers — signal model stub for criteria 5
-# ---------------------------------------------------------------------------
-
-
-class _SignalStub(BaseModel):
-    """Minimal signal model for G-Doc criterion 5."""
-
-    output_type = "signal"
-
-    def fit(
-        self,
-        X_train: np.ndarray,  # noqa: N803
-        y_train: np.ndarray,
-        X_val: np.ndarray,  # noqa: N803
-        y_val: np.ndarray,
-        config: Any,
-        run_dir: Path,
-        meta_train: Any = None,
-        meta_val: Any = None,
-        ohlcv: Any = None,
-    ) -> dict:
-        return {}
-
-    def predict(
-        self,
-        X: np.ndarray,  # noqa: N803
-        meta: Any = None,
-        ohlcv: Any = None,
-    ) -> np.ndarray:
-        return np.ones(X.shape[0], dtype=np.float32)
-
-    def save(self, path: Path) -> None:
-        pass
-
-    def load(self, path: Path) -> None:
-        pass
-
 
 # ---------------------------------------------------------------------------
 # Shared calibration parameters
