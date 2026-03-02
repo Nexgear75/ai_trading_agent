@@ -60,4 +60,4 @@ Implémenter l'export du journal de trades au format CSV (`trades.csv`) avec tou
 - [x] `ruff check ai_trading/ tests/` passe sans erreur.
 - [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
 - [x] **Commit GREEN** : `[WS-8] #035 GREEN: export trade journal CSV`.
-- [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-8] #035 — Journal de trades (trades.csv)`.
+- [x] **Pull Request ouverte** vers `Max6000i1` : `[WS-8] #035 — Journal de trades (trades.csv)`.
