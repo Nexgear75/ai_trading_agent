@@ -1,6 +1,6 @@
 # Tâche — Baseline SMA rule (Go/No-Go)
 
-Statut : TODO
+Statut : DONE
 Ordre : 039
 Workstream : WS-9
 Milestone : M4
@@ -12,7 +12,7 @@ La baseline SMA rule génère des signaux Go/No-Go basés sur le croisement de d
 Références :
 - Plan : `docs/plan/implementation.md` (WS-9.3)
 - Spécification : `docs/specifications/Specification_Pipeline_Commun_AI_Trading_v1.0.md` (§13.3, Annexe E.2.4)
-- Code : `ai_trading/baselines/sma_rule.py` (à créer)
+- Code : `ai_trading/baselines/sma_rule.py`
 
 Dépendances :
 - Tâche 036 — Validation du gate G-Backtest (doit être DONE)
@@ -37,32 +37,32 @@ Implémenter la classe `SmaRuleBaseline(BaseModel)` enregistrée dans le `MODEL_
 - Créer `tests/test_baseline_sma_rule.py`.
 
 ## Critères d'acceptation
-- [ ] `SmaRuleBaseline` hérite de `BaseModel` et est enregistrée `@register_model("sma_rule")`.
-- [ ] `output_type == "signal"`, `execution_mode == "standard"`.
-- [ ] `fit()` est un no-op.
-- [ ] `predict()` calcule SMA via `pd.Series.rolling(window).mean()` sur `ohlcv["close"]`.
-- [ ] Signal correct sur séries synthétiques : tendance haussière → Go, baissière → No-Go.
-- [ ] Premières décisions (SMA_slow non définie) → No-Go.
-- [ ] Paramètres `fast` et `slow` lus depuis la config (`baselines.sma.fast`, `baselines.sma.slow`).
-- [ ] Validation `fast < slow` avec `raise` si non respecté.
-- [ ] **Test de causalité** : modifier les prix futurs (t > T) et vérifier que `predict()` retourne le même signal pour tout t ≤ T.
-- [ ] `"sma_rule"` est résolvable via `get_model_class("sma_rule")`.
-- [ ] Soumis au backtest commun → `n_trades >= 0`.
-- [ ] Tests couvrent les scénarios nominaux + erreurs + bords.
-- [ ] Suite de tests verte après implémentation.
-- [ ] `ruff check` passe sans erreur.
+- [x] `SmaRuleBaseline` hérite de `BaseModel` et est enregistrée `@register_model("sma_rule")`.
+- [x] `output_type == "signal"`, `execution_mode == "standard"`.
+- [x] `fit()` est un no-op.
+- [x] `predict()` calcule SMA via `pd.Series.rolling(window).mean()` sur `ohlcv["close"]`.
+- [x] Signal correct sur séries synthétiques : tendance haussière → Go, baissière → No-Go.
+- [x] Premières décisions (SMA_slow non définie) → No-Go.
+- [x] Paramètres `fast` et `slow` lus depuis la config (`baselines.sma.fast`, `baselines.sma.slow`).
+- [x] Validation `fast < slow` avec `raise` si non respecté.
+- [x] **Test de causalité** : modifier les prix futurs (t > T) et vérifier que `predict()` retourne le même signal pour tout t ≤ T.
+- [x] `"sma_rule"` est résolvable via `get_model_class("sma_rule")`.
+- [x] Soumis au backtest commun → `n_trades >= 0`.
+- [x] Tests couvrent les scénarios nominaux + erreurs + bords.
+- [x] Suite de tests verte après implémentation.
+- [x] `ruff check` passe sans erreur.
 
 ## Pré-condition de démarrage
 - **Tous les tests existants sont GREEN** avant de commencer.
 - **Créer une branche dédiée** `task/039-baseline-sma-rule` depuis `Max6000i1`.
 
 ## Checklist de fin de tâche
-- [ ] Branche `task/039-baseline-sma-rule` créée depuis `Max6000i1`.
-- [ ] Tests RED écrits avant implémentation.
-- [ ] **Commit RED** : `[WS-9] #039 RED: <résumé>` (fichiers de tests uniquement).
-- [ ] Tests GREEN passants et reproductibles.
-- [ ] Critères d'acceptation tous satisfaits.
-- [ ] `ruff check ai_trading/ tests/` passe sans erreur.
-- [ ] Fichier de tâche mis à jour (statut DONE, critères cochés).
+- [x] Branche `task/039-baseline-sma-rule` créée depuis `Max6000i1`.
+- [x] Tests RED écrits avant implémentation.
+- [x] **Commit RED** : `[WS-9] #039 RED: tests for SmaRuleBaseline`.
+- [x] Tests GREEN passants et reproductibles.
+- [x] Critères d'acceptation tous satisfaits.
+- [x] `ruff check ai_trading/ tests/` passe sans erreur.
+- [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
 - [ ] **Commit GREEN** : `[WS-9] #039 GREEN: <résumé>`.
 - [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-9] #039 — Baseline SMA rule`.

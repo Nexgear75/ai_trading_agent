@@ -53,7 +53,7 @@ _X_VAL = _RNG.standard_normal((10, _L, _F)).astype(np.float32)
 _Y_VAL = _RNG.standard_normal((10,)).astype(np.float32)
 
 
-def _import_sma_rule():
+def _import_sma_rule() -> type:
     """Import the sma_rule module to trigger registration."""
     import ai_trading.baselines.sma_rule as mod
 
