@@ -16,6 +16,8 @@ import numpy as np
 
 from ai_trading.models.base import BaseModel, register_model
 
+_MODEL_FILENAME = "dummy_model.json"
+
 
 @register_model("dummy")
 class DummyModel(BaseModel):
@@ -52,10 +54,23 @@ class DummyModel(BaseModel):
         rng = np.random.default_rng(self._seed)
         return rng.standard_normal(n).astype(np.float32)
 
+    @staticmethod
+    def _resolve_path(path: Path) -> Path:
+        """Resolve *path* to a concrete file path.
+
+        If *path* is an existing directory, append the default model filename.
+        Otherwise treat *path* as a file path.
+        """
+        path = Path(path)
+        if path.is_dir():
+            return path / _MODEL_FILENAME
+        return path
+
     def save(self, path: Path) -> None:
         """Persist seed to a JSON file."""
-        path = Path(path)
-        path.write_text(json.dumps({"seed": self._seed}))
+        resolved = self._resolve_path(path)
+        resolved.parent.mkdir(parents=True, exist_ok=True)
+        resolved.write_text(json.dumps({"seed": self._seed}))
 
     def load(self, path: Path) -> None:
         """Restore seed from a JSON file.
@@ -69,8 +84,8 @@ class DummyModel(BaseModel):
         KeyError
             If JSON does not contain ``"seed"`` key.
         """
-        path = Path(path)
-        if not path.exists():
-            raise FileNotFoundError(f"Model file not found: {path}")
-        data = json.loads(path.read_text())
+        resolved = self._resolve_path(path)
+        if not resolved.exists():
+            raise FileNotFoundError(f"Model file not found: {resolved}")
+        data = json.loads(resolved.read_text())
         self._seed = data["seed"]

@@ -78,19 +78,19 @@ class TestDummyModelAttributes:
 class TestDummyModelFit:
     """#025 — fit() contract compliance."""
 
-    def test_fit_returns_dict(self):
+    def test_fit_returns_dict(self, tmp_path: Path):
         model = DummyModel(seed=42)
         result = model.fit(
             X_train=_X, y_train=_Y, X_val=_X_VAL, y_val=_Y_VAL,
-            config=None, run_dir=Path("/tmp/dummy_run"),
+            config=None, run_dir=tmp_path / "dummy_run",
         )
         assert isinstance(result, dict)
 
-    def test_fit_with_optional_params(self):
+    def test_fit_with_optional_params(self, tmp_path: Path):
         model = DummyModel(seed=42)
         result = model.fit(
             X_train=_X, y_train=_Y, X_val=_X_VAL, y_val=_Y_VAL,
-            config=None, run_dir=Path("/tmp/dummy_run"),
+            config=None, run_dir=tmp_path / "dummy_run",
             meta_train={"a": 1}, meta_val={"b": 2}, ohlcv=np.zeros((5, 6)),
         )
         assert isinstance(result, dict)
@@ -189,6 +189,31 @@ class TestDummyModelSaveLoad:
         assert isinstance(data, dict)
         assert data["seed"] == 55
 
+    def test_save_to_directory(self, tmp_path: Path):
+        """save() with a directory path writes inside the directory."""
+        model = DummyModel(seed=42)
+        model.save(tmp_path)
+        expected_file = tmp_path / "dummy_model.json"
+        assert expected_file.exists()
+        data = json.loads(expected_file.read_text())
+        assert data["seed"] == 42
+
+    def test_load_from_directory(self, tmp_path: Path):
+        """load() with a directory path finds the model file inside."""
+        model = DummyModel(seed=42)
+        model.save(tmp_path)
+
+        model2 = DummyModel(seed=999)
+        model2.load(tmp_path)
+        np.testing.assert_array_equal(model.predict(_X), model2.predict(_X))
+
+    def test_save_creates_parent_dirs(self, tmp_path: Path):
+        """save() creates parent directories if they don't exist."""
+        model = DummyModel(seed=42)
+        filepath = tmp_path / "nested" / "deep" / "model.json"
+        model.save(filepath)
+        assert filepath.exists()
+
 
 # ---------------------------------------------------------------------------
 # Tests — Error / edge cases
@@ -238,16 +263,21 @@ class TestDummyModelRegistry:
     """#025 — Registry integration."""
 
     def test_registry_contains_dummy(self):
-        """After importing dummy module, MODEL_REGISTRY contains 'dummy'."""
-        from ai_trading.models.base import register_model
+        """Importing the dummy module auto-registers DummyModel in MODEL_REGISTRY."""
+        import importlib
 
-        register_model("dummy")(DummyModel)
+        import ai_trading.models.dummy as mod
+
+        importlib.reload(mod)
         assert "dummy" in MODEL_REGISTRY
-        assert MODEL_REGISTRY["dummy"] is DummyModel
+        assert MODEL_REGISTRY["dummy"] is mod.DummyModel
 
     def test_get_model_class_resolves_dummy(self):
-        """get_model_class('dummy') returns DummyModel after registration."""
-        from ai_trading.models.base import get_model_class, register_model
+        """get_model_class('dummy') returns DummyModel after auto-registration."""
+        import importlib
 
-        register_model("dummy")(DummyModel)
-        assert get_model_class("dummy") is DummyModel
+        import ai_trading.models.dummy as mod
+        from ai_trading.models.base import get_model_class
+
+        importlib.reload(mod)
+        assert get_model_class("dummy") is mod.DummyModel
