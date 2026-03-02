@@ -80,15 +80,29 @@ Les skills `.github/skills/*/SKILL.md` fournissent des workflows spécialisés i
 
 | Skill | Déclencheur | Description |
 |---|---|---|
-| `implementing-task` | « implémente la tâche #NNN » | Orchestre 3 parties : A (implémentation TDD par subagent), B (revue branche par subagent → review_vN), C (corrections par subagent). Boucle B+C jusqu'à 5× max. |
+| `implementing-task` | « implémente la tâche #NNN » | Orchestre 3 agents workers : TDD-Implementer (RED→GREEN), TDD-Reviewer (revue), TDD-Fixer (corrections). Boucle B+C jusqu'à 5× max. |
 | `implementing-request-change` | « implémente les request changes 0001 », « corrige les bloquants » | Corrections issues d'un rapport request_changes, par sévérité |
 | `pr-reviewer` | « review la PR », « vérifie avant merge » | Revue systématique de PR |
 | `task-creator` | « crée les tâches pour WS-X » | Génération de tâches structurées depuis spec/plan |
 | `gate-validator` | « valide le gate M2 » | Audit Go/No-Go des gates M1–M5, G-* |
 | `global-review` | « revue globale », « audit du code », « revue de la branche » | Revue complète de branche : cohérence inter-modules, conformité spec, qualité |
 | `test-adherence` | « vérifie l'adhérence des tests », « tests vs spec », « matrice couverture » | Audit croisé tests ↔ spec ↔ tâches : formules, critères, anti-patterns |
-| `plan-coherence` | « revue du plan », « cohérence du plan », « audit plan » | Revue de cohérence intrinsèque du plan d'implémentation + correction séquentielle |
+| `plan-coherence` | « revue du plan », « cohérence du plan », « audit plan » | Orchestre 2 agents workers : Plan-Corrector (corrections), Plan-Analyzer (ré-analyse). Itère jusqu'à convergence. |
 | `markdown-redaction` | « rédige un document Markdown » | Conventions GFM, mode Corporate FR, templates |
+
+## Custom Agents (workers)
+
+Les agents `.github/agents/*.agent.md` sont des workers invocables comme subagents par les skills orchestrateurs. Ils ne sont pas visibles directement dans le dropdown Copilot (`user-invokable: false`).
+
+> **Modèle** : par défaut, chaque agent hérite du modèle sélectionné dans la session principale. Pour forcer un modèle spécifique, décommenter la ligne `model:` dans le frontmatter de l'agent (ex : `model: ['Claude Opus 4.6 (copilot)']`).
+
+| Agent | Fichier | Utilisé par | Rôle |
+|---|---|---|---|
+| `TDD-Implementer` | `.github/agents/tdd-implementer.agent.md` | `implementing-task` | Implémentation TDD RED→GREEN |
+| `TDD-Reviewer` | `.github/agents/tdd-reviewer.agent.md` | `implementing-task` | Revue de branche (audit complet) |
+| `TDD-Fixer` | `.github/agents/tdd-fixer.agent.md` | `implementing-task` | Corrections post-revue |
+| `Plan-Corrector` | `.github/agents/plan-corrector.agent.md` | `plan-coherence` | Correction d'une incohérence plan |
+| `Plan-Analyzer` | `.github/agents/plan-analyzer.agent.md` | `plan-coherence` | Analyse de cohérence complète (Phase A itérative) |
 
 ## Instructions automatiques
 
