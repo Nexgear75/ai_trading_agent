@@ -31,8 +31,8 @@ Implémenter `DummyModel(BaseModel)` enregistré via `@register_model("dummy")`,
 - `output_type = "regression"` (le DummyModel simule un modèle supervisé)
 - `execution_mode = "standard"` (hérité du défaut BaseModel)
 - `fit()` : stocke la seed, ne fait rien d'autre (no-op fonctionnel)
-- `predict(X)` : retourne un vecteur `y_hat` de shape `(N,)` généré avec `numpy.random.default_rng(seed)` ou une constante configurable
-- `save(path)` : exporte un fichier JSON minimal `{"seed": 42, "constant": 0.0}`
+- `predict(X)` : retourne un vecteur `y_hat` de shape `(N,)` généré avec `numpy.random.default_rng(seed)`
+- `save(path)` : exporte un fichier JSON minimal `{"seed": 42}`
 - `load(path)` : recharge le JSON et restaure l'état interne
 
 ### 2. Enregistrement dans le registre
