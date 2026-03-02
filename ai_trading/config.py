@@ -172,8 +172,8 @@ class ThresholdingConfig(_StrictBase):
 
 class CostsConfig(_StrictBase):
     cost_model: str
-    fee_rate_per_side: float = Field(ge=0)
-    slippage_rate_per_side: float = Field(ge=0)
+    fee_rate_per_side: float = Field(ge=0, lt=1)
+    slippage_rate_per_side: float = Field(ge=0, lt=1)
 
 
 class BacktestConfig(_StrictBase):
