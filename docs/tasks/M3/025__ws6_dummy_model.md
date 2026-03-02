@@ -1,6 +1,6 @@
 # Tâche — DummyModel pour tests d'intégration
 
-Statut : TODO
+Statut : DONE
 Ordre : 025
 Workstream : WS-6
 Milestone : M3
@@ -40,30 +40,30 @@ Implémenter `DummyModel(BaseModel)` enregistré via `@register_model("dummy")`,
 - Auto-import dans `ai_trading/models/__init__.py` pour que le registre soit peuplé à l'import du package
 
 ## Critères d'acceptation
-- [ ] `DummyModel` hérite de `BaseModel` et est importable depuis `ai_trading.models.dummy`
-- [ ] `DummyModel.output_type == "regression"`
-- [ ] `DummyModel.execution_mode == "standard"`
-- [ ] `fit()` exécutable sans erreur (accepte tous les paramètres du contrat, y compris `meta_train`, `meta_val`, `ohlcv`)
-- [ ] `predict(X)` retourne un `ndarray` de shape `(N,)` en float
-- [ ] Prédictions reproductibles : deux appels avec la même seed produisent le même résultat
-- [ ] `save(path)` crée un fichier JSON lisible
-- [ ] `load(path)` restaure l'état et `predict()` donne le même résultat qu'avant `save()`
-- [ ] `MODEL_REGISTRY["dummy"]` résout vers `DummyModel`
-- [ ] Tests couvrent les scénarios nominaux + erreurs + bords
-- [ ] Suite de tests verte après implémentation
-- [ ] `ruff check` passe sans erreur
+- [x] `DummyModel` hérite de `BaseModel` et est importable depuis `ai_trading.models.dummy`
+- [x] `DummyModel.output_type == "regression"`
+- [x] `DummyModel.execution_mode == "standard"`
+- [x] `fit()` exécutable sans erreur (accepte tous les paramètres du contrat, y compris `meta_train`, `meta_val`, `ohlcv`)
+- [x] `predict(X)` retourne un `ndarray` de shape `(N,)` en float
+- [x] Prédictions reproductibles : deux appels avec la même seed produisent le même résultat
+- [x] `save(path)` crée un fichier JSON lisible
+- [x] `load(path)` restaure l'état et `predict()` donne le même résultat qu'avant `save()`
+- [x] `MODEL_REGISTRY["dummy"]` résout vers `DummyModel`
+- [x] Tests couvrent les scénarios nominaux + erreurs + bords
+- [x] Suite de tests verte après implémentation
+- [x] `ruff check` passe sans erreur
 
 ## Pré-condition de démarrage
 - **Tous les tests existants sont GREEN** avant de commencer.
 - **Créer une branche dédiée** `task/025-dummy-model` depuis `Max6000i1`.
 
 ## Checklist de fin de tâche
-- [ ] Branche `task/025-dummy-model` créée depuis `Max6000i1`.
-- [ ] Tests RED écrits avant implémentation.
-- [ ] **Commit RED** : `[WS-6] #025 RED: tests DummyModel fit/predict/save/load` (fichiers de tests uniquement).
-- [ ] Tests GREEN passants et reproductibles.
-- [ ] Critères d'acceptation tous satisfaits.
-- [ ] `ruff check ai_trading/ tests/` passe sans erreur.
-- [ ] Fichier de tâche mis à jour (statut DONE, critères cochés).
-- [ ] **Commit GREEN** : `[WS-6] #025 GREEN: DummyModel pour tests d'intégration`.
-- [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-6] #025 — DummyModel pour tests d'intégration`.
+- [x] Branche `task/025-dummy-model` créée depuis `Max6000i1`.
+- [x] Tests RED écrits avant implémentation.
+- [x] **Commit RED** : `[WS-6] #025 RED: tests DummyModel fit/predict/save/load` (fichiers de tests uniquement).
+- [x] Tests GREEN passants et reproductibles.
+- [x] Critères d'acceptation tous satisfaits.
+- [x] `ruff check ai_trading/ tests/` passe sans erreur.
+- [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
+- [x] **Commit GREEN** : `[WS-6] #025 GREEN: DummyModel pour tests d'intégration`.
+- [x] **Pull Request ouverte** vers `Max6000i1` : `[WS-6] #025 — DummyModel pour tests d'intégration`.

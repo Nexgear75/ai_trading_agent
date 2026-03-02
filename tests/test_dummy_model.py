@@ -20,7 +20,6 @@ import pytest
 from ai_trading.models.base import MODEL_REGISTRY, BaseModel
 from ai_trading.models.dummy import DummyModel
 
-
 # ---------------------------------------------------------------------------
 # Registry cleanup fixture (same pattern as test_base_model.py)
 # ---------------------------------------------------------------------------
@@ -240,22 +239,15 @@ class TestDummyModelRegistry:
 
     def test_registry_contains_dummy(self):
         """After importing dummy module, MODEL_REGISTRY contains 'dummy'."""
-        # Re-register since fixture clears registry
         from ai_trading.models.base import register_model
 
-        @register_model("dummy")
-        class _Dummy(DummyModel):
-            pass
-
+        register_model("dummy")(DummyModel)
         assert "dummy" in MODEL_REGISTRY
-        assert MODEL_REGISTRY["dummy"] is _Dummy
+        assert MODEL_REGISTRY["dummy"] is DummyModel
 
     def test_get_model_class_resolves_dummy(self):
         """get_model_class('dummy') returns DummyModel after registration."""
         from ai_trading.models.base import get_model_class, register_model
 
-        @register_model("dummy")
-        class _Dummy(DummyModel):
-            pass
-
-        assert get_model_class("dummy") is _Dummy
+        register_model("dummy")(DummyModel)
+        assert get_model_class("dummy") is DummyModel
