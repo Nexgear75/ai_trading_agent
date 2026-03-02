@@ -1,6 +1,6 @@
 # Tâche — Règles d'exécution des trades (backtest engine)
 
-Statut : TODO
+Statut : DONE
 Ordre : 026
 Workstream : WS-8
 Milestone : M3
@@ -46,29 +46,29 @@ Implémenter le moteur d'exécution des trades dans `ai_trading/backtest/engine.
 - Validation : aucun trade ne chevauche un autre en mode `one_at_a_time`
 
 ## Critères d'acceptation
-- [ ] Le moteur accepte un vecteur de signaux (0/1) et produit une liste de trades
-- [ ] Go à t → entrée à `Open[t+1]`, sortie à `Close[t+H]`
-- [ ] Mode `one_at_a_time` : un Go pendant un trade actif est ignoré
-- [ ] Mode `long_only` : aucun trade short généré
-- [ ] Mode `single_trade` : un seul trade (entry = `Open[first_timestamp]` sans décalage, exit = `Close[last_timestamp]`) indépendamment des signaux
-- [ ] Mode `standard` : trades de H bougies respectant les règles
-- [ ] Cas bord : Go sur la dernière bougie (pas assez de bougies pour le trade) → trade ignoré ou tronqué selon spec
-- [ ] Cas bord : aucun signal Go → liste de trades vide
-- [ ] Tests couvrent les scénarios nominaux + erreurs + bords
-- [ ] Suite de tests verte après implémentation
-- [ ] `ruff check` passe sans erreur
+- [x] Le moteur accepte un vecteur de signaux (0/1) et produit une liste de trades
+- [x] Go à t → entrée à `Open[t+1]`, sortie à `Close[t+H]`
+- [x] Mode `one_at_a_time` : un Go pendant un trade actif est ignoré
+- [x] Mode `long_only` : aucun trade short généré
+- [x] Mode `single_trade` : un seul trade (entry = `Open[first_timestamp]` sans décalage, exit = `Close[last_timestamp]`) indépendamment des signaux
+- [x] Mode `standard` : trades de H bougies respectant les règles
+- [x] Cas bord : Go sur la dernière bougie (pas assez de bougies pour le trade) → trade ignoré ou tronqué selon spec
+- [x] Cas bord : aucun signal Go → liste de trades vide
+- [x] Tests couvrent les scénarios nominaux + erreurs + bords
+- [x] Suite de tests verte après implémentation
+- [x] `ruff check` passe sans erreur
 
 ## Pré-condition de démarrage
 - **Tous les tests existants sont GREEN** avant de commencer.
 - **Créer une branche dédiée** `task/026-trade-execution` depuis `Max6000i1`.
 
 ## Checklist de fin de tâche
-- [ ] Branche `task/026-trade-execution` créée depuis `Max6000i1`.
-- [ ] Tests RED écrits avant implémentation.
-- [ ] **Commit RED** : `[WS-8] #026 RED: tests règles d'exécution des trades` (fichiers de tests uniquement).
-- [ ] Tests GREEN passants et reproductibles.
-- [ ] Critères d'acceptation tous satisfaits.
-- [ ] `ruff check ai_trading/ tests/` passe sans erreur.
-- [ ] Fichier de tâche mis à jour (statut DONE, critères cochés).
+- [x] Branche `task/026-trade-execution` créée depuis `Max6000i1`.
+- [x] Tests RED écrits avant implémentation.
+- [x] **Commit RED** : `[WS-8] #026 RED: tests règles d'exécution des trades` (fichiers de tests uniquement).
+- [x] Tests GREEN passants et reproductibles.
+- [x] Critères d'acceptation tous satisfaits.
+- [x] `ruff check ai_trading/ tests/` passe sans erreur.
+- [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
 - [ ] **Commit GREEN** : `[WS-8] #026 GREEN: règles d'exécution des trades`.
 - [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-8] #026 — Règles d'exécution des trades`.
