@@ -53,6 +53,7 @@
 - [ ] **Path creation** : si un paramètre `path`/`run_dir` est reçu et utilisé pour I/O (écriture de fichiers, sous-répertoires), il doit être créé avant usage (`mkdir(parents=True, exist_ok=True)`) ou le contrat exige explicitement qu'il préexiste. **Un `run_dir / "model"` sans `run_dir.mkdir()` préalable est un bug latent — BLOQUANT.**
 - [ ] **open() sans context manager** : tout `open()` utilise `with`. Les raccourcis `Path.read_text()` / `Path.write_text()` sont acceptés.
 - [ ] **Comparaison float avec ==** : pas de `==` sur des floats numpy. Utiliser `np.isclose`, `np.testing.assert_allclose`, ou `pytest.approx`.
+- [ ] **Validation de bornes numériques et NaN/±inf** : quand un paramètre float est validé par une borne (`< 0`, `> 1`, etc.), vérifier que les valeurs **non-finies** (NaN, +inf, -inf) sont également rejetées. En Python/IEEE 754, `NaN < 0` et `NaN > 1` sont **tous les deux `False`** — un NaN passe silencieusement toute validation par bornes. De même, `set()` ne déduplique pas les NaN de manière fiable. Toujours ajouter un check `math.isfinite(val)` (ou `np.isfinite`) **avant** les tests de bornes pour tout paramètre numérique en entrée publique. Un NaN silencieusement accepté qui se propage jusqu'au calcul → **BLOQUANT**.
 - [ ] **Comparaison booléenne par identité** : ne jamais utiliser `is np.bool_(...)`, `is True`, ou `is False` sur des valeurs numpy/pandas. L'identité d'objet (`is`) n'est pas garantie entre versions numpy. Utiliser `==` pour les booléens numpy/pandas, ou convertir avec `bool()` avant `is`.
 - [ ] **`.values` perdant l'index** : pas de `.values` implicite sur un DataFrame/Series pandas sans raison documentée.
 - [ ] **f-string ou format** : pas de `str + str` dans les messages d'erreur — utiliser f-string.
@@ -73,6 +74,7 @@
 - [ ] **`__init__.py` à jour** : si un nouveau module a été créé, le `__init__.py` du package l'importe si nécessaire (ex : enregistrement automatique features). Import **relatif** (`from . import module`).
 - [ ] **Tests de registre** : si un test vérifie l'enregistrement dans un registre (MODEL_REGISTRY, FEATURE_REGISTRY), il doit utiliser `importlib.reload` pour tester le side-effect réel du décorateur, pas un appel manuel à `register_xxx()`.
 - [ ] **Portabilité des chemins dans les tests** : aucun chemin hardcodé `/tmp/...` ou `C:\...`, toujours `tmp_path` de pytest.
+- [ ] **Réutilisation des fixtures partagées** : avant de créer une fixture locale dans un fichier de test, vérifier si `tests/conftest.py` fournit déjà une fixture équivalente (ex : `default_config_path`, `default_yaml_data`, `tmp_yaml`). Dupliquer une fixture partagée (surtout avec un chemin relatif au lieu du chemin absolu via `PROJECT_ROOT`) crée un risque de fragilité et de drift — **MINEUR**.
 - [ ] **Contrat ABC complet** : si une méthode abstraite documente qu'elle accepte directory OU fichier, l'implémentation supporte les deux cas avec tests.
 
 ## §R8 — Cohérence intermodule
@@ -100,6 +102,7 @@ Une incohérence intermodule est **bloquante** — elle provoque des bugs silenc
 - [ ] **Cohérence des unités et échelles** : grandeurs manipulées avec unités cohérentes (returns log vs arithmétique, prix en quote currency, timestamps UTC). Pas de mélange implicite.
 - [ ] **Patterns de calcul financier** : bonnes pratiques numériques (`np.log` vs `math.log`, rolling windows pandas natif, pas de boucles Python sur séries temporelles).
 - [ ] **Vectorisation numpy** : quand une opération sur un array numpy peut être exprimée par un slice assignment (`arr[a:b] = val`) ou une opération vectorisée, ne pas utiliser de boucle Python `for j in range(...)`. Les boucles Python sur des arrays numpy sont un anti-pattern de performance — **MINEUR** si fonctionnellement correct, **WARNING** sur des hot paths (backtest, features).
+- [ ] **Appels numpy répétés vectorisables** : quand une fonction numpy est appelée N fois dans une boucle ou compréhension avec des paramètres issus d'une liste (ex : `{q: np.quantile(arr, q) for q in q_list}`), vérifier si la fonction accepte un array de paramètres en une seule passe (ex : `np.quantile(arr, q_list)` retourne un array de résultats). Préférer l'appel vectorisé unique + reconstruction du dict via `zip()`. **MINEUR** en général, **WARNING** sur des hot paths.
 
 ## §R10 — Defensive indexing / slicing
 
@@ -165,6 +168,16 @@ grep -n '\[.*\] = .*' $CHANGED_SRC | grep -v 'def \|#\|"""'
 
 # §R9 — Boucle Python sur array numpy (vectorisation manquante)
 grep -n 'for .* in range(.*):' $CHANGED_SRC
+
+# §R6 — Validation de bornes sans check isfinite (NaN/inf bypass)
+# Chercher les patterns 'if val < ... or val > ...' sans isfinite préalable
+grep -n 'isfinite\|math.isfinite\|np.isfinite' $CHANGED_SRC
+
+# §R9 — Appels numpy répétés dans une compréhension (vectorisation manquante)
+grep -n 'np\.[a-z]*(.*for .* in ' $CHANGED_SRC
+
+# §R7 — Fixtures dupliquées (chemin relatif vers config dans les tests)
+grep -n 'load_config.*configs/' $CHANGED_TEST
 ```
 
 **Pour chaque match** : analyser en contexte (lire les lignes autour) et classer :
