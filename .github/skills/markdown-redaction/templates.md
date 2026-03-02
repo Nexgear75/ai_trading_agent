@@ -33,7 +33,7 @@
 
 > **Note** : le template canonique des tâches est défini dans le skill `task-creator`
 > (`.github/skills/task-creator/SKILL.md` § Format des fichiers de tâche).
-> Utiliser ce template-là pour toute création de tâche `docs/tasks/NNN__slug.md`.
+> Utiliser ce template-là pour toute création de tâche `docs/tasks/<milestone>/NNN__slug.md`.
 
 ## Template 3 — Guide technique
 

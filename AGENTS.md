@@ -14,7 +14,7 @@ Pipeline commun AI Trading : comparaison rigoureuse de modèles ML/DL (XGBoost, 
 ## Documents de référence
 - **Spécification** : `docs/specifications/Specification_Pipeline_Commun_AI_Trading_v1.0.md` (v1.0 + addendum v1.1 + v1.2)
 - **Plan** : `docs/plan/implementation.md` (WS-1..WS-12, M1..M5)
-- **Tâches** : `docs/tasks/NNN__slug.md`
+- **Tâches** : `docs/tasks/<milestone>/NNN__slug.md` (ex : `docs/tasks/M1/001__ws1_config_loader.md`)
 
 ## Règles non négociables
 

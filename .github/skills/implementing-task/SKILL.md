@@ -6,13 +6,13 @@ description: Implémenter une ou plusieurs tâches de docs/tasks/ via TDD strict
 # Agent Skill — Implementing Task (AI Trading Pipeline)
 
 ## Objectif
-Exécuter des tâches décrites dans `docs/tasks/NNN__slug.md` selon un workflow **TDD strict**, en respectant les conventions du dépôt AI Trading Pipeline, puis livrer proprement (tests, couverture, statut de tâche, commits).
+Exécuter des tâches décrites dans `docs/tasks/<milestone>/NNN__slug.md` selon un workflow **TDD strict**, en respectant les conventions du dépôt AI Trading Pipeline, puis livrer proprement (tests, couverture, statut de tâche, commits).
 
 ## Contexte repo
 
 > Les conventions complètes, la stack, les principes non négociables et la structure des workstreams sont définis dans **`AGENTS.md`** (racine du repo). Ce skill ne duplique pas AGENTS.md — il le **complète** avec le workflow opérationnel spécifique à l'implémentation de tâches.
 
-- **Tâches** : `docs/tasks/NNN__slug.md`
+- **Tâches** : `docs/tasks/<milestone>/NNN__slug.md` (ex : `docs/tasks/M1/001__ws1_config_loader.md`)
 - **Spécification** : `docs/specifications/Specification_Pipeline_Commun_AI_Trading_v1.0.md` (v1.0 + addendum v1.1 + v1.2)
 - **Plan** : `docs/plan/implementation.md` (WS-1..WS-12, M1..M5)
 - **Code source** : `ai_trading/` (package Python principal)
@@ -56,7 +56,7 @@ git checkout -b task/NNN-short-slug
 ```
 
 ### 1. Lire la tâche
-Ouvrir `docs/tasks/NNN__slug.md` et extraire :
+Ouvrir `docs/tasks/<milestone>/NNN__slug.md` et extraire :
 - objectif, workstream (WS-1..WS-12), milestone (M1..M5), gate lié ;
 - contraintes et règles attendues ;
 - critères d'acceptation ;
@@ -180,7 +180,7 @@ Vérifier que les changements ne créent pas de divergence avec les modules exis
 Si un point de cette checklist échoue, corriger et **revenir à l'étape 7** pour revalider.
 
 ### 9. Mettre à jour la tâche
-Dans `docs/tasks/NNN__slug.md` :
+Dans `docs/tasks/<milestone>/NNN__slug.md` :
 - Cocher chaque critère d'acceptation vérifié : `- [x]`
 - Cocher chaque item de la checklist de fin de tâche : `- [x]`
 - Passer `Statut : DONE`
@@ -192,12 +192,12 @@ Conditions requises : tests GREEN + tous les critères d'acceptation validés + 
 **Contenu attendu** du commit GREEN :
 - Fichiers d'implémentation (`ai_trading/`) — obligatoire.
 - `__init__.py` modifiés — si nécessaire.
-- `docs/tasks/NNN__slug.md` — obligatoire (statut DONE).
+- `docs/tasks/<milestone>/NNN__slug.md` — obligatoire (statut DONE).
 - `configs/default.yaml` — si des paramètres ont été ajoutés/modifiés.
 - Fichiers de test (`tests/`) — autorisé pour ajustements mineurs post-implémentation (tolérances, noms de colonnes, etc.).
 
 ```bash
-git add ai_trading/ tests/ docs/tasks/NNN__slug.md configs/
+git add ai_trading/ tests/ docs/tasks/<milestone>/NNN__slug.md configs/
 git commit -m "[WS-X] #NNN GREEN: <résumé du livrable>"
 ```
 

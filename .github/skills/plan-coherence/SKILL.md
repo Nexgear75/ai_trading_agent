@@ -20,7 +20,7 @@ Le skill opère en deux phases distinctes :
 
 - **Plan** : `docs/plan/implementation.md` (WS-1..WS-12, M1..M5)
 - **Rapport de cohérence** : `docs/review_coherence_implementation.md`
-- **Tâches** : `docs/tasks/NNN__slug.md`
+- **Tâches** : `docs/tasks/<milestone>/NNN__slug.md`
 
 ## Phase A — Analyse de cohérence intrinsèque
 
@@ -149,7 +149,7 @@ Tu dois corriger UNE incohérence dans le plan d'implémentation du projet AI Tr
 ## Règles
 
 1. Lis les sections du plan concernées par l'incohérence (`docs/plan/implementation.md`).
-2. Si la correction nécessite de comprendre l'impact sur les tâches existantes, lis les fichiers de tâches concernés (`docs/tasks/NNN__slug.md`).
+2. Si la correction nécessite de comprendre l'impact sur les tâches existantes, lis les fichiers de tâches concernés (`docs/tasks/<milestone>/NNN__slug.md`).
 3. Si la correction nécessite de vérifier une référence spec, lis la section spec ciblée (`docs/specifications/Specification_Pipeline_Commun_AI_Trading_v1.0.md`).
 4. Ne charge que les fichiers strictement nécessaires à CETTE incohérence.
 5. Applique la correction dans `docs/plan/implementation.md`. La correction doit être minimale et ciblée.

@@ -8,7 +8,7 @@ argument-hint: "[scope: all|module_name|WS-X] [severity: strict|normal]"
 
 ## Objectif
 
-Auditer systématiquement l'adhérence des tests (`tests/`) à la spécification (`docs/specifications/Specification_Pipeline_Commun_AI_Trading_v1.0.md`), aux tâches (`docs/tasks/NNN__slug.md`) et au code source (`ai_trading/`). Détecter :
+Auditer systématiquement l'adhérence des tests (`tests/`) à la spécification (`docs/specifications/Specification_Pipeline_Commun_AI_Trading_v1.0.md`), aux tâches (`docs/tasks/<milestone>/NNN__slug.md`) et au code source (`ai_trading/`). Détecter :
 
 1. **Tests manquants** : critères d'acceptation sans test correspondant.
 2. **Tests incorrects** : assertions qui ne valident pas la formule/le comportement de la spec.
@@ -19,7 +19,7 @@ Auditer systématiquement l'adhérence des tests (`tests/`) à la spécification
 
 - **Spécification** : `docs/specifications/Specification_Pipeline_Commun_AI_Trading_v1.0.md` (v1.0 + addendum v1.1 + v1.2)
 - **Plan** : `docs/plan/implementation.md` (WS-1..WS-12, M1..M5)
-- **Tâches** : `docs/tasks/NNN__slug.md`
+- **Tâches** : `docs/tasks/<milestone>/NNN__slug.md`
 - **Code source** : `ai_trading/`
 - **Tests** : `tests/` (pytest)
 - **Configs** : `configs/default.yaml`
@@ -45,7 +45,7 @@ Si l'utilisateur spécifie un scope (module, WS, tâche), limiter l'audit à ce 
 find tests/ -name "test_*.py" -not -path "*__pycache__*" | sort
 
 # Lister toutes les tâches DONE
-grep -l "Statut : DONE" docs/tasks/*.md | sort
+grep -rl "Statut : DONE" docs/tasks/ | sort
 ```
 
 ### 1. Construire la matrice spec → tâche → test
@@ -53,7 +53,7 @@ grep -l "Statut : DONE" docs/tasks/*.md | sort
 Pour chaque module/workstream dans le périmètre :
 
 1. **Identifier la section de spec** applicable (§4 données, §5 labels, §6 features, §7 datasets, §8 splits, §9 scaling, etc.).
-2. **Lire la tâche associée** (`docs/tasks/NNN__slug.md`) et extraire les critères d'acceptation.
+2. **Lire la tâche associée** (`docs/tasks/<milestone>/NNN__slug.md`) et extraire les critères d'acceptation.
 3. **Lire le fichier de test** correspondant (`tests/test_*.py`) et inventorier les fonctions de test avec leurs docstrings.
 4. **Mapper** chaque critère d'acceptation vers un ou plusieurs tests.
 

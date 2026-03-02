@@ -13,7 +13,7 @@ Effectuer une revue systématique et exigeante d'une Pull Request (ou d'une bran
 
 - **Spécification** : `docs/specifications/Specification_Pipeline_Commun_AI_Trading_v1.0.md` (v1.0 + addendum v1.1 + v1.2)
 - **Plan** : `docs/plan/implementation.md` (WS-1..WS-12, M1..M5)
-- **Tâches** : `docs/tasks/NNN__slug.md`
+- **Tâches** : `docs/tasks/<milestone>/NNN__slug.md`
 - **Code source** : `ai_trading/` (package Python principal)
 - **Tests** : `tests/` (pytest)
 - **Configs** : `configs/default.yaml`
@@ -33,7 +33,7 @@ Tu dois :
 ### 1. Identifier le périmètre
 
 - Déterminer la branche source (`task/NNN-short-slug`).
-- Identifier la tâche associée dans `docs/tasks/NNN__slug.md`.
+- Identifier la tâche associée dans `docs/tasks/<milestone>/NNN__slug.md`.
 - Lister les fichiers modifiés vs `Max6000i1` :
   ```
   git diff --name-only Max6000i1...task/NNN-short-slug
@@ -50,7 +50,7 @@ Tu dois :
 
 ### 3. Vérifier la tâche associée
 
-- [ ] Le fichier `docs/tasks/NNN__slug.md` est modifié dans la PR.
+- [ ] Le fichier `docs/tasks/<milestone>/NNN__slug.md` est modifié dans la PR.
 - [ ] `Statut` est passé à `DONE`.
 - [ ] Tous les critères d'acceptation sont cochés `[x]`.
 - [ ] Toute la checklist de fin de tâche est cochée `[x]`.
@@ -152,7 +152,7 @@ Une incohérence intermodule est **bloquante** — elle provoque des bugs silenc
 # Revue PR — [WS-X] #NNN — <titre de la tâche>
 
 Branche : `task/NNN-short-slug`
-Tâche : `docs/tasks/NNN__slug.md`
+Tâche : `docs/tasks/<milestone>/NNN__slug.md`
 Date : YYYY-MM-DD
 
 ## Verdict global : ✅ APPROVE | ⚠️ REQUEST CHANGES | ❌ REJECT
