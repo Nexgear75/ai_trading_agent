@@ -1,6 +1,6 @@
 # Tâche — Pré-gate G-Doc (vérification structurelle M3)
 
-Statut : TODO
+Statut : DONE
 Ordre : 034
 Workstream : WS-6
 Milestone : M3
@@ -60,27 +60,27 @@ Dépendances :
 - θ est indépendant de `y_hat_test`
 
 ## Critères d'acceptation
-- [ ] Critère G-Doc 1 vérifié par test : `DummyModel.output_type == "regression"`
-- [ ] Critère G-Doc 2 vérifié par test : `DummyModel.execution_mode == "standard"`
-- [ ] Critère G-Doc 3 vérifié par test : `set(MODEL_REGISTRY) ⊆ set(VALID_STRATEGIES)`
-- [ ] Critère G-Doc 4 vérifié par test : docstrings présentes et conformes sur `BaseModel` et `DummyModel`
-- [ ] Critère G-Doc 5 vérifié par test : bypass θ fonctionnel pour `output_type == "signal"`
-- [ ] Critère G-Doc 6 vérifié par test : θ indépendant de `y_hat_test` (perturbation)
-- [ ] Tous les tests G-Doc passent (`pytest tests/test_gate_doc.py -v`)
-- [ ] Suite de tests complète verte après implémentation
-- [ ] `ruff check` passe sans erreur
+- [x] Critère G-Doc 1 vérifié par test : `DummyModel.output_type == "regression"`
+- [x] Critère G-Doc 2 vérifié par test : `DummyModel.execution_mode == "standard"`
+- [x] Critère G-Doc 3 vérifié par test : `set(MODEL_REGISTRY) ⊆ set(VALID_STRATEGIES)`
+- [x] Critère G-Doc 4 vérifié par test : docstrings présentes et conformes sur `BaseModel` et `DummyModel`
+- [x] Critère G-Doc 5 vérifié par test : bypass θ fonctionnel pour `output_type == "signal"`
+- [x] Critère G-Doc 6 vérifié par test : θ indépendant de `y_hat_test` (perturbation)
+- [x] Tous les tests G-Doc passent (`pytest tests/test_gate_doc.py -v`)
+- [x] Suite de tests complète verte après implémentation
+- [x] `ruff check` passe sans erreur
 
 ## Pré-condition de démarrage
 - **Tous les tests existants sont GREEN** avant de commencer.
 - **Créer une branche dédiée** `task/034-gate-doc` depuis `Max6000i1`.
 
 ## Checklist de fin de tâche
-- [ ] Branche `task/034-gate-doc` créée depuis `Max6000i1`.
-- [ ] Tests RED écrits avant implémentation.
-- [ ] **Commit RED** : `[WS-6] #034 RED: tests pré-gate G-Doc` (fichiers de tests uniquement).
-- [ ] Tests GREEN passants et reproductibles.
-- [ ] Critères d'acceptation tous satisfaits.
-- [ ] `ruff check ai_trading/ tests/` passe sans erreur.
-- [ ] Fichier de tâche mis à jour (statut DONE, critères cochés).
+- [x] Branche `task/034-gate-doc` créée depuis `Max6000i1`.
+- [x] Tests RED écrits avant implémentation.
+- [x] **Commit RED** : `[WS-6] #034 RED: tests pré-gate G-Doc` (fichiers de tests uniquement).
+- [x] Tests GREEN passants et reproductibles.
+- [x] Critères d'acceptation tous satisfaits.
+- [x] `ruff check ai_trading/ tests/` passe sans erreur.
+- [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
 - [ ] **Commit GREEN** : `[WS-6] #034 GREEN: pré-gate G-Doc validé`.
 - [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-6] #034 — Pré-gate G-Doc (vérification structurelle M3)`.
