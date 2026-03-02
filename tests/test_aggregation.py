@@ -212,7 +212,10 @@ class TestAggregateFoldMetrics:
     def test_single_fold(self):
         """Single fold: mean = value, std = NaN (ddof=1 on 1 sample)."""
         folds = [_make_fold_metrics(net_pnl=0.15)]
-        result = aggregate_fold_metrics(folds)
+        import warnings
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", RuntimeWarning)
+            result = aggregate_fold_metrics(folds)
         assert result["net_pnl_mean"] == pytest.approx(0.15)
         # std with ddof=1 on 1 element is NaN
         net_pnl_std = result["net_pnl_std"]
@@ -226,7 +229,10 @@ class TestAggregateFoldMetrics:
             _make_fold_metrics(sharpe=2.5),
             _make_fold_metrics(sharpe=None),
         ]
-        result = aggregate_fold_metrics(folds)
+        import warnings
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", RuntimeWarning)
+            result = aggregate_fold_metrics(folds)
         assert result["sharpe_mean"] == pytest.approx(2.5)
         sharpe_std = result["sharpe_std"]
         assert sharpe_std is not None
@@ -390,6 +396,13 @@ class TestStitchEquityCurves:
         with pytest.raises(ValueError, match="equity"):
             stitch_equity_curves([df])
 
+    def test_equity_starting_at_zero_raises(self):
+        """Fold equity starting at 0.0 → ValueError (cannot rescale)."""
+        ec0 = _make_equity_df([1.0, 1.2], start="2024-01-01")
+        ec1 = _make_equity_df([0.0, 0.5], start="2024-02-01")
+        with pytest.raises(ValueError, match="equity starting at 0.0"):
+            stitch_equity_curves([ec0, ec1])
+
 
 # ============================================================================
 # check_acceptance_criteria
@@ -486,6 +499,20 @@ class TestCheckAcceptanceCriteria:
                "max_drawdown_mean": 0.10}
         with pytest.raises(ValueError, match="mdd_cap"):
             check_acceptance_criteria(agg, mdd_cap=-0.1)
+
+    def test_mdd_cap_nan_raises(self):
+        """mdd_cap=NaN → ValueError."""
+        agg = {"net_pnl_mean": 0.10, "profit_factor_mean": 1.5,
+               "max_drawdown_mean": 0.10}
+        with pytest.raises(ValueError, match="mdd_cap"):
+            check_acceptance_criteria(agg, mdd_cap=float("nan"))
+
+    def test_mdd_cap_inf_raises(self):
+        """mdd_cap=inf → ValueError."""
+        agg = {"net_pnl_mean": 0.10, "profit_factor_mean": 1.5,
+               "max_drawdown_mean": 0.10}
+        with pytest.raises(ValueError, match="mdd_cap"):
+            check_acceptance_criteria(agg, mdd_cap=float("inf"))
 
 
 # ============================================================================

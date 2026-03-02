@@ -170,6 +170,11 @@ def stitch_equity_curves(
 
             # Rescale: multiply by (carry / original_start).
             original_start = original_equity[0]
+            if original_start == 0.0:
+                raise ValueError(
+                    f"fold_equities[{k}] has equity starting at 0.0, "
+                    "cannot rescale."
+                )
             scale = carry_equity / original_start
             ec_copy["equity"] = original_equity * scale
 
@@ -198,7 +203,7 @@ def check_acceptance_criteria(
     aggregate:
         Aggregated metrics dict (output of ``aggregate_fold_metrics``).
     mdd_cap:
-        Maximum drawdown cap from config (``calibration.mdd_cap``).
+        Maximum drawdown cap from config (``thresholding.mdd_cap``).
 
     Returns
     -------
