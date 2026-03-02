@@ -72,5 +72,5 @@ Implémenter le module `ai_trading/training/trainer.py` qui orchestre le workflo
 - [x] Critères d'acceptation tous satisfaits.
 - [x] `ruff check ai_trading/ tests/` passe sans erreur.
 - [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
-- [ ] **Commit GREEN** : `[WS-6] #028 GREEN: fold trainer orchestration`.
-- [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-6] #028 — Fold trainer (orchestration fit/predict par fold)`.
+- [x] **Commit GREEN** : `[WS-6] #028 GREEN: fold trainer orchestration`.
+- [x] **Pull Request ouverte** vers `Max6000i1` : `[WS-6] #028 — Fold trainer (orchestration fit/predict par fold)`.
