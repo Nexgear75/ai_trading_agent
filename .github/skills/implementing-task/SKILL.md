@@ -1,12 +1,18 @@
 ---
 name: implementing-task
-description: Implémenter une ou plusieurs tâches de docs/tasks/ via TDD strict (tests d'acceptation → rouge → vert), conventions du repo AI Trading Pipeline, seuils de couverture, mise à jour du fichier de tâche et commits. À utiliser quand l'utilisateur demande « implémente/exécute/travaille sur la tâche #NNN ».
+description: Implémenter une ou plusieurs tâches de docs/tasks/ via TDD strict (tests d'acceptation → rouge → vert), conventions du repo AI Trading Pipeline, seuils de couverture, mise à jour du fichier de tâche et commits. Orchestre 3 parties : A (implémentation par subagent), B (revue par subagent + corrections itératives). À utiliser quand l'utilisateur demande « implémente/exécute/travaille sur la tâche #NNN ».
 ---
 
 # Agent Skill — Implementing Task (AI Trading Pipeline)
 
 ## Objectif
-Exécuter des tâches décrites dans `docs/tasks/<milestone>/NNN__slug.md` selon un workflow **TDD strict**, en respectant les conventions du dépôt AI Trading Pipeline, puis livrer proprement (tests, couverture, statut de tâche, commits).
+Orchestrer l'implémentation de tâches décrites dans `docs/tasks/<milestone>/NNN__slug.md` en déléguant le travail à des **subagents spécialisés** via un workflow en 3 parties :
+
+- **Partie A** : Subagent d'implémentation (TDD strict RED→GREEN).
+- **Partie B** : Subagent de revue de branche + stockage du rapport.
+- **Partie C** (conditionnel) : Subagent de correction si la revue relève des items.
+
+Les parties B+C sont itérées jusqu'à 5 fois maximum, ou jusqu'à obtention d'un verdict CLEAN.
 
 ## Contexte repo
 
@@ -32,7 +38,7 @@ Exécuter des tâches décrites dans `docs/tasks/<milestone>/NNN__slug.md` selon
 - **Anti-fuite** : ne jamais introduire de look-ahead. Données point-in-time. Embargo `embargo_bars >= H`. Scaler fit sur train uniquement. Splits walk-forward séquentiels (train < val < test).
 - **Reproductibilité** : seeds fixées et tracées. Hashes SHA-256 (données, config).
 - **Branche dédiée** : `task/NNN-short-slug` depuis `Max6000i1`. Jamais de commit direct sur `Max6000i1`.
-- **Pull Request obligatoire** vers `Max6000i1` après commit GREEN.
+- **Pull Request obligatoire** vers `Max6000i1` — créée **uniquement par l'orchestrateur** dans la Partie Finale, après que toutes les itérations de revue (Partie B/C) aient abouti à un verdict CLEAN. Les subagents (A, B, C) ne doivent **jamais** exécuter `git push` ni créer de PR.
 - **Ambiguïté** : si specs ou tâche ambiguës → demander des clarifications avant d'implémenter.
 - **Zéro `# noqa` injustifié** : `# noqa` est interdit sauf pour les noms imposés par la spec (ex : `horizon_H_bars`, `L`). Tout diagnostic ruff fixable doit être corrigé à la source, jamais masqué par une suppression.
 
@@ -42,18 +48,132 @@ Exécuter des tâches décrites dans `docs/tasks/<milestone>/NNN__slug.md` selon
 - Ne pas charger le document de spécification par défaut : le lire **uniquement si nécessaire**.
 - Préférer **exécuter** une commande plutôt que décrire longuement.
 
-## Workflow standard (1 tâche)
+---
 
-### 0. Pré-condition GREEN
-Exécuter `pytest` → **tous les tests existants doivent être GREEN**.
-Si RED : corriger d'abord les régressions avant de commencer la tâche.
+# WORKFLOW ORCHESTRATEUR (1 tâche)
 
-### 0b. Créer la branche dédiée
+L'agent orchestrateur coordonne les 3 parties. Il ne code pas lui-même — il délègue via `runSubagent`.
+
+## Étape 0 — Préparation (orchestrateur)
+
+1. **Pré-condition GREEN** : exécuter `pytest` → tous les tests existants doivent être GREEN. Si RED : corriger d'abord.
+2. **Lire la tâche** : ouvrir `docs/tasks/<milestone>/NNN__slug.md`, extraire le milestone `<milestone>`, le numéro `NNN`, le workstream `WS-X`, le slug, les dépendances.
+3. **Créer le dossier de review** : `docs/tasks/<milestone>/<NNN>/` (s'il n'existe pas).
+4. **Créer la branche dédiée** :
+   ```bash
+   git checkout Max6000i1
+   git pull
+   git checkout -b task/NNN-short-slug
+   ```
+5. **Initialiser le compteur de review** : `review_iteration = 0`.
+
+---
+
+## Partie A — Implémentation (subagent)
+
+Lancer un subagent avec le prompt suivant (adapter les variables) :
+
+> **Prompt subagent Partie A** :
+>
+> Tu es un agent d'implémentation TDD strict pour le projet AI Trading Pipeline.
+>
+> **Tâche** : Implémenter la tâche `docs/tasks/<milestone>/NNN__slug.md`.
+> **Branche** : `task/NNN-short-slug` (déjà créée et checkoutée).
+>
+> Suis le workflow TDD détaillé ci-dessous, étape par étape.
+> À la fin, la branche doit contenir : un commit RED (tests uniquement) et un commit GREEN (implémentation + tâche DONE).
+>
+> <Insérer ici le contenu complet du § « Instructions subagent Partie A » ci-dessous>
+
+Le subagent doit retourner :
+- La liste des fichiers modifiés.
+- Le résultat de `pytest` (nombre de tests passed/failed).
+- Le résultat de `ruff check ai_trading/ tests/`.
+- Confirmation du commit RED et GREEN effectués.
+
+---
+
+## Partie B — Revue de branche (subagent)
+
+Incrémenter : `review_iteration += 1`.
+
+Lancer un subagent de revue avec le prompt suivant :
+
+> **Prompt subagent Partie B** :
+>
+> Tu es un agent de revue de code pour le projet AI Trading Pipeline.
+>
+> **Branche à auditer** : `task/NNN-short-slug`
+> **Tâche associée** : `docs/tasks/<milestone>/NNN__slug.md`
+> **Itération de revue** : v<review_iteration>
+>
+> Effectue une revue complète de la branche en suivant la grille d'audit du skill `pr-reviewer` (lire `.github/skills/pr-reviewer/SKILL.md` pour la grille complète).
+>
+> Produis un rapport de revue structuré et écris-le dans :
+> `docs/tasks/<milestone>/<NNN>/review_v<review_iteration>.md`
+>
+> Le rapport doit suivre le format standard (voir ci-dessous) et se terminer par un verdict :
+> - **CLEAN** : aucune correction nécessaire (aucun BLOQUANT, WARNING, ni MINEUR).
+> - **REQUEST CHANGES** : au moins un item (BLOQUANT, WARNING, ou MINEUR) nécessite une correction.
+>
+> **Important** : dans ton message de retour, indique clairement :
+> 1. Le verdict (CLEAN ou REQUEST CHANGES).
+> 2. Le nombre d'items par sévérité (N bloquants, N warnings, N mineurs).
+> 3. Le chemin du fichier de rapport créé.
+>
+> <Insérer ici le contenu complet du § « Instructions subagent Partie B » ci-dessous>
+
+### Décision de l'orchestrateur après Partie B
+
+- **Si verdict = CLEAN** → passer à la Partie Finale (push + PR).
+- **Si verdict = REQUEST CHANGES** ET `review_iteration < 5` → lancer la Partie C.
+- **Si verdict = REQUEST CHANGES** ET `review_iteration >= 5` → **stopper les itérations**. Informer l'utilisateur que 5 itérations de revue ont été effectuées sans atteindre CLEAN. Lister les items restants. Laisser l'utilisateur décider de la suite.
+
+---
+
+## Partie C — Corrections (subagent, conditionnel)
+
+Lancer un subagent de correction :
+
+> **Prompt subagent Partie C** :
+>
+> Tu es un agent de correction pour le projet AI Trading Pipeline.
+>
+> **Rapport de revue à traiter** : `docs/tasks/<milestone>/<NNN>/review_v<review_iteration>.md`
+> **Branche** : `task/NNN-short-slug` (déjà checkoutée).
+>
+> Lis le rapport de revue et implémente **toutes les corrections** identifiées, dans l'ordre de sévérité : BLOQUANTS → WARNINGS → MINEURS.
+>
+> Suis le workflow de correction détaillé ci-dessous.
+> À la fin, la branche doit contenir un ou plusieurs commits FIX avec tous les tests GREEN.
+>
+> <Insérer ici le contenu complet du § « Instructions subagent Partie C » ci-dessous>
+
+Le subagent doit retourner :
+- La liste des items corrigés.
+- Le résultat de `pytest` (nombre de tests passed/failed).
+- Le résultat de `ruff check ai_trading/ tests/`.
+- Confirmation des commits FIX effectués.
+
+Après la Partie C, **reboucler sur la Partie B** (nouvelle itération de revue).
+
+---
+
+## Partie Finale — Push et Pull Request (orchestrateur)
+
+Quand la Partie B retourne un verdict CLEAN :
+
 ```bash
-git checkout Max6000i1
-git pull
-git checkout -b task/NNN-short-slug
+git push -u origin task/NNN-short-slug
 ```
+- Titre de la PR : `[WS-X] #NNN — <titre de la tâche>`
+- Description : résumé des changements, lien vers la tâche, nombre d'itérations de revue effectuées.
+
+---
+
+# INSTRUCTIONS DÉTAILLÉES DES SUBAGENTS
+
+## Instructions subagent Partie A — Implémentation TDD
 
 ### 1. Lire la tâche
 Ouvrir `docs/tasks/<milestone>/NNN__slug.md` et extraire :
@@ -144,8 +264,6 @@ pytest --cov=ai_trading --cov-report=term-missing
 ### 8. Audit strict (obligatoire — ne pas escamoter)
 Relecture manuelle de **chaque fichier modifié**. Checklist minimale :
 
-> **Limite structurelle** : l'agent qui implémente est le même qui audite. Pour mitiger ce biais, envisager de lancer le skill `pr-reviewer` sur sa propre branche avant le commit GREEN si la tâche est complexe.
-
 #### 8a. Traçabilité critères ↔ tests ↔ code
 - [ ] Chaque critère d'acceptation a au moins un test correspondant.
 - [ ] Chaque test correspond à un comportement attendu.
@@ -158,7 +276,7 @@ Relecture manuelle de **chaque fichier modifié**. Checklist minimale :
 
 #### 8c. Qualité du code (post-implémentation)
 - [ ] **Aucun import inutilisé** : chaque `import` est référencé dans le code.
-- [ ] **DRY** : pas de duplication de code dans le projet. Si un bloc de code est copié-collé, extraire une fonction ou classe réutilisable. 
+- [ ] **DRY** : pas de duplication de code dans le projet. Si un bloc de code est copié-collé, extraire une fonction ou classe réutilisable.
 - [ ] **PYLANCE (via `get_errors`)** : appeler `get_errors` sur chaque fichier modifié et corriger toutes les erreurs de type. Attention aux pièges courants : type narrowing sur `self.attr` (Pylance ne narrow pas les attributs `self` après affectation — utiliser des variables locales), `Optional` non vérifié, retours `Any` implicites.
 - [ ] **Aucune variable morte** : chaque variable assignée est utilisée au moins une fois.
 - [ ] **Aucun `# noqa` injustifié** : seuls les `# noqa` pour des noms imposés par la spec sont tolérés (ex : `N815` sur `horizon_H_bars`). Si un `# noqa` existe, vérifier qu'il est encore nécessaire.
@@ -201,57 +319,251 @@ git add ai_trading/ tests/ docs/tasks/<milestone>/NNN__slug.md configs/
 git commit -m "[WS-X] #NNN GREEN: <résumé du livrable>"
 ```
 
-### 11. Push et Pull Request
-```bash
-git push -u origin task/NNN-short-slug
+### 11. Retourner le résultat à l'orchestrateur
+
+**INTERDIT** : ne jamais exécuter `git push` ni créer de Pull Request. Le push et la PR sont gérés exclusivement par l'orchestrateur dans la Partie Finale.
+
+Le subagent doit retourner au format suivant :
 ```
-- Titre de la PR : `[WS-X] #NNN — <titre de la tâche>`
-- Description : résumé des changements, lien vers la tâche.
-
-### 12. Itération post-revue
-
-Après la revue de la PR (skill `pr-reviewer` ou revue humaine), des corrections peuvent être demandées. Workflow pour chaque itération :
-
-1. Appliquer les corrections demandées (code, tests, docs).
-2. Exécuter les validations de l'étape 7 (`ruff check` + `pytest`).
-3. Commiter avec le format :
-```bash
-git commit -m "[WS-X] #NNN FIX: <résumé des corrections>"
+RÉSULTAT PARTIE A :
+- Fichiers modifiés : <liste>
+- pytest : <N> passed, <N> failed
+- ruff check : <clean / N erreurs>
+- get_errors : <clean / N erreurs>
+- Commit RED : <hash> — <message>
+- Commit GREEN : <hash> — <message>
 ```
-4. Push sur la même branche : `git push`.
 
-**Règles des commits FIX** :
-- Chaque commit FIX doit laisser les tests GREEN.
-- Le contenu peut mélanger code + tests + docs (pas de séparation RED/GREEN en itération).
-- Pas de modification du skill ou de fichiers hors périmètre de la tâche dans un commit FIX.
-- Si les corrections sont substantielles (> 50 lignes), envisager un squash avant merge : `git rebase -i` pour fusionner les FIX dans le GREEN.
+---
 
-## Format de commits
+## Instructions subagent Partie B — Revue de branche
 
-| Moment | Format | Contenu |
+Le subagent de revue suit la grille d'audit complète du skill `pr-reviewer`. Il doit :
+
+### 1. Lire le skill de revue
+Lire `.github/skills/pr-reviewer/SKILL.md` pour obtenir la grille d'audit complète.
+
+### 2. Identifier le périmètre
+- Lister les fichiers modifiés vs `Max6000i1` :
+  ```bash
+  git diff --name-only Max6000i1...HEAD
+  ```
+- Lire la tâche associée `docs/tasks/<milestone>/NNN__slug.md`.
+
+### 3. Exécuter les validations
+```bash
+ruff check ai_trading/ tests/
+pytest
+```
+Appeler `get_errors` sur chaque fichier modifié.
+
+### 4. Auditer selon la grille complète du pr-reviewer
+Suivre exhaustivement toutes les sections de la grille :
+- Structure branche & commits
+- Tâche associée (statut, critères, checklist)
+- Tests (couverture, cas nominaux/erreurs/bords, déterminisme)
+- Strict code (no fallbacks)
+- Config-driven
+- Anti-fuite (look-ahead)
+- Reproductibilité
+- Float conventions
+- Qualité du code
+- Cohérence intermodule
+- Conformité avec les specs
+- Bonnes pratiques métier
+
+### 5. Produire le rapport
+
+Écrire le rapport dans `docs/tasks/<milestone>/<NNN>/review_v<review_iteration>.md` au format suivant :
+
+```markdown
+# Revue tâche #NNN — v<review_iteration>
+
+**Branche** : `task/NNN-short-slug`
+**Tâche** : `docs/tasks/<milestone>/NNN__slug.md`
+**Date** : YYYY-MM-DD
+**Itération** : v<review_iteration>
+
+## Verdict : ✅ CLEAN | ⚠️ REQUEST CHANGES
+
+## Résultats d'exécution
+
+| Check | Résultat |
+|---|---|
+| `pytest` | **NNN passed** / X failed |
+| `ruff check ai_trading/ tests/` | **All checks passed** / N erreurs |
+| `get_errors` | **Clean** / N erreurs |
+
+## Structure branche & commits
+| Critère | Verdict |
+|---|---|
+| Convention de branche | ✅/❌ |
+| Commit RED présent | ✅/❌ |
+| Commit GREEN présent | ✅/❌ |
+| Pas de commits parasites | ✅/❌ |
+
+## Tâche
+| Critère | Verdict |
+|---|---|
+| Statut DONE | ✅/❌ |
+| Critères d'acceptation cochés | ✅/❌ |
+| Checklist cochée | ✅/❌ |
+
+## Tests
+| Critère | Verdict |
+|---|---|
+| Couverture des critères | ✅/❌ |
+| Cas nominaux + erreurs + bords | ✅/❌ |
+| Tous GREEN | ✅/❌ |
+| Déterministes | ✅/❌ |
+| ruff clean | ✅/❌ |
+
+## Code — Règles non négociables
+| Règle | Verdict | Commentaire |
 |---|---|---|
-| Après tests RED | `[WS-X] #NNN RED: <résumé>` | Fichiers de tests (+ conftest.py, configs/ si nécessaire) |
-| Clôture tâche | `[WS-X] #NNN GREEN: <résumé>` | Implémentation + tests ajustés + tâche + configs |
-| Itération post-revue | `[WS-X] #NNN FIX: <résumé>` | Corrections demandées (code + tests + docs mélangés) |
+| Strict code (no fallbacks) | ✅/❌ | |
+| Config-driven | ✅/❌ | |
+| Anti-fuite | ✅/❌ | |
+| Reproductibilité | ✅/❌ | |
+| Float conventions | ✅/❌ | |
 
-Aucun commit intermédiaire entre RED et GREEN sauf refactoring mineur (tests verts).
+## Qualité du code
+| Critère | Verdict |
+|---|---|
+| Nommage et style | ✅/❌ |
+| Pas de code mort/debug | ✅/❌ |
+| Imports propres | ✅/❌ |
+| DRY | ✅/❌ |
+
+## Cohérence intermodule
+| Critère | Verdict |
+|---|---|
+| Signatures et types | ✅/❌ |
+| Colonnes DataFrame | ✅/❌ |
+| Clés de config | ✅/❌ |
+| Registres | ✅/❌ |
+
+---
+
+## BLOQUANTS (N)
+
+### B-1. <Titre descriptif>
+**Fichiers** : `chemin/fichier.py` (LNNN)
+**Sévérité** : BLOQUANT — <impact>.
+<Description.>
+**Action** : <Action corrective>
+
+---
+
+## WARNINGS (N)
+
+### W-1. <Titre descriptif>
+**Fichiers** : `chemin/fichier.py` (LNNN)
+**Sévérité** : WARNING — <risque>.
+<Description.>
+**Action** : <Action corrective>
+
+---
+
+## MINEURS (N)
+
+### M-1. <Titre descriptif>
+**Fichiers** : `chemin/fichier.py`
+**Sévérité** : MINEUR — <amélioration>.
+<Description.>
+**Action** : <Action corrective>
+
+---
+
+## Résumé
+<synthèse en 2-3 phrases>
+```
+
+### 6. Retourner le résultat à l'orchestrateur
+
+```
+RÉSULTAT PARTIE B :
+- Verdict : CLEAN | REQUEST CHANGES
+- Bloquants : N
+- Warnings : N
+- Mineurs : N
+- Rapport : docs/tasks/<milestone>/<NNN>/review_v<review_iteration>.md
+```
+
+---
+
+## Instructions subagent Partie C — Corrections
+
+Le subagent de correction suit le workflow du skill `implementing-request-change`, adapté au contexte d'une review de tâche.
+
+### 1. Lire le rapport de revue
+Ouvrir `docs/tasks/<milestone>/<NNN>/review_v<review_iteration>.md` et extraire tous les items (BLOQUANTS, WARNINGS, MINEURS).
+
+### 2. Trier et planifier
+**Ordre obligatoire** : BLOQUANTS → WARNINGS → MINEURS.
+Regrouper par module impacté quand possible.
+
+### 3. Pour chaque item (ou groupe d'items liés)
+
+#### 3a. Analyser l'impact
+- Lire les fichiers référencés.
+- Identifier tous les modules impactés via `grep_search`.
+- Évaluer l'effet domino.
+
+#### 3b. Appliquer la correction
+- Écrire ou adapter les tests si nécessaire.
+- Modifier le code source.
+- **Strict code** : validation explicite + `raise`. Pas de fallbacks.
+- **Cohérence intermodule** : vérifier signatures, colonnes, clés config, registres.
+
+#### 3c. Valider après chaque groupe
+```bash
+ruff check ai_trading/ tests/
+pytest
+```
+Appeler `get_errors` sur les fichiers modifiés.
+
+#### 3d. Commiter
+```bash
+git add <fichiers modifiés>
+git commit -m "[WS-X] #NNN FIX: <résumé de la correction>"
+```
+
+### 4. Règles des commits FIX
+- Chaque commit FIX doit laisser les tests GREEN.
+- Le contenu peut mélanger code + tests + docs.
+- Pas de modification de fichiers hors périmètre de la tâche.
+- Si les corrections sont substantielles (> 50 lignes), envisager un squash : `git rebase -i`.
+
+### 5. Retourner le résultat à l'orchestrateur
+
+```
+RÉSULTAT PARTIE C :
+- Items corrigés : B-1, B-2, W-1, M-1, M-2
+- pytest : <N> passed, <N> failed
+- ruff check : <clean / N erreurs>
+- get_errors : <clean / N erreurs>
+- Commits FIX : <liste hash — message>
+```
+
+---
 
 ## Workflow variante : tâche de refactoring
 
 Pour les tâches de type refactoring (ex : renommer, clarifier un contrat, unifier une convention) où les tests **existants passent déjà**, le cycle RED classique ne s'applique pas directement.
 
 ### Adaptation du workflow
-1. **Étapes 0–2** : identiques au workflow standard.
-2. **Étape 3 (RED adapté)** : écrire/modifier des tests qui **capturent le nouveau comportement attendu** et qui échouent avec le code actuel. Exemples :
+1. **Étape 0** de l'orchestrateur : identique.
+2. **Partie A (RED adapté)** : le subagent d'implémentation doit écrire/modifier des tests qui **capturent le nouveau comportement attendu** et qui échouent avec le code actuel. Exemples :
    - Un test qui vérifie la nouvelle valeur de retour (ex : `assert feature.min_periods == 14` alors que le code retourne `15`).
    - Un test de cohérence cross-module (ex : `min_periods` correspond au nombre réel de NaN).
    Si le refactoring ne change aucun comportement observable (renommage interne pur), les tests existants suffisent — dans ce cas, le commit RED peut contenir uniquement des tests de non-régression renforcés.
-3. **Étapes 4–12** : identiques au workflow standard.
+3. **Parties B et C** : identiques au workflow standard.
 
 ## Plusieurs tâches
 
 - Traiter **dans l'ordre**, en respectant les dépendances.
-- Terminer le workflow complet (0→12) **pour chaque tâche** avant de passer à la suivante.
+- Terminer le workflow complet (Étape 0 → Partie A → Boucle B/C → Partie Finale) **pour chaque tâche** avant de passer à la suivante.
 - Commits **par tâche** (pas de batch multi-tâches).
 - Chaque tâche a sa propre branche et sa propre PR.
 
@@ -264,6 +576,39 @@ Si à n'importe quelle étape la tâche s'avère irréalisable (spec ambiguë no
 3. **Passer le statut** à `BLOCKED` (pas `DONE`, pas `IN_PROGRESS`).
 4. **Informer l'utilisateur** avec la raison et la suggestion d'action (clarifier la spec, résoudre la dépendance, etc.).
 5. **Ne pas supprimer la branche** tant que le blocage n'est pas résolu.
+
+## Format de commits
+
+| Moment | Format | Contenu |
+|---|---|---|
+| Après tests RED (Partie A) | `[WS-X] #NNN RED: <résumé>` | Fichiers de tests (+ conftest.py, configs/ si nécessaire) |
+| Clôture tâche (Partie A) | `[WS-X] #NNN GREEN: <résumé>` | Implémentation + tests ajustés + tâche + configs |
+| Corrections post-revue (Partie C) | `[WS-X] #NNN FIX: <résumé>` | Corrections demandées (code + tests + docs mélangés) |
+
+Aucun commit intermédiaire entre RED et GREEN sauf refactoring mineur (tests verts).
+
+## Résumé du flux orchestrateur
+
+```
+Étape 0 : Préparation (branche, dossier review)
+    │
+    ▼
+Partie A : Subagent implémentation TDD (RED → GREEN)
+    │
+    ▼
+┌─► Partie B : Subagent revue → review_v<N>.md
+│       │
+│       ├── CLEAN → Partie Finale (push + PR) ──► FIN
+│       │
+│       └── REQUEST CHANGES (et N < 5)
+│               │
+│               ▼
+│       Partie C : Subagent corrections → commits FIX
+│               │
+└───────────────┘  (reboucle sur Partie B, N+1)
+
+Si N >= 5 et toujours REQUEST CHANGES → STOP, informer l'utilisateur.
+```
 
 ## Conventions Python / AI Trading
 
