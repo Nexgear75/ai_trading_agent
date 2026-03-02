@@ -1,13 +1,16 @@
-"""Tests for θ optimization loop — calibrate_threshold (#031 WS-7).
+"""Tests for θ optimization loop — calibrate_threshold (#031, #032 WS-7).
 
 Covers:
 - calibrate_threshold: single feasible θ, multiple feasible θ, tiebreaker,
   no feasible θ, anti-leak (y_hat_test invariance), config-driven params,
   equity reset per candidate, edge cases.
 - compute_max_drawdown: correctness, no-trade, constant equity.
+- #032: fallback θ (E.2.2) — relax min_trades, θ = +∞, warnings, fold conserved.
 """
 
 from __future__ import annotations
+
+import logging
 
 import numpy as np
 import pandas as pd
@@ -246,10 +249,10 @@ class TestCalibrateThresholdTiebreaker:
 
 
 class TestCalibrateThresholdNoFeasible:
-    """#031 — No θ meets constraints → result indicates no selection."""
+    """#031 — No θ meets both constraints → fallback E.2.2 applies (#032)."""
 
-    def test_no_feasible_theta_returns_none_theta(self) -> None:
-        """min_trades impossibly high → no feasible θ."""
+    def test_no_feasible_theta_triggers_fallback(self) -> None:
+        """min_trades impossibly high + tight mdd_cap → fallback applies."""
         n = 50
         ohlcv = _make_ohlcv(n)
         y_hat_val = _make_y_hat_val(n)
@@ -268,15 +271,14 @@ class TestCalibrateThresholdNoFeasible:
             min_trades=10000,  # impossible
         )
 
-        # theta is None when no feasible candidate
-        assert result["theta"] is None
-        assert result["quantile"] is None
-        assert result["net_pnl"] is None
-        assert result["mdd"] is None
-        assert result["n_trades"] is None
+        # Fallback applies: either relaxed or θ = +∞
+        assert result["theta"] is not None
+        assert result["method"] in (
+            "fallback_relax_min_trades",
+            "fallback_no_trade",
+        )
         # Details still populated for traceability
         assert len(result["details"]) == 2
-        assert result["method"] == "quantile_grid"
 
 
 # ---------------------------------------------------------------------------
@@ -641,3 +643,345 @@ class TestCalibrateThresholdZeroTrades:
         assert detail["n_trades"] == 0
         assert detail["net_pnl"] == pytest.approx(0.0)
         assert detail["mdd"] == pytest.approx(0.0)
+
+
+# ---------------------------------------------------------------------------
+# calibrate_threshold — fallback θ E.2.2 step 1: relax min_trades (#032)
+# ---------------------------------------------------------------------------
+
+
+def _make_crashing_ohlcv(n: int) -> pd.DataFrame:
+    """OHLCV with prices crashing exponentially from 100 → ~5."""
+    idx = pd.date_range("2024-01-01", periods=n, freq="1h")
+    close = 100.0 * np.exp(np.linspace(0, -3, n))
+    return pd.DataFrame(
+        {
+            "open": close * 1.01,
+            "high": close * 1.02,
+            "low": close * 0.98,
+            "close": close,
+            "volume": np.full(n, 500.0),
+        },
+        index=idx,
+    )
+
+
+class TestCalibrateThresholdFallbackRelax:
+    """#032 — Step 1: relax min_trades when no θ satisfies both constraints."""
+
+    def test_fallback_relax_selects_theta(self) -> None:
+        """When no θ satisfies both mdd_cap AND min_trades, but some satisfy
+        mdd_cap alone, relax min_trades to 0 and select highest quantile
+        with mdd <= mdd_cap."""
+        n = 200
+        ohlcv = _make_ohlcv(n)
+        y_hat_val = _make_y_hat_val(n)
+        q_grid = [0.3, 0.5, 0.7, 0.9]
+
+        result = calibrate_threshold(
+            y_hat_val=y_hat_val,
+            ohlcv_val=ohlcv,
+            q_grid=q_grid,
+            horizon=HORIZON,
+            fee_rate_per_side=0.0005,
+            slippage_rate_per_side=0.00025,
+            initial_equity=1.0,
+            position_fraction=1.0,
+            objective="max_net_pnl_with_mdd_cap",
+            mdd_cap=1.0,  # permissive → all θ satisfy mdd_cap
+            min_trades=10000,  # impossible → triggers fallback
+        )
+
+        # Must select a θ (not None) via fallback relaxation
+        assert result["theta"] is not None
+        assert result["quantile"] is not None
+        assert result["method"] == "fallback_relax_min_trades"
+        # Highest quantile among mdd-feasible candidates
+        assert result["quantile"] == 0.9
+        assert result["mdd"] <= 1.0
+
+    def test_fallback_relax_picks_highest_quantile_among_feasible(self) -> None:
+        """Among mdd-feasible candidates only, highest quantile is chosen."""
+        n = 200
+        ohlcv = _make_ohlcv(n)
+        y_hat_val = _make_y_hat_val(n)
+        q_grid = [0.1, 0.5, 0.9]
+
+        result = calibrate_threshold(
+            y_hat_val=y_hat_val,
+            ohlcv_val=ohlcv,
+            q_grid=q_grid,
+            horizon=HORIZON,
+            fee_rate_per_side=0.0005,
+            slippage_rate_per_side=0.00025,
+            initial_equity=1.0,
+            position_fraction=1.0,
+            objective="max_net_pnl_with_mdd_cap",
+            mdd_cap=1.0,
+            min_trades=10000,  # impossible → fallback
+        )
+
+        assert result["quantile"] == 0.9
+
+    def test_fallback_relax_emits_warning(self, caplog) -> None:
+        """Warning emitted when min_trades is relaxed."""
+        n = 200
+        ohlcv = _make_ohlcv(n)
+        y_hat_val = _make_y_hat_val(n)
+
+        with caplog.at_level(logging.WARNING, logger="ai_trading.calibration.threshold"):
+            calibrate_threshold(
+                y_hat_val=y_hat_val,
+                ohlcv_val=ohlcv,
+                q_grid=[0.5, 0.9],
+                horizon=HORIZON,
+                fee_rate_per_side=0.0005,
+                slippage_rate_per_side=0.00025,
+                initial_equity=1.0,
+                position_fraction=1.0,
+                objective="max_net_pnl_with_mdd_cap",
+                mdd_cap=1.0,
+                min_trades=10000,
+            )
+
+        warning_msgs = [r.message for r in caplog.records if r.levelno == logging.WARNING]
+        assert any("min_trades" in msg for msg in warning_msgs)
+
+    def test_fallback_relax_partial_mdd_filtering(self) -> None:
+        """Only some candidates pass mdd <= mdd_cap; highest quantile among
+        those is selected (exercises real step 1 filtering)."""
+        n = 200
+        # Crashing prices: low quantiles → many trades → high MDD,
+        # high quantiles → few/no trades → low MDD.
+        ohlcv = _make_crashing_ohlcv(n)
+        y_hat_val = np.linspace(0, 1, n)
+        q_grid = [0.1, 0.3, 0.5, 0.7, 0.9]
+
+        result = calibrate_threshold(
+            y_hat_val=y_hat_val,
+            ohlcv_val=ohlcv,
+            q_grid=q_grid,
+            horizon=HORIZON,
+            fee_rate_per_side=0.0005,
+            slippage_rate_per_side=0.00025,
+            initial_equity=1.0,
+            position_fraction=1.0,
+            objective="max_net_pnl_with_mdd_cap",
+            mdd_cap=0.50,  # moderate: some pass, some don't
+            min_trades=10000,  # impossible → triggers fallback
+        )
+
+        assert result["method"] == "fallback_relax_min_trades"
+        assert result["theta"] is not None
+        assert result["quantile"] is not None
+        assert result["mdd"] <= 0.50
+        # Verify that at least one candidate was filtered out (MDD > mdd_cap)
+        details = result["details"]
+        mdd_values = [d["mdd"] for d in details]
+        assert any(m > 0.50 for m in mdd_values), (
+            "Expected at least one candidate with mdd > mdd_cap to exercise "
+            "real partial filtering"
+        )
+        # Among mdd-feasible, highest quantile was picked
+        mdd_feasible_qs = [
+            d["quantile"] for d in details if d["mdd"] <= 0.50
+        ]
+        assert len(mdd_feasible_qs) >= 1
+        assert result["quantile"] == max(mdd_feasible_qs)
+
+    def test_fallback_relax_details_preserved(self) -> None:
+        """Details list still contains all candidate evaluations."""
+        n = 200
+        ohlcv = _make_ohlcv(n)
+        y_hat_val = _make_y_hat_val(n)
+        q_grid = [0.3, 0.5, 0.7]
+
+        result = calibrate_threshold(
+            y_hat_val=y_hat_val,
+            ohlcv_val=ohlcv,
+            q_grid=q_grid,
+            horizon=HORIZON,
+            fee_rate_per_side=0.0005,
+            slippage_rate_per_side=0.00025,
+            initial_equity=1.0,
+            position_fraction=1.0,
+            objective="max_net_pnl_with_mdd_cap",
+            mdd_cap=1.0,
+            min_trades=10000,
+        )
+
+        assert len(result["details"]) == len(q_grid)
+
+
+# ---------------------------------------------------------------------------
+# calibrate_threshold — fallback θ E.2.2 step 2: θ = +∞ (#032)
+# ---------------------------------------------------------------------------
+
+
+class TestCalibrateThresholdFallbackNoTrade:
+    """#032 — Step 2: θ = +∞ when no θ satisfies even mdd_cap."""
+
+    def test_fallback_theta_infinity(self) -> None:
+        """When no θ satisfies mdd <= mdd_cap, θ = +∞ (no-trade)."""
+        n = 200
+        ohlcv = _make_crashing_ohlcv(n)
+        # Spread predictions → all low quantiles produce many trades
+        y_hat_val = np.linspace(0, 1, n)
+        # Only low quantiles: all generate many Go signals
+        q_grid = [0.1, 0.2, 0.3]
+
+        result = calibrate_threshold(
+            y_hat_val=y_hat_val,
+            ohlcv_val=ohlcv,
+            q_grid=q_grid,
+            horizon=HORIZON,
+            fee_rate_per_side=0.0005,
+            slippage_rate_per_side=0.00025,
+            initial_equity=1.0,
+            position_fraction=1.0,
+            objective="max_net_pnl_with_mdd_cap",
+            mdd_cap=0.001,  # impossibly tight for crashing prices
+            min_trades=1,
+        )
+
+        assert result["theta"] == float("inf")
+        assert result["method"] == "fallback_no_trade"
+        assert result["n_trades"] == 0
+        assert result["net_pnl"] == pytest.approx(0.0)
+        assert result["mdd"] == pytest.approx(0.0)
+
+    def test_fallback_theta_infinity_emits_warning(self, caplog) -> None:
+        """Warning emitted when θ = +∞."""
+        n = 200
+        ohlcv = _make_crashing_ohlcv(n)
+        y_hat_val = np.linspace(0, 1, n)
+        q_grid = [0.1, 0.2, 0.3]
+
+        with caplog.at_level(logging.WARNING, logger="ai_trading.calibration.threshold"):
+            calibrate_threshold(
+                y_hat_val=y_hat_val,
+                ohlcv_val=ohlcv,
+                q_grid=q_grid,
+                horizon=HORIZON,
+                fee_rate_per_side=0.0005,
+                slippage_rate_per_side=0.00025,
+                initial_equity=1.0,
+                position_fraction=1.0,
+                objective="max_net_pnl_with_mdd_cap",
+                mdd_cap=0.001,
+                min_trades=1,
+            )
+
+        warning_msgs = [r.message for r in caplog.records if r.levelno == logging.WARNING]
+        assert len(warning_msgs) >= 1
+
+    def test_fallback_fold_conserved(self) -> None:
+        """Fold conserved with n_trades=0, net_pnl=0 when θ = +∞."""
+        n = 200
+        ohlcv = _make_crashing_ohlcv(n)
+        y_hat_val = np.linspace(0, 1, n)
+        q_grid = [0.1, 0.2, 0.3]
+
+        result = calibrate_threshold(
+            y_hat_val=y_hat_val,
+            ohlcv_val=ohlcv,
+            q_grid=q_grid,
+            horizon=HORIZON,
+            fee_rate_per_side=0.0005,
+            slippage_rate_per_side=0.00025,
+            initial_equity=1.0,
+            position_fraction=1.0,
+            objective="max_net_pnl_with_mdd_cap",
+            mdd_cap=0.001,
+            min_trades=1,
+        )
+
+        # Fold is present (theta is not None, it's +∞)
+        assert result["theta"] is not None
+        assert result["n_trades"] == 0
+        assert result["net_pnl"] == pytest.approx(0.0)
+        assert result["mdd"] == pytest.approx(0.0)
+        # Details still populated for all candidates
+        assert len(result["details"]) == len(q_grid)
+
+    def test_fallback_theta_infinity_quantile_none(self) -> None:
+        """When θ = +∞, quantile is None (no quantile selected)."""
+        n = 200
+        ohlcv = _make_crashing_ohlcv(n)
+        y_hat_val = np.linspace(0, 1, n)
+        q_grid = [0.1, 0.2, 0.3]
+
+        result = calibrate_threshold(
+            y_hat_val=y_hat_val,
+            ohlcv_val=ohlcv,
+            q_grid=q_grid,
+            horizon=HORIZON,
+            fee_rate_per_side=0.0005,
+            slippage_rate_per_side=0.00025,
+            initial_equity=1.0,
+            position_fraction=1.0,
+            objective="max_net_pnl_with_mdd_cap",
+            mdd_cap=0.001,
+            min_trades=1,
+        )
+
+        assert result["quantile"] is None
+
+
+# ---------------------------------------------------------------------------
+# calibrate_threshold — fallback θ E.2.2: no regression (#032)
+# ---------------------------------------------------------------------------
+
+
+class TestCalibrateThresholdFallbackNoRegression:
+    """#032 — Fallback does NOT alter behavior when a feasible θ exists."""
+
+    def test_feasible_theta_method_unchanged(self) -> None:
+        """When a feasible θ exists, method is 'quantile_grid' (no fallback)."""
+        n = 200
+        ohlcv = _make_ohlcv(n)
+        y_hat_val = _make_y_hat_val(n)
+        q_grid = [0.3, 0.5, 0.7, 0.9]
+
+        result = calibrate_threshold(
+            y_hat_val=y_hat_val,
+            ohlcv_val=ohlcv,
+            q_grid=q_grid,
+            horizon=HORIZON,
+            fee_rate_per_side=0.0005,
+            slippage_rate_per_side=0.00025,
+            initial_equity=1.0,
+            position_fraction=1.0,
+            objective="max_net_pnl_with_mdd_cap",
+            mdd_cap=1.0,  # permissive
+            min_trades=0,
+        )
+
+        assert result["method"] == "quantile_grid"
+        assert result["theta"] is not None
+        assert isinstance(result["theta"], float)
+        assert result["mdd"] <= 1.0
+
+    def test_feasible_no_warning_emitted(self, caplog) -> None:
+        """When a feasible θ exists, no fallback warning is emitted."""
+        n = 200
+        ohlcv = _make_ohlcv(n)
+        y_hat_val = _make_y_hat_val(n)
+
+        with caplog.at_level(logging.WARNING, logger="ai_trading.calibration.threshold"):
+            calibrate_threshold(
+                y_hat_val=y_hat_val,
+                ohlcv_val=ohlcv,
+                q_grid=[0.3, 0.5, 0.7, 0.9],
+                horizon=HORIZON,
+                fee_rate_per_side=0.0005,
+                slippage_rate_per_side=0.00025,
+                initial_equity=1.0,
+                position_fraction=1.0,
+                objective="max_net_pnl_with_mdd_cap",
+                mdd_cap=1.0,
+                min_trades=0,
+            )
+
+        warning_msgs = [r.message for r in caplog.records if r.levelno == logging.WARNING]
+        assert len(warning_msgs) == 0
