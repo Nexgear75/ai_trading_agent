@@ -2,7 +2,7 @@
 
 **Branche** : `task/040-prediction-metrics`
 **Tâche** : `docs/tasks/M4/040__ws10_prediction_metrics.md`
-**Date** : 2025-03-02
+**Date** : 2026-03-02
 **Itération** : v1
 
 ## Verdict global : ⚠️ REQUEST CHANGES

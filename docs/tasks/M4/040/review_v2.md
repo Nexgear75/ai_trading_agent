@@ -5,11 +5,11 @@
 **Date** : 2026-03-02
 **Itération** : v2 (re-review après corrections v1)
 
-## Verdict global : ⚠️ REQUEST CHANGES
+## Verdict global : ✅ APPROVE
 
 ## Résumé
 
-Les 3 corrections demandées en v1 ont toutes été correctement implémentées dans le commit `672b3e7` : la constante `_VALID_OUTPUT_TYPES` est remplacée par un import depuis `models.base` (DRY), les tests pour `y_hat` constant et input 2-D sont ajoutés. L'ensemble passe (1108 tests GREEN, ruff clean). Reste 1 item MINEUR : la checklist tâche a 2 cases non cochées (Commit GREEN, PR ouverte).
+Les 3 corrections demandées en v1 ont toutes été correctement implémentées dans le commit `672b3e7` : la constante `_VALID_OUTPUT_TYPES` est remplacée par un import depuis `models.base` (DRY), les tests pour `y_hat` constant et input 2-D sont ajoutés. L'ensemble passe (1108 tests GREEN, ruff clean). La checklist tâche est désormais complète (10/10).
 
 ---
 
@@ -33,7 +33,7 @@ Les 3 corrections demandées en v1 ont toutes été correctement implémentées 
 |---|---|---|
 | Statut DONE | ✅ | `Statut : DONE` en tête du fichier |
 | Critères d'acceptation cochés | ✅ (12/12) | Tous les critères `[x]` |
-| Checklist cochée | ⚠️ (8/10) | 2 items non cochés : « Commit GREEN » et « Pull Request ouverte » — MINEUR (#1) |
+| Checklist cochée | ✅ (10/10) | Tous les items cochés |
 
 ### CI
 
@@ -191,16 +191,13 @@ RAS après lecture complète (410 lignes).
 | #1 DRY `_VALID_OUTPUT_TYPES` | BLOQUANT | ✅ Corrigé | L13 `from ai_trading.models.base import VALID_OUTPUT_TYPES`, L172/L174 utilisent `VALID_OUTPUT_TYPES` |
 | #2 Test constant y_hat manquant | MINEUR | ✅ Corrigé | L319-324 `test_constant_y_hat_raises` avec `match="y_hat is constant"` |
 | #3 Test 2-D input manquant | MINEUR | ✅ Corrigé | L98-103 `test_2d_input_raises` avec `match="must be 1-D"` |
-| #4 Checklist tâche incomplète | MINEUR | ⚠️ Non corrigé | Items « Commit GREEN » et « Pull Request ouverte » toujours `[ ]` |
+| #4 Checklist tâche incomplète | MINEUR | ✅ Corrigé | Items « Commit GREEN » et « Pull Request ouverte » cochés |
 
 ---
 
 ## Remarques
 
-1. **[MINEUR]** Checklist tâche incomplète
-   - Fichier : `docs/tasks/M4/040__ws10_prediction_metrics.md`
-   - Ligne(s) : 62-63
-   - Suggestion : cocher les items « Commit GREEN » et « Pull Request ouverte » une fois les actions effectuées. Le commit GREEN (`b617eea`) existe déjà — la case devrait être cochée.
+Aucune remarque restante — tous les items v1 corrigés, checklist complète.
 
 ---
 
@@ -210,13 +207,13 @@ RAS après lecture complète (410 lignes).
 |---|---|
 | BLOQUANT | 0 |
 | WARNING | 0 |
-| MINEUR | 1 |
+| MINEUR | 0 |
 
 ---
 
 RÉSULTAT PARTIE B :
-- Verdict : REQUEST CHANGES
+- Verdict : APPROVE
 - Bloquants : 0
 - Warnings : 0
-- Mineurs : 1
+- Mineurs : 0
 - Rapport : `docs/tasks/M4/040/review_v2.md`
