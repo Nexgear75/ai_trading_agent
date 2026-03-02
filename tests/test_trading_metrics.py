@@ -26,7 +26,6 @@ from ai_trading.metrics.trading import (
     compute_trading_metrics,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers — synthetic equity curves and trades
 # ---------------------------------------------------------------------------
