@@ -60,4 +60,4 @@ Dépendances :
 - [x] `ruff check ai_trading/ tests/` passe sans erreur.
 - [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
 - [x] **Commit GREEN** : `[WS-10] #043 GREEN: <résumé>`.
-- [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-10] #043 — Validation du gate M4`.
+- [x] **Pull Request ouverte** vers `Max6000i1` : `[WS-10] #043 — Validation du gate M4`.
