@@ -1,8 +1,8 @@
 ---
 name: TDD-Fixer
 description: "Agent de correction post-revue pour le projet AI Trading Pipeline. Corrige les items identifiés dans un rapport de revue."
-user-invokable: false
-tools: ['read', 'edit', 'search', 'terminal', 'create']
+user-invocable: false
+tools: [vscode, execute, read, agent, edit, search, web, browser, 'pylance-mcp-server/*', ms-python.python/getPythonEnvironmentInfo, ms-python.python/getPythonExecutableCommand, ms-python.python/installPythonPackage, ms-python.python/configurePythonEnvironment, todo]
 # Pour forcer un modèle spécifique, décommenter la ligne ci-dessous :
 # model: ['Claude Opus 4.6 (copilot)']
 ---

@@ -1,8 +1,7 @@
 ---
 name: Plan-Analyzer
 description: "Agent d'analyse de cohérence intrinsèque du plan d'implémentation AI Trading Pipeline. Audit complet et indépendant, sans connaissance des corrections précédentes."
-user-invokable: false
-tools: ['read', 'search', 'edit', 'create']
+tools: [vscode, execute, read, agent, edit, search, web, browser, 'pylance-mcp-server/*', ms-python.python/getPythonEnvironmentInfo, ms-python.python/getPythonExecutableCommand, ms-python.python/installPythonPackage, ms-python.python/configurePythonEnvironment, todo]
 # Pour forcer un modèle spécifique, décommenter la ligne ci-dessous :
 # model: ['Claude Opus 4.6 (copilot)']
 ---

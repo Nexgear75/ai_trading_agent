@@ -1,8 +1,8 @@
 ---
 name: TDD-Implementer
 description: "Agent d'implémentation TDD strict pour le projet AI Trading Pipeline. Exécute le cycle RED→GREEN pour une tâche donnée."
-user-invokable: false
-tools: ['read', 'edit', 'search', 'terminal', 'create']
+user-invocable: false
+tools: [vscode, execute, read, agent, edit, search, web, browser, 'pylance-mcp-server/*', ms-python.python/getPythonEnvironmentInfo, ms-python.python/getPythonExecutableCommand, ms-python.python/installPythonPackage, ms-python.python/configurePythonEnvironment, todo]
 # Pour forcer un modèle spécifique, décommenter la ligne ci-dessous :
 # model: ['Claude Opus 4.6 (copilot)']
 ---
