@@ -80,7 +80,7 @@ Les skills `.github/skills/*/SKILL.md` fournissent des workflows spécialisés i
 
 | Skill | Déclencheur | Description |
 |---|---|---|
-| `implementing-task` | « implémente la tâche #NNN » | Orchestre 3 agents workers : TDD-Implementer (RED→GREEN), TDD-Reviewer (revue), TDD-Fixer (corrections). Boucle B+C jusqu'à 5× max. |
+| `implementing-task` | « implémente la tâche #NNN » | Orchestre 4 agents workers : TDD-Implementer (RED→GREEN), TDD-Reviewer (revue), TDD-Fixer (corrections), PR-Review-Fixer (corrections post-review GitHub). Boucle B+C jusqu'à 5× max, puis Post-PR jusqu'à 3×. |
 | `implementing-request-change` | « implémente les request changes 0001 », « corrige les bloquants » | Corrections issues d'un rapport request_changes, par sévérité |
 | `pr-reviewer` | « review la PR », « vérifie avant merge » | Revue systématique de PR |
 | `task-creator` | « crée les tâches pour WS-X » | Génération de tâches structurées depuis spec/plan |
@@ -101,6 +101,7 @@ Les agents `.github/agents/*.agent.md` sont des workers invocables comme subagen
 | `TDD-Implementer` | `.github/agents/tdd-implementer.agent.md` | `implementing-task` | Implémentation TDD RED→GREEN |
 | `TDD-Reviewer` | `.github/agents/tdd-reviewer.agent.md` | `implementing-task` | Revue de branche (audit complet) |
 | `TDD-Fixer` | `.github/agents/tdd-fixer.agent.md` | `implementing-task` | Corrections post-revue |
+| `PR-Review-Fixer` | `.github/agents/pr-review-fixer.agent.md` | `implementing-task` | Corrections post-review GitHub automatique |
 | `Plan-Corrector` | `.github/agents/plan-corrector.agent.md` | `plan-coherence` | Correction d'une incohérence plan |
 | `Plan-Analyzer` | `.github/agents/plan-analyzer.agent.md` | `plan-coherence` | Analyse de cohérence complète (Phase A itérative) |
 

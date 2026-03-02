@@ -1,18 +1,20 @@
 ---
 name: implementing-task
-description: Implémenter une ou plusieurs tâches de docs/tasks/ via TDD strict (tests d'acceptation → rouge → vert), conventions du repo AI Trading Pipeline, seuils de couverture, mise à jour du fichier de tâche et commits. Orchestre 3 parties via custom agents : A (TDD-Implementer), B (TDD-Reviewer), C (TDD-Fixer). À utiliser quand l'utilisateur demande « implémente/exécute/travaille sur la tâche #NNN ».
+description: Implémenter une ou plusieurs tâches de docs/tasks/ via TDD strict (tests d'acceptation → rouge → vert), conventions du repo AI Trading Pipeline, seuils de couverture, mise à jour du fichier de tâche et commits. Orchestre 4 parties via custom agents : A (TDD-Implementer), B (TDD-Reviewer), C (TDD-Fixer), Post-PR (PR-Review-Fixer). À utiliser quand l'utilisateur demande « implémente/exécute/travaille sur la tâche #NNN ».
 ---
 
 # Agent Skill — Implementing Task (AI Trading Pipeline)
 
 ## Objectif
-Orchestrer l'implémentation de tâches décrites dans `docs/tasks/<milestone>/NNN__slug.md` en déléguant le travail à des **custom agents spécialisés** via un workflow en 3 parties :
+Orchestrer l'implémentation de tâches décrites dans `docs/tasks/<milestone>/NNN__slug.md` en déléguant le travail à des **custom agents spécialisés** via un workflow en 4 parties :
 
 - **Partie A** : Agent `TDD-Implementer` (TDD strict RED→GREEN).
 - **Partie B** : Agent `TDD-Reviewer` (revue de branche + rapport).
 - **Partie C** (conditionnel) : Agent `TDD-Fixer` (corrections si la revue relève des items).
+- **Partie Post-PR** : Agent `PR-Review-Fixer` (attend la review GitHub automatique, corrige les commentaires).
 
 Les parties B+C sont itérées jusqu'à 5 fois maximum, ou jusqu'à obtention d'un verdict CLEAN.
+La partie Post-PR est itérée jusqu'à 3 fois maximum après la création de la PR.
 
 ## Agents workers
 
@@ -23,6 +25,7 @@ Les instructions détaillées de chaque agent sont dans `.github/agents/` :
 | `TDD-Implementer` | `.github/agents/tdd-implementer.agent.md` | Implémentation TDD RED→GREEN |
 | `TDD-Reviewer` | `.github/agents/tdd-reviewer.agent.md` | Revue de branche (audit complet) |
 | `TDD-Fixer` | `.github/agents/tdd-fixer.agent.md` | Corrections post-revue |
+| `PR-Review-Fixer` | `.github/agents/pr-review-fixer.agent.md` | Corrections post-review GitHub automatique |
 
 > **Modèle** : par défaut, les agents héritent du modèle de la session principale. Pour forcer un modèle spécifique, décommenter la ligne `model:` dans le frontmatter de chaque agent `.agent.md`.
 
@@ -167,6 +170,73 @@ git push -u origin task/NNN-short-slug
 4. **Cocher l'item PR dans la checklist** :
 Mettre à jour le fichier de tâche. Commiter et pousser l'update.
 
+5. **Initialiser le compteur Post-PR** : `pr_review_iteration = 0`.
+
+---
+
+## Partie Post-PR — Review GitHub automatique (orchestrateur + agent PR-Review-Fixer)
+
+Après la création de la PR, GitHub déclenche une review automatique (Copilot PR reviewer). L'orchestrateur attend cette review, puis délègue les corrections éventuelles.
+
+### Étape 1 — Polling de la review (orchestrateur)
+
+L'orchestrateur interroge la PR via l'outil `github-pull-request_activePullRequest` pour récupérer les commentaires de review.
+
+**Stratégie de polling** :
+- **Délai initial** : attendre 60 secondes après le push avant le premier poll (la review GitHub prend typiquement 30s à 2min).
+- **Intervalle** : 30 secondes entre chaque tentative.
+- **Timeout** : 10 minutes maximum. Si aucun commentaire de review n'apparaît après 10 minutes, **abandonner le polling** et informer l'utilisateur.
+- **Détection** : la review est considérée comme arrivée quand le champ `comments` de `activePullRequest` contient au moins un commentaire dont l'auteur est `copilot-pull-request-reviewer`.
+
+### Étape 2 — Extraction et triage (orchestrateur)
+
+Une fois les commentaires récupérés :
+
+1. **Filtrer** : ne garder que les commentaires de `copilot-pull-request-reviewer` avec `commentState == "unresolved"`.
+2. **Classifier** chaque commentaire par sévérité :
+   - **BLOQUANT** : le commentaire signale un bug, une régression potentielle, une violation de convention, ou une faille.
+   - **MINEUR** : le commentaire concerne le style, la documentation, ou une suggestion d'amélioration.
+   - **IGNORÉ** : le commentaire est un faux positif, non pertinent, ou contredit les conventions du repo (ex : le reviewer suggère un pattern interdit par AGENTS.md). Documenter la raison.
+3. **Si 0 items actionnables** (tout IGNORÉ ou aucun commentaire) : **FIN**. Informer l'utilisateur que la review GitHub est clean.
+
+### Étape 3 — Corrections (agent PR-Review-Fixer)
+
+Incrémenter : `pr_review_iteration += 1`.
+
+Formuler un rapport structuré à partir des commentaires extraits et lancer l'agent `PR-Review-Fixer` :
+
+```
+Commentaires de review GitHub à traiter :
+
+1. [BLOQUANT|MINEUR] <résumé du commentaire>
+   - Fichier : `<chemin>`
+   - Commentaire original : <texte complet>
+   - Suggestion : <suggestion du reviewer si présente>
+
+2. ...
+
+Commentaires IGNORÉS (pas de correction) :
+- <commentaire> → Raison : <justification>
+
+Branche : `task/NNN-short-slug` (déjà checkoutée).
+Tâche : `docs/tasks/<milestone>/NNN__slug.md`
+Workstream : WS-X, numéro tâche : NNN.
+```
+
+L'agent retourne :
+- La liste des items corrigés.
+- Le résultat de `pytest` (nombre de tests passed/failed).
+- Le résultat de `ruff check ai_trading/ tests/`.
+- Confirmation des commits PR-FIX effectués.
+
+### Étape 4 — Push et re-polling (orchestrateur)
+
+Après les corrections :
+
+1. **Push** : `git push` (la branche est déjà trackée).
+2. **Si `pr_review_iteration < 3`** : reboucler sur l'Étape 1 (la nouvelle review GitHub se déclenche automatiquement sur le push).
+3. **Si `pr_review_iteration >= 3`** : **stopper les itérations**. Informer l'utilisateur que 3 itérations de correction post-PR ont été effectuées. Lister les items restants.
+
 ---
 
 ## Plusieurs tâches
@@ -193,6 +263,7 @@ Si à n'importe quelle étape la tâche s'avère irréalisable :
 | Après tests RED (Partie A) | `[WS-X] #NNN RED: <résumé>` | Fichiers de tests (+ conftest.py, configs/ si nécessaire) |
 | Clôture tâche (Partie A) | `[WS-X] #NNN GREEN: <résumé>` | Implémentation + tests ajustés + tâche + configs |
 | Corrections post-revue (Partie C) | `[WS-X] #NNN FIX: <résumé>` | Corrections demandées (code + tests + docs mélangés) |
+| Corrections post-review GitHub (Post-PR) | `[WS-X] #NNN PR-FIX: <résumé>` | Corrections des commentaires du reviewer GitHub |
 
 Aucun commit intermédiaire entre RED et GREEN sauf refactoring mineur (tests verts).
 
@@ -207,16 +278,24 @@ Partie A : Agent TDD-Implementer (RED → GREEN)
     ▼
 ┌─► Partie B : Agent TDD-Reviewer → review_v<N>.md
 │       │
-│       ├── CLEAN → Partie Finale (push + PR) ──► FIN
-│       │
-│       └── REQUEST CHANGES (et N < 5)
-│               │
-│               ▼
-│       Partie C : Agent TDD-Fixer → commits FIX
-│               │
-└───────────────┘  (reboucle sur Partie B, N+1)
+│       ├── CLEAN → Partie Finale (push + PR)
+│       │                   │
+│       └── REQUEST CHANGES │ (et N < 5)
+│               │           │
+│               ▼           ▼
+│       Partie C          Partie Post-PR
+│       TDD-Fixer       ┌─► Poll review GitHub (timeout 10min)
+│               │       │       │
+└───────────────┘       │   0 items → FIN
+  (reboucle B, N+1)     │       │
+                        │   items → Agent PR-Review-Fixer
+                        │       │
+                        │   push → re-poll (M+1)
+                        │       │
+                        └───────┘ (max 3 itérations)
 
-Si N >= 5 et toujours REQUEST CHANGES → STOP, informer l'utilisateur.
+Si N >= 5 et toujours REQUEST CHANGES → STOP.
+Si M >= 3 et toujours des commentaires → STOP.
 ```
 
 ## Conventions Python / AI Trading
