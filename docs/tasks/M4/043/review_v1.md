@@ -32,7 +32,7 @@ Itération : v1
 |---|---|
 | Statut DONE | ✅ |
 | Critères d'acceptation cochés | ✅ (8/8) |
-| Checklist cochée | ✅ (8/9 — seule « PR ouverte » reste décochée, attendu) |
+| Checklist cochée | ✅ (9/9) |
 
 ### CI
 

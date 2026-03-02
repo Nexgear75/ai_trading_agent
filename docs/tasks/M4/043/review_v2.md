@@ -32,7 +32,7 @@ Re-review après corrections du FIX commit `0411261`. Les 5 items v1 (1 WARNING 
 |---|---|
 | Statut DONE | ✅ |
 | Critères d'acceptation cochés | ✅ (8/8) |
-| Checklist cochée | ✅ (8/9 — seule « PR ouverte » reste décochée, attendu) |
+| Checklist cochée | ✅ (9/9) |
 
 ### CI
 
