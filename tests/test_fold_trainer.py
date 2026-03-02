@@ -6,16 +6,15 @@ Task #028 (WS-6).
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
 
 from ai_trading.config import load_config
-from ai_trading.data.scaler import StandardScaler, create_scaler
+from ai_trading.data.scaler import create_scaler
 from ai_trading.models.dummy import DummyModel
 from ai_trading.training.trainer import FoldTrainer
-
 
 # ---------------------------------------------------------------------------
 # Shared fixtures
@@ -361,7 +360,8 @@ class TestFoldTrainerModelFit:
 
             mock_fit.assert_called_once()
             call_kwargs = mock_fit.call_args
-            fit_X_train = call_kwargs[1]["X_train"] if "X_train" in (call_kwargs[1] or {}) else call_kwargs[0][0]
+            kw = call_kwargs[1] or {}
+            fit_X_train = kw["X_train"] if "X_train" in kw else call_kwargs[0][0]
 
             # Scaled data should differ from raw (unless degenerate)
             # We check that scaler was applied — mean should be closer to 0
@@ -441,8 +441,8 @@ class TestFoldTrainerPatience:
     def test_patience_from_config(self, config):
         """#028 — FoldTrainer reads early_stopping_patience from config."""
         trainer = FoldTrainer(config=config)
-        # The config has the value — trainer passes it through to model
-        assert config.training.early_stopping_patience == 10
+        # Trainer stores the config, which contains early_stopping_patience
+        assert trainer._config.training.early_stopping_patience == 10
 
     def test_patience_transmitted_to_model(
         self, config, make_fold_data, tmp_path
@@ -501,7 +501,8 @@ class TestFoldTrainerPredict:
 
             assert mock_predict.call_count == 2
             # First call: val prediction
-            val_call_X = mock_predict.call_args_list[0][1]["X"] if "X" in (mock_predict.call_args_list[0][1] or {}) else mock_predict.call_args_list[0][0][0]
+            kw0 = mock_predict.call_args_list[0][1] or {}
+            val_call_X = kw0["X"] if "X" in kw0 else mock_predict.call_args_list[0][0][0]
 
             scaler = create_scaler(config.scaling)
             scaler.fit(X_train)
@@ -529,7 +530,8 @@ class TestFoldTrainerPredict:
             )
 
             # Second call: test prediction
-            test_call_X = mock_predict.call_args_list[1][1]["X"] if "X" in (mock_predict.call_args_list[1][1] or {}) else mock_predict.call_args_list[1][0][0]
+            kw1 = mock_predict.call_args_list[1][1] or {}
+            test_call_X = kw1["X"] if "X" in kw1 else mock_predict.call_args_list[1][0][0]
 
             scaler = create_scaler(config.scaling)
             scaler.fit(X_train)
@@ -602,20 +604,22 @@ class TestFoldTrainerEdgeCases:
         model = DummyModel(seed=7)
         trainer = FoldTrainer(config=config)
 
-        with patch.object(model, "fit", side_effect=RuntimeError("boom")):
-            with pytest.raises(RuntimeError, match="boom"):
-                trainer.train_fold(
-                    model=model,
-                    X_train=X_train,
-                    y_train=y_train,
-                    X_val=X_val,
-                    y_val=y_val,
-                    X_test=X_test,
-                    run_dir=tmp_path,
-                    meta_train=None,
-                    meta_val=None,
-                    ohlcv=None,
-                )
+        with (
+            patch.object(model, "fit", side_effect=RuntimeError("boom")),
+            pytest.raises(RuntimeError, match="boom"),
+        ):
+            trainer.train_fold(
+                model=model,
+                X_train=X_train,
+                y_train=y_train,
+                X_val=X_val,
+                y_val=y_val,
+                X_test=X_test,
+                run_dir=tmp_path,
+                meta_train=None,
+                meta_val=None,
+                ohlcv=None,
+            )
 
     def test_scaler_error_propagates(self, config, make_fold_data, tmp_path):
         """#028 — If scaler.fit() raises, the error propagates (no fallback)."""
