@@ -10,9 +10,7 @@ import math
 import numpy as np
 from scipy import stats
 
-# Valid output types (mirrors ai_trading.models.base.VALID_OUTPUT_TYPES).
-_VALID_OUTPUT_TYPES = frozenset({"regression", "signal"})
-
+from ai_trading.models.base import VALID_OUTPUT_TYPES
 
 # ---------------------------------------------------------------------------
 # Validation helpers
@@ -171,9 +169,9 @@ def compute_prediction_metrics(
         Keys: ``mae``, ``rmse``, ``directional_accuracy``, ``spearman_ic``.
         All values are ``None`` when ``output_type == "signal"``.
     """
-    if output_type not in _VALID_OUTPUT_TYPES:
+    if output_type not in VALID_OUTPUT_TYPES:
         raise ValueError(
-            f"output_type must be one of {sorted(_VALID_OUTPUT_TYPES)}, "
+            f"output_type must be one of {sorted(VALID_OUTPUT_TYPES)}, "
             f"got {output_type!r}."
         )
     if output_type == "signal":

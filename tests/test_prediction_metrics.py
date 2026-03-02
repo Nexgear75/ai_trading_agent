@@ -95,6 +95,13 @@ class TestComputeMAE:
         with pytest.raises(ValueError):
             compute_mae(y_true, y_hat)
 
+    def test_2d_input_raises(self):
+        """MAE raises on 2-D input arrays (ndim != 1)."""
+        y_true = np.array([[1.0, 2.0], [3.0, 4.0]], dtype=np.float64)
+        y_hat = np.array([[1.0, 2.0], [3.0, 4.0]], dtype=np.float64)
+        with pytest.raises(ValueError, match="must be 1-D"):
+            compute_mae(y_true, y_hat)
+
 
 # ===========================================================================
 # compute_rmse
@@ -303,12 +310,20 @@ class TestComputeSpearmanIC:
                 np.array([1.0], dtype=np.float64),
             )
 
-    def test_constant_input_raises(self):
-        """Spearman IC raises when one input is constant (zero variance)."""
-        with pytest.raises(ValueError):
+    def test_constant_y_true_raises(self):
+        """Spearman IC raises when y_true is constant (zero variance)."""
+        with pytest.raises(ValueError, match="y_true is constant"):
             compute_spearman_ic(
                 np.array([1.0, 1.0, 1.0], dtype=np.float64),
                 np.array([1.0, 2.0, 3.0], dtype=np.float64),
+            )
+
+    def test_constant_y_hat_raises(self):
+        """Spearman IC raises when y_hat is constant (zero variance)."""
+        with pytest.raises(ValueError, match="y_hat is constant"):
+            compute_spearman_ic(
+                np.array([1.0, 2.0, 3.0], dtype=np.float64),
+                np.array([5.0, 5.0, 5.0], dtype=np.float64),
             )
 
 
