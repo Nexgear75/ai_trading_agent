@@ -1,6 +1,6 @@
 # Tâche — Validation du gate G-Backtest
 
-Statut : TODO
+Statut : DONE
 Ordre : 036
 Workstream : WS-8
 Milestone : M4
@@ -35,27 +35,27 @@ Dépendances :
 - Les tests utilisent le DummyModel et des données OHLCV synthétiques.
 
 ## Critères d'acceptation
-- [ ] Critère 1 — Déterminisme : 2 runs → `trades.csv` byte-identiques (SHA-256), equity `atol=1e-10`.
-- [ ] Critère 2 — Cohérence equity-trades : `E_final == E_0 * Π(1 + w * r_net_i)` à `atol=1e-8`.
-- [ ] Critère 3 — One-at-a-time : aucun chevauchement sur signaux denses.
-- [ ] Critère 4 — Coûts : résultat identique au calcul à la main sur >= 3 cas.
-- [ ] Critère 5 — trades.csv parseable avec colonnes conformes.
-- [ ] Critère 6 — Anti-fuite : perturbation des prix futurs ne change pas les signaux passés.
-- [ ] Tests couvrent les scénarios nominaux + erreurs + bords.
-- [ ] Suite de tests verte après implémentation.
-- [ ] `ruff check` passe sans erreur.
+- [x] Critère 1 — Déterminisme : 2 runs → `trades.csv` byte-identiques (SHA-256), equity `atol=1e-10`.
+- [x] Critère 2 — Cohérence equity-trades : `E_final == E_0 * Π(1 + w * r_net_i)` à `atol=1e-8`.
+- [x] Critère 3 — One-at-a-time : aucun chevauchement sur signaux denses.
+- [x] Critère 4 — Coûts : résultat identique au calcul à la main sur >= 3 cas.
+- [x] Critère 5 — trades.csv parseable avec colonnes conformes.
+- [x] Critère 6 — Anti-fuite : perturbation des prix futurs ne change pas les signaux passés.
+- [x] Tests couvrent les scénarios nominaux + erreurs + bords.
+- [x] Suite de tests verte après implémentation.
+- [x] `ruff check` passe sans erreur.
 
 ## Pré-condition de démarrage
 - **Tous les tests existants sont GREEN** avant de commencer.
 - **Créer une branche dédiée** `task/036-gate-backtest` depuis `Max6000i1`.
 
 ## Checklist de fin de tâche
-- [ ] Branche `task/036-gate-backtest` créée depuis `Max6000i1`.
-- [ ] Tests RED écrits avant implémentation.
-- [ ] **Commit RED** : `[WS-8] #036 RED: <résumé>` (fichiers de tests uniquement).
-- [ ] Tests GREEN passants et reproductibles.
-- [ ] Critères d'acceptation tous satisfaits.
-- [ ] `ruff check ai_trading/ tests/` passe sans erreur.
-- [ ] Fichier de tâche mis à jour (statut DONE, critères cochés).
-- [ ] **Commit GREEN** : `[WS-8] #036 GREEN: <résumé>`.
+- [x] Branche `task/036-gate-backtest` créée depuis `Max6000i1`.
+- [x] Tests RED écrits avant implémentation.
+- [x] **Commit RED** : `[WS-8] #036 RED: <résumé>` (fichiers de tests uniquement).
+- [x] Tests GREEN passants et reproductibles.
+- [x] Critères d'acceptation tous satisfaits.
+- [x] `ruff check ai_trading/ tests/` passe sans erreur.
+- [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
+- [x] **Commit GREEN** : `[WS-8] #036 GREEN: <résumé>`.
 - [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-8] #036 — Validation du gate G-Backtest`.
