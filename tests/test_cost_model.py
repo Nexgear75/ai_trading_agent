@@ -233,3 +233,27 @@ class TestValidation:
         trades = [_make_trade(-100.0, 102.0)]
         with pytest.raises(ValueError, match="entry_price"):
             apply_cost_model(trades, fee_rate_per_side=0.001, slippage_rate_per_side=0.0003)
+
+    def test_nan_fee_rate_raises(self):
+        """NaN fee_rate_per_side raises ValueError."""
+        trades = [_make_trade(100.0, 102.0)]
+        with pytest.raises(ValueError, match="fee_rate_per_side"):
+            apply_cost_model(trades, fee_rate_per_side=float("nan"), slippage_rate_per_side=0.0)
+
+    def test_nan_slippage_rate_raises(self):
+        """NaN slippage_rate_per_side raises ValueError."""
+        trades = [_make_trade(100.0, 102.0)]
+        with pytest.raises(ValueError, match="slippage_rate_per_side"):
+            apply_cost_model(trades, fee_rate_per_side=0.0, slippage_rate_per_side=float("nan"))
+
+    def test_inf_fee_rate_raises(self):
+        """Infinite fee_rate_per_side raises ValueError."""
+        trades = [_make_trade(100.0, 102.0)]
+        with pytest.raises(ValueError, match="fee_rate_per_side"):
+            apply_cost_model(trades, fee_rate_per_side=float("inf"), slippage_rate_per_side=0.0)
+
+    def test_inf_slippage_rate_raises(self):
+        """Infinite slippage_rate_per_side raises ValueError."""
+        trades = [_make_trade(100.0, 102.0)]
+        with pytest.raises(ValueError, match="slippage_rate_per_side"):
+            apply_cost_model(trades, fee_rate_per_side=0.0, slippage_rate_per_side=float("inf"))
