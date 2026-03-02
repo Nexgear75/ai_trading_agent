@@ -1,6 +1,6 @@
 # Tâche — Baseline no-trade
 
-Statut : TODO
+Statut : DONE
 Ordre : 037
 Workstream : WS-9
 Milestone : M4
@@ -34,28 +34,28 @@ Implémenter la classe `NoTradeBaseline(BaseModel)` enregistrée dans le `MODEL_
 - Créer `tests/test_baseline_no_trade.py`.
 
 ## Critères d'acceptation
-- [ ] `NoTradeBaseline` hérite de `BaseModel` et est enregistrée `@register_model("no_trade")`.
-- [ ] `output_type == "signal"`, `execution_mode == "standard"`.
-- [ ] `fit()` est un no-op (ne modifie aucun état).
-- [ ] `predict(X)` retourne `np.zeros(N, dtype=np.float32)`.
-- [ ] Soumis au backtest commun → 0 trades, equity constante à 1.0.
-- [ ] Métriques attendues : `net_pnl = 0`, `n_trades = 0`, `MDD = 0`.
-- [ ] `"no_trade"` est résolvable via `get_model_class("no_trade")`.
-- [ ] Tests couvrent les scénarios nominaux + erreurs + bords.
-- [ ] Suite de tests verte après implémentation.
-- [ ] `ruff check` passe sans erreur.
+- [x] `NoTradeBaseline` hérite de `BaseModel` et est enregistrée `@register_model("no_trade")`.
+- [x] `output_type == "signal"`, `execution_mode == "standard"`.
+- [x] `fit()` est un no-op (ne modifie aucun état).
+- [x] `predict(X)` retourne `np.zeros(N, dtype=np.float32)`.
+- [x] Soumis au backtest commun → 0 trades, equity constante à 1.0.
+- [x] Métriques attendues : `net_pnl = 0`, `n_trades = 0`, `MDD = 0`.
+- [x] `"no_trade"` est résolvable via `get_model_class("no_trade")`.
+- [x] Tests couvrent les scénarios nominaux + erreurs + bords.
+- [x] Suite de tests verte après implémentation.
+- [x] `ruff check` passe sans erreur.
 
 ## Pré-condition de démarrage
 - **Tous les tests existants sont GREEN** avant de commencer.
 - **Créer une branche dédiée** `task/037-baseline-no-trade` depuis `Max6000i1`.
 
 ## Checklist de fin de tâche
-- [ ] Branche `task/037-baseline-no-trade` créée depuis `Max6000i1`.
-- [ ] Tests RED écrits avant implémentation.
-- [ ] **Commit RED** : `[WS-9] #037 RED: <résumé>` (fichiers de tests uniquement).
-- [ ] Tests GREEN passants et reproductibles.
-- [ ] Critères d'acceptation tous satisfaits.
-- [ ] `ruff check ai_trading/ tests/` passe sans erreur.
-- [ ] Fichier de tâche mis à jour (statut DONE, critères cochés).
-- [ ] **Commit GREEN** : `[WS-9] #037 GREEN: <résumé>`.
-- [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-9] #037 — Baseline no-trade`.
+- [x] Branche `task/037-baseline-no-trade` créée depuis `Max6000i1`.
+- [x] Tests RED écrits avant implémentation.
+- [x] **Commit RED** : `[WS-9] #037 RED: <résumé>` (fichiers de tests uniquement).
+- [x] Tests GREEN passants et reproductibles.
+- [x] Critères d'acceptation tous satisfaits.
+- [x] `ruff check ai_trading/ tests/` passe sans erreur.
+- [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
+- [x] **Commit GREEN** : `[WS-9] #037 GREEN: <résumé>`.
+- [x] **Pull Request ouverte** vers `Max6000i1` : `[WS-9] #037 — Baseline no-trade`.
