@@ -1,6 +1,6 @@
 # Tâche — Métriques de prédiction
 
-Statut : TODO
+Statut : DONE
 Ordre : 040
 Workstream : WS-10
 Milestone : M4
@@ -38,30 +38,30 @@ Implémenter le module `metrics/prediction.py` calculant MAE, RMSE, Directional 
 - Créer `tests/test_prediction_metrics.py`.
 
 ## Critères d'acceptation
-- [ ] `compute_mae` : test numérique sur vecteurs connus → résultat exact.
-- [ ] `compute_rmse` : test numérique sur vecteurs connus → résultat exact.
-- [ ] `compute_directional_accuracy` : DA ∈ [0, 1] sur données normales.
-- [ ] DA exclut les samples avec `y_true == 0` ou `y_hat == 0`.
-- [ ] DA retourne `None` si tous les samples sont exclus.
-- [ ] `compute_spearman_ic` : test numérique sur vecteurs connus.
-- [ ] `compute_prediction_metrics` avec `output_type == "signal"` → toutes les métriques `None`.
-- [ ] `compute_prediction_metrics` avec `output_type == "regression"` → métriques calculées.
-- [ ] Métriques en float64.
-- [ ] Tests couvrent les scénarios nominaux + erreurs + bords.
-- [ ] Suite de tests verte après implémentation.
-- [ ] `ruff check` passe sans erreur.
+- [x] `compute_mae` : test numérique sur vecteurs connus → résultat exact.
+- [x] `compute_rmse` : test numérique sur vecteurs connus → résultat exact.
+- [x] `compute_directional_accuracy` : DA ∈ [0, 1] sur données normales.
+- [x] DA exclut les samples avec `y_true == 0` ou `y_hat == 0`.
+- [x] DA retourne `None` si tous les samples sont exclus.
+- [x] `compute_spearman_ic` : test numérique sur vecteurs connus.
+- [x] `compute_prediction_metrics` avec `output_type == "signal"` → toutes les métriques `None`.
+- [x] `compute_prediction_metrics` avec `output_type == "regression"` → métriques calculées.
+- [x] Métriques en float64.
+- [x] Tests couvrent les scénarios nominaux + erreurs + bords.
+- [x] Suite de tests verte après implémentation.
+- [x] `ruff check` passe sans erreur.
 
 ## Pré-condition de démarrage
 - **Tous les tests existants sont GREEN** avant de commencer.
 - **Créer une branche dédiée** `task/040-prediction-metrics` depuis `Max6000i1`.
 
 ## Checklist de fin de tâche
-- [ ] Branche `task/040-prediction-metrics` créée depuis `Max6000i1`.
-- [ ] Tests RED écrits avant implémentation.
-- [ ] **Commit RED** : `[WS-10] #040 RED: <résumé>` (fichiers de tests uniquement).
-- [ ] Tests GREEN passants et reproductibles.
-- [ ] Critères d'acceptation tous satisfaits.
-- [ ] `ruff check ai_trading/ tests/` passe sans erreur.
-- [ ] Fichier de tâche mis à jour (statut DONE, critères cochés).
-- [ ] **Commit GREEN** : `[WS-10] #040 GREEN: <résumé>`.
-- [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-10] #040 — Métriques de prédiction`.
+- [x] Branche `task/040-prediction-metrics` créée depuis `Max6000i1`.
+- [x] Tests RED écrits avant implémentation.
+- [x] **Commit RED** : `[WS-10] #040 RED: tests for prediction metrics (MAE, RMSE, DA, Spearman IC)`.
+- [x] Tests GREEN passants et reproductibles.
+- [x] Critères d'acceptation tous satisfaits.
+- [x] `ruff check ai_trading/ tests/` passe sans erreur.
+- [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
+- [x] **Commit GREEN** : `[WS-10] #040 GREEN: prediction metrics (MAE, RMSE, DA, Spearman IC)`.
+- [x] **Pull Request ouverte** vers `Max6000i1` : `[WS-10] #040 — Métriques de prédiction`.
