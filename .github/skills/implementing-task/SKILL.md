@@ -197,9 +197,10 @@ Charger uniquement les parties référencées de la spécification et du plan. N
   Ne pas viser l'exhaustivité combinatoire — viser la couverture des **classes d'équivalence à risque**.
 - **Atomicité des tests** : chaque test doit vérifier **un seul scénario**. Ne pas empiler plusieurs `pytest.raises` ou assertions indépendantes dans un même test body. Si le premier échoue, les suivants ne s'exécutent pas.
 - Utiliser des données synthétiques (fixtures `conftest.py`), jamais de données réseau.
+- **Portabilité des chemins** : ne jamais utiliser de chemins hardcodés OS-spécifiques (ex : `Path("/tmp/...")`) dans les tests. Toujours utiliser la fixture pytest `tmp_path` pour tout chemin temporaire (y compris `run_dir` passé aux méthodes comme `fit()`).
 - Si la tâche concerne l'anti-fuite : inclure un test de perturbation (modifier prix futurs → résultat identique pour t ≤ T).
-- **Exports `__init__.py`** : si le module créé doit être importé automatiquement (ex : features enregistrées via décorateur à l'import), s'assurer que `__init__.py` du package importe le module. Le test d'enregistrement dans le registre valide implicitement cet import.
-- **Lancer `ruff check` sur le fichier test après écriture**, avant le commit RED. Corriger tout diagnostic à la source (réordonner, supprimer l'import, renommer) — jamais de `# noqa` comme contournement.
+- **Exports `__init__.py`** : si le nouveau module doit être découvert à l'import du package (ex : feature enregistrée via `@register_feature`), ajouter l'import dans le `__init__.py` du package avec un **import relatif** (ex : `from . import ema  # noqa: F401` dans `ai_trading/features/__init__.py`). Toujours préférer `from . import module` à `from ai_trading.package import module` pour les imports intra-package side-effect.
+- **Tests de registre via `importlib.reload`** : quand un test vérifie qu'un module s'enregistre dans un registre (ex : `MODEL_REGISTRY`, `FEATURE_REGISTRY`) via décorateur à l'import, ne **jamais** appeler manuellement `register_xxx("name")(Cls)`. À la place, utiliser `importlib.reload(module)` après nettoyage du registre par la fixture, puis vérifier que la clé est présente. Comparer avec `mod.ClassName` (module rechargé), pas avec la référence importée en haut du fichier (qui pointe vers l'ancien objet classe).
 
 ### 4. Prouver que les tests échouent
 `pytest tests/test_xxx.py -v` → RED.
@@ -230,8 +231,9 @@ git commit -m "[WS-X] #NNN RED: <résumé des tests ajoutés>"
 - **Nommage** : snake_case, anglais pour le code.
 - **Imports** : pas d'import `*`, pas d'imports inutilisés, pas de variables assignées mais jamais référencées (dead code). Ordre isort strict (stdlib → third-party → local).
 - **Pas de print()** : utiliser `logging` uniquement si le module en a besoin. Ne pas importer `logging` ni créer `logger` « au cas où ».
-- **Exports `__init__.py`** : si le nouveau module doit être découvert à l'import du package (ex : feature enregistrée via `@register_feature`), ajouter l'import dans le `__init__.py` du package (ex : `from ai_trading.features import ema  # noqa: F401` dans `ai_trading/features/__init__.py`).
+- **Exports `__init__.py`** : si le nouveau module doit être découvert à l'import du package (ex : feature enregistrée via `@register_feature`), ajouter l'import dans le `__init__.py` du package avec un **import relatif** (ex : `from . import ema  # noqa: F401` dans `ai_trading/features/__init__.py`). Toujours préférer `from . import module` à `from ai_trading.package import module` pour les imports intra-package side-effect — les imports absolus auto-référençants créent des comportements confus à l'initialisation du package.
 - **Cohérence intermodule** : avant d'implémenter, identifier les modules existants qui consomment ou produisent les mêmes structures (DataFrames, configs, registres). S'assurer que les signatures, noms de colonnes, types de retour et conventions adoptées dans le nouveau code sont alignés avec les modules voisins. En cas de doute, lire le code appelant/appelé pour vérifier la cohérence.
+- **Contrat ABC complet** : si la classe parente (ABC) documente qu'un paramètre accepte plusieurs types d'entrées (ex : `path` = répertoire OU fichier), l'implémentation **doit** supporter tous les cas documentés. Vérifier la docstring de chaque méthode abstraite et implémenter chaque variante avec un test correspondant. Créer les répertoires parents si nécessaire (`path.parent.mkdir(parents=True, exist_ok=True)`).
 - **Ajustement des tests autorisé** : si l'implémentation révèle une inexactitude mineure dans les tests RED (ex : tolérance numérique, nom de colonne), corriger les tests dans le commit GREEN. Les modifications de tests dans le GREEN doivent rester mineures et tracées.
 - **Corrections à la source** : si ruff signale un problème, corriger la cause (renommer, réordonner, supprimer). Ne jamais appliquer deux corrections contradictoires en même temps (ex : renommer un symbol ET ajouter un `# noqa` sur le même diagnostic).
 
@@ -283,7 +285,10 @@ Relecture manuelle de **chaque fichier modifié**. Checklist minimale :
 - [ ] **Imports ordonnés** : stdlib → third-party → local, séparés par des lignes vides. Pas de `# noqa: I001`.
 - [ ] **Pas de code mort, commenté, ou TODO orphelin.**
 - [ ] **Pas de `print()`** restant.
-- [ ] **`__init__.py` à jour** : si un nouveau module a été créé, vérifier que le `__init__.py` du package l'importe si nécessaire (ex : pour l'enregistrement automatique des features).
+- [ ] **`__init__.py` à jour** : si un nouveau module a été créé, vérifier que le `__init__.py` du package l'importe si nécessaire (ex : pour l'enregistrement automatique des features). L'import doit être **relatif** (`from . import module`), jamais absolu auto-référençant.
+- [ ] **Tests de registre** : si un test vérifie l'enregistrement dans un registre (MODEL_REGISTRY, FEATURE_REGISTRY), il doit utiliser `importlib.reload` pour tester le side-effect réel du décorateur, pas un appel manuel à `register_xxx()`.
+- [ ] **Portabilité des chemins dans les tests** : aucun chemin hardcodé `/tmp/...`, toujours `tmp_path` de pytest.
+- [ ] **Contrat ABC complet** : si une méthode abstraite documente qu'elle accepte directory OU fichier, l'implémentation supporte les deux cas avec tests.
 
 #### 8d. Cohérence intermodule
 Vérifier que les changements ne créent pas de divergence avec les modules existants qui interagissent avec le code modifié.
