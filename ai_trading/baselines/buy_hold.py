@@ -10,23 +10,23 @@ Spec reference: §12.5, §13.2.
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 
+from ai_trading.baselines._base import BaselinePersistenceMixin
 from ai_trading.models.base import BaseModel, register_model
-
-_MODEL_FILENAME = "buy_hold_baseline.json"
 
 
 @register_model("buy_hold")
-class BuyHoldBaseline(BaseModel):
+class BuyHoldBaseline(BaselinePersistenceMixin, BaseModel):
     """Baseline that always goes long — predict() always returns ones."""
 
     output_type = "signal"
     execution_mode = "single_trade"
+    _model_filename = "buy_hold_baseline.json"
+    _model_name = "buy_hold"
 
     def fit(
         self,
@@ -63,34 +63,3 @@ class BuyHoldBaseline(BaseModel):
         """
         n = X.shape[0]
         return np.ones(n, dtype=np.float32)
-
-    @staticmethod
-    def _resolve_path(path: Path) -> Path:
-        """Resolve *path* to a concrete file path.
-
-        If *path* is an existing directory, append the default model filename.
-        Otherwise treat *path* as a file path.
-        """
-        path = Path(path)
-        if path.is_dir():
-            return path / _MODEL_FILENAME
-        return path
-
-    def save(self, path: Path) -> None:
-        """Persist (minimal) state to a JSON file."""
-        resolved = self._resolve_path(path)
-        resolved.parent.mkdir(parents=True, exist_ok=True)
-        resolved.write_text(json.dumps({"model": "buy_hold"}))
-
-    def load(self, path: Path) -> None:
-        """Restore state from a JSON file.
-
-        Raises
-        ------
-        FileNotFoundError
-            If *path* does not exist.
-        """
-        resolved = self._resolve_path(path)
-        if not resolved.exists():
-            raise FileNotFoundError(f"Model file not found: {resolved}")
-        json.loads(resolved.read_text())
