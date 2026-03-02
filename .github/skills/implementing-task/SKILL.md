@@ -40,9 +40,11 @@ Les parties B+C sont itérées jusqu'à 5 fois maximum, ou jusqu'à obtention d'
 - **Branche dédiée** : `task/NNN-short-slug` depuis `Max6000i1`. Jamais de commit direct sur `Max6000i1`.
 - **Pull Request obligatoire** vers `Max6000i1` — créée **uniquement par l'orchestrateur** dans la Partie Finale, après que toutes les itérations de revue (Partie B/C) aient abouti à un verdict CLEAN. Les subagents (A, B, C) ne doivent **jamais** exécuter `git push` ni créer de PR.
 - **Ambiguïté** : si specs ou tâche ambiguës → demander des clarifications avant d'implémenter.
-- **Zéro `# noqa` injustifié** : `# noqa` est interdit sauf pour les noms imposés par la spec (ex : `horizon_H_bars`, `L`). Tout diagnostic ruff fixable doit être corrigé à la source, jamais masqué par une suppression.
+- **Zéro suppression lint injustifiée** : `# noqa` et `per-file-ignores` dans `pyproject.toml` sont interdits sauf pour les noms **imposés par l'interface/spec** (ex : N803 sur `X_train` paramètre d'une ABC). Tout diagnostic ruff fixable doit être corrigé à la source. En particulier, **distinguer paramètres** (noms imposés par l'ABC → suppression N803 justifiée) des **variables locales** (toujours renommables → suppression N806 injustifiée, renommer en snake_case).
 
 ## Discipline de contexte
+
+> **Prérequis** : le subagent d'implémentation et le subagent de revue doivent lire `.github/shared/coding_rules.md` (§R1-§R10, §GREP) au début de leur workflow.
 
 - Lire **ciblé** : utiliser grep/recherche et ne charger que les sections pertinentes de la spec.
 - Ne pas charger le document de spécification par défaut : le lire **uniquement si nécessaire**.
@@ -235,6 +237,8 @@ git commit -m "[WS-X] #NNN RED: <résumé des tests ajoutés>"
 
 ### 6. Implémenter (GREEN)
 Écrire pour faire passer les tests :
+
+> **Règles complètes et checklists** : `.github/shared/coding_rules.md` (§R1-§R10). Résumé opérationnel ci-dessous.
 - **Strict code** : validation explicite + `raise`. Pas de fallbacks, pas de defaults implicites.
 - **Config-driven** : paramètres dans `configs/default.yaml`, pas hardcodés.
 - **DRY** : éviter la duplication de code, extraire des fonctions/classes réutilisables.
@@ -246,6 +250,9 @@ git commit -m "[WS-X] #NNN RED: <résumé des tests ajoutés>"
 - **Exports `__init__.py`** : si le nouveau module doit être découvert à l'import du package (ex : feature enregistrée via `@register_feature`), ajouter l'import dans le `__init__.py` du package avec un **import relatif** (ex : `from . import ema  # noqa: F401` dans `ai_trading/features/__init__.py`). Toujours préférer `from . import module` à `from ai_trading.package import module` pour les imports intra-package side-effect — les imports absolus auto-référençants créent des comportements confus à l'initialisation du package.
 - **Cohérence intermodule** : avant d'implémenter, identifier les modules existants qui consomment ou produisent les mêmes structures (DataFrames, configs, registres). S'assurer que les signatures, noms de colonnes, types de retour et conventions adoptées dans le nouveau code sont alignés avec les modules voisins. En cas de doute, lire le code appelant/appelé pour vérifier la cohérence.
 - **Contrat ABC complet** : si la classe parente (ABC) documente qu'un paramètre accepte plusieurs types d'entrées (ex : `path` = répertoire OU fichier), l'implémentation **doit** supporter tous les cas documentés. Vérifier la docstring de chaque méthode abstraite et implémenter chaque variante avec un test correspondant. Créer les répertoires parents si nécessaire (`path.parent.mkdir(parents=True, exist_ok=True)`).
+- **Forwarding complet** : quand le code orchestre des appels à d'autres interfaces (model.fit(), model.predict(), scaler.transform()...), s'assurer que **tous les kwargs pertinents** reçus en entrée sont transmis au sous-appel. Ne pas « perdre » silencieusement un paramètre optionnel en omettant de le passer.
+- **Defaults cohérents** : si un paramètre miroir une interface amont/aval (ex : `ohlcv: Any` qui sera passé à `BaseModel.predict(ohlcv: Any = None)`), donner le même default (`= None`). Un paramètre sémantiquement optionnel sans default crée un fardeau inutile.
+- **Création run_dir** : si une fonction reçoit un `run_dir: Path` et y écrit des fichiers ou sous-répertoires, appeler `run_dir.mkdir(parents=True, exist_ok=True)` au début de la fonction — ne jamais supposer que le répertoire existe.
 - **Ajustement des tests autorisé** : si l'implémentation révèle une inexactitude mineure dans les tests RED (ex : tolérance numérique, nom de colonne), corriger les tests dans le commit GREEN. Les modifications de tests dans le GREEN doivent rester mineures et tracées.
 - **Corrections à la source** : si ruff signale un problème, corriger la cause (renommer, réordonner, supprimer). Ne jamais appliquer deux corrections contradictoires en même temps (ex : renommer un symbol ET ajouter un `# noqa` sur le même diagnostic).
 
@@ -289,28 +296,14 @@ Relecture manuelle de **chaque fichier modifié**. Checklist minimale :
 - [ ] Cohérence avec la spec v1.0.
 
 #### 8c. Qualité du code (post-implémentation)
-- [ ] **Aucun import inutilisé** : chaque `import` est référencé dans le code.
-- [ ] **DRY** : pas de duplication de code dans le projet. Si un bloc de code est copié-collé, extraire une fonction ou classe réutilisable.
+> Checklist : `.github/shared/coding_rules.md` §R7. Vérifier chaque item et corriger.
+
+Complément spécifique implémentation :
 - [ ] **PYLANCE (via `get_errors`)** : appeler `get_errors` sur chaque fichier modifié et corriger toutes les erreurs de type. Attention aux pièges courants : type narrowing sur `self.attr` (Pylance ne narrow pas les attributs `self` après affectation — utiliser des variables locales), `Optional` non vérifié, retours `Any` implicites.
-- [ ] **Aucune variable morte** : chaque variable assignée est utilisée au moins une fois.
-- [ ] **Aucun `# noqa` injustifié** : seuls les `# noqa` pour des noms imposés par la spec sont tolérés (ex : `N815` sur `horizon_H_bars`). Si un `# noqa` existe, vérifier qu'il est encore nécessaire.
-- [ ] **Imports ordonnés** : stdlib → third-party → local, séparés par des lignes vides. Pas de `# noqa: I001`.
-- [ ] **Pas de code mort, commenté, ou TODO orphelin.**
-- [ ] **Pas de `print()`** restant.
-- [ ] **`__init__.py` à jour** : si un nouveau module a été créé, vérifier que le `__init__.py` du package l'importe si nécessaire (ex : pour l'enregistrement automatique des features). L'import doit être **relatif** (`from . import module`), jamais absolu auto-référençant.
-- [ ] **Tests de registre** : si un test vérifie l'enregistrement dans un registre (MODEL_REGISTRY, FEATURE_REGISTRY), il doit utiliser `importlib.reload` pour tester le side-effect réel du décorateur, pas un appel manuel à `register_xxx()`.
-- [ ] **Portabilité des chemins dans les tests** : aucun chemin hardcodé `/tmp/...`, toujours `tmp_path` de pytest.
-- [ ] **Contrat ABC complet** : si une méthode abstraite documente qu'elle accepte directory OU fichier, l'implémentation supporte les deux cas avec tests.
 
 #### 8d. Cohérence intermodule
-Vérifier que les changements ne créent pas de divergence avec les modules existants qui interagissent avec le code modifié.
-
-- [ ] **Signatures et types de retour** : les fonctions/classes modifiées ou créées respectent les signatures attendues par les modules appelants existants (mêmes noms de paramètres, mêmes types, même ordre). Si une signature est modifiée, vérifier tous les appels dans le codebase (`grep_search`).
-- [ ] **Noms de colonnes DataFrame** : les colonnes produites ou consommées (ex : `close`, `logret_1`, `vol_24`) sont identiques à celles utilisées dans les modules amont/aval. Pas de renommage silencieux.
-- [ ] **Clés de configuration** : les clés lues depuis `configs/default.yaml` correspondent aux noms définis dans le modèle Pydantic (`config.py`). Pas de clé orpheline ni manquante.
-- [ ] **Registres et conventions partagées** : si le module s'inscrit dans un registre (ex : `FEATURE_REGISTRY`), vérifier que l'interface implémentée (méthodes, attributs comme `name`, `min_periods`) est cohérente avec les autres entrées du registre et avec le code qui itère sur le registre.
-- [ ] **Structures de données partagées** : les dataclasses, TypedDict ou NamedTuple partagées entre modules sont utilisées de manière identique (mêmes champs, mêmes types). Pas de champ ajouté dans un module sans mise à jour des consommateurs.
-- [ ] **Conventions numériques** : les dtypes (float32 vs float64), les conventions NaN (NaN en tête vs valeurs par défaut), et les index (DatetimeIndex, RangeIndex) sont cohérents avec les modules voisins.
+> Checklist : `.github/shared/coding_rules.md` §R8 + §R6 (path creation, kwargs forwarding).
+> Vérifier que les changements ne créent pas de divergence avec les modules existants.
 
 Si un point de cette checklist échoue, corriger et **revenir à l'étape 7** pour revalider.
 
@@ -511,11 +504,8 @@ Si N >= 5 et toujours REQUEST CHANGES → STOP, informer l'utilisateur.
 
 ## Conventions Python / AI Trading
 
-> Source de vérité : **`AGENTS.md` § Conventions de code**. Points opérationnels complémentaires ci-dessous.
+> Source de vérité : **`AGENTS.md`** § Conventions de code + `.github/shared/coding_rules.md` (§R1-§R10).
+> Points opérationnels complémentaires (non couverts par le fichier partagé) :
 
-- **API random NumPy** : toujours utiliser `np.random.default_rng(seed)` (nouvelle API). Ne jamais utiliser `np.random.seed()` ni `np.random.randn()` (legacy API).
-- **Exports `__init__.py`** : tout module qui s'enregistre via décorateur à l'import (features, modèles, baselines) doit être importé dans le `__init__.py` de son package. Vérifier cet import à chaque nouveau module.
 - **Nommage tests** : structurés par module (`test_config.py`, `test_features.py`, `test_splitter.py`, etc.). Identifiant tâche `#NNN` dans les docstrings uniquement.
-- **Ordre des imports** : toujours stdlib → third-party → local, séparés par une ligne vide. Ne jamais contourner I001 avec `# noqa`.
-- **Politique `# noqa`** : interdit sauf pour les noms imposés par la spec (ex : `N815` sur `horizon_H_bars`, `L`). Chaque `# noqa` restant doit être justifié par un commentaire.
 - **Type checking** : corriger les erreurs Pylance/pyright dans les fichiers modifiés. Ne pas laisser de types `Any` implicites si le type réel est connu.

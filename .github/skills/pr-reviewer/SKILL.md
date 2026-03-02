@@ -9,6 +9,9 @@ argument-hint: "[branche: task/NNN-short-slug] ou [PR number]"
 ## Objectif
 Effectuer une revue systématique et exigeante d'une Pull Request (ou d'une branche `task/NNN-*`) avant merge vers `Max6000i1`, en vérifiant la conformité avec les règles du projet AI Trading Pipeline.
 
+## Prérequis
+> **Avant de commencer**, lire `.github/shared/coding_rules.md` pour disposer des checklists détaillées (§R1-§R10) et des commandes de scan (§GREP) référencées dans ce workflow.
+
 ## Contexte repo
 
 - **Spécification** : `docs/specifications/Specification_Pipeline_Commun_AI_Trading_v1.0.md` (v1.0 + addendum v1.1 + v1.2)
@@ -92,54 +95,8 @@ ruff check ai_trading/ tests/
 
 **Exécuter TOUTES les commandes ci-dessous** sur les fichiers modifiés et documenter les résultats dans le rapport. Aucun raccourci : même si « ça a l'air OK », exécuter le grep et noter le résultat.
 
-```bash
-# Fichiers modifiés (source + tests)
-CHANGED=$(git diff --name-only Max6000i1...HEAD | grep '\.py$')
-CHANGED_SRC=$(echo "$CHANGED" | grep '^ai_trading/')
-CHANGED_TEST=$(echo "$CHANGED" | grep '^tests/')
-
-# --- Anti-patterns code source ---
-# Fallbacks silencieux
-grep -n ' or \[\]\| or {}\| or ""\| or 0\b\| if .* else ' $CHANGED_SRC
-
-# Except trop large
-grep -n 'except:$\|except Exception:' $CHANGED_SRC
-
-# Print résiduel
-grep -n 'print(' $CHANGED_SRC
-
-# Shift négatif (look-ahead)
-grep -n '\.shift(-' $CHANGED_SRC
-
-# Legacy random API
-grep -n 'np\.random\.seed\|np\.random\.randn\|np\.random\.RandomState\|random\.seed' $CHANGED
-
-# TODO/FIXME orphelins
-grep -n 'TODO\|FIXME\|HACK\|XXX' $CHANGED
-
-# --- Anti-patterns tests ---
-# Chemins hardcodés OS-spécifiques
-grep -n '/tmp\|/var/tmp\|C:\\' $CHANGED_TEST
-
-# Imports absolus dans __init__.py
-grep -n 'from ai_trading\.' $(echo "$CHANGED" | grep '__init__.py')
-
-# Tests de registre : registration manuelle au lieu de importlib.reload
-grep -n 'register_model\|register_feature' $CHANGED_TEST
-
-# Mutable default arguments
-grep -n 'def .*=\[\]\|def .*={}' $CHANGED
-
-# open() sans context manager
-grep -n '\.read_text\|open(' $CHANGED_SRC
-```
-
-**Pour chaque match** : analyser en contexte (lire les lignes autour) et classer :
-- **BLOQUANT** si c'est un vrai problème
-- **WARNING** si risque potentiel
-- **Faux positif** si le pattern est utilisé correctement (noter dans le rapport)
-
-**Si aucun match** pour un pattern → noter « 0 occurrences (grep exécuté) » dans le rapport comme preuve d'exécution.
+> **Commandes et classification** : voir `.github/shared/coding_rules.md` §GREP.
+> Exécuter **toutes** les commandes listées et documenter chaque résultat dans le rapport.
 
 ### B2. Lecture du diff ligne par ligne (OBLIGATOIRE)
 
@@ -154,7 +111,7 @@ Pour chaque hunk de diff, appliquer cette grille de lecture :
 1. **Type safety** : les valeurs lues depuis l'extérieur (JSON, YAML, fichiers, args) sont-elles validées en type ? Une valeur lue depuis un `json.loads()` ou `yaml.safe_load()` sans vérification de type est un **WARNING**.
 2. **Edge cases** : que se passe-t-il si l'entrée est `None`, vide, du mauvais type, très grande ?
 3. **Domaine mathématique des paramètres** : pour chaque paramètre validé par une borne (ex : `>= 0`), vérifier que la **borne opposée** est également couverte. En particulier pour les **taux et proportions** (`fee_rate`, `slippage_rate`, `position_fraction`, tout paramètre utilisé comme multiplicateur `(1 - p)` ou `(1 + p)`) : le domaine valide est typiquement `[0, 1)` — une valeur `>= 1` rend le calcul mathématiquement incohérent (multiplicateur négatif ou nul). Si la validation ne couvre que `>= 0` sans borne supérieure → **BLOQUANT**.
-4. **Path handling** : si un paramètre `path` est manipulé, supporte-t-il tous les cas documentés par le contrat (directory ET fichier) ? Crée-t-il les parents si nécessaire ?
+4. **Path handling** : si un paramètre `path` ou `run_dir` est reçu et utilisé pour de l'I/O (écriture de fichiers, sous-répertoires), vérifier **impérativement** : (a) est-il créé avant usage (`mkdir(parents=True, exist_ok=True)`) ou le contrat exige-t-il explicitement qu'il préexiste ? (b) supporte-t-il directory ET fichier si documenté comme tel ? (c) les parents sont-ils créés ? **Un `run_dir / "model"` sans `run_dir.mkdir()` préalable est un bug latent — BLOQUANT.**
 5. **Return contract** : le type de retour est-il garanti en toute circonstance (shape, dtype, clés dict) ?
 6. **Resource cleanup** : fichiers ouverts, connections — sont-ils fermés en cas d'erreur ?
 7. **Cohérence doc/code** : la docstring correspond-elle au comportement réel ?
@@ -177,75 +134,39 @@ Documenter **chaque observation** dans la section « Annotations par fichier » 
 
 ### B4. Audit du code — Règles non négociables
 
-#### B4a. Strict code (no fallbacks)
-- [ ] Aucun fallback silencieux (prouvé par scan B1).
-- [ ] Aucun `except` trop large qui continue l'exécution (prouvé par scan B1).
-- [ ] Aucun paramètre optionnel avec default implicite masquant une erreur.
-- [ ] Validation explicite aux frontières (entrées utilisateur, données externes).
-- [ ] Erreur explicite (`raise`) en cas d'entrée invalide ou manquante.
+> Checklists détaillées : `.github/shared/coding_rules.md`.
+> Prouver chaque item par scan B1 ou lecture diff B2.
 
-#### B4a-bis. Revue défensive indexing / slicing
-- [ ] Pour tout `array[expr:]` ou `array[:expr]` : vérifier manuellement le comportement quand `expr` est **négatif**, **zéro**, ou **> len(array)**. En Python/NumPy, `array[-k:]` ne fait **pas** `array[0:]` — c'est un piège silencieux.
-- [ ] Pour tout `range(a, b)` ou `mask[lo : hi + 1]` : vérifier que `lo` et `hi` sont clampés (`max(0, ...)`, `min(n-1, ...)`) pour toutes les valeurs extrêmes des paramètres d'entrée.
-- [ ] Si un paramètre numérique peut dépasser la taille des données (ex. `H > N`), vérifier que le code produit un résultat correct (tout False, raise, etc.) et non un comportement silencieusement faux.
+#### B4a. Strict code (no fallbacks)
+> Checklist : §R1. Preuve : scan B1 (fallbacks, except).
+
+#### B4a-bis. Defensive indexing / slicing
+> Checklist : §R10. Preuve : lecture diff B2.
 
 #### B4b. Config-driven (pas de hardcoding)
-- [ ] Tout paramètre modifiable est lu depuis `configs/default.yaml` via l'objet config Pydantic v2.
-- [ ] Aucune valeur magique ou constante significative hardcodée dans le code.
-- [ ] Les formules respectent celles de la spec (§6 features, §5 labels, §8 splits, §12 backtest).
-- [ ] Tout choix implementation-defined est explicite dans la config YAML.
+> Checklist : §R2. Preuve : lecture diff B2.
 
 #### B4c. Anti-fuite (look-ahead)
-- [ ] Aucun accès à des données futures (point-in-time respecté).
-- [ ] Embargo respecté : `embargo_bars >= label.horizon_H_bars` (§8.2).
-- [ ] Pas de `.shift(-n)` (prouvé par scan B1) ou équivalent sans justification temporelle correcte.
-- [ ] Scaler fit sur train uniquement (pas de données val/test dans fit).
-- [ ] Splits walk-forward séquentiels (train < val < test).
-- [ ] θ calibré uniquement sur val, jamais sur test.
-- [ ] Features causales : backward-looking uniquement.
+> Checklist : §R3. Preuve : scan B1 (`.shift(-`) + lecture diff B2.
 
 #### B4d. Reproductibilité
-- [ ] Seeds fixées et tracées via `utils/seed.py`.
-- [ ] Pas de legacy random API (prouvé par scan B1).
-- [ ] Hashes SHA-256 (données, config) si applicable.
-- [ ] Résultats reproductibles sur relance (test de déterminisme si pertinent).
+> Checklist : §R4. Preuve : scan B1 (legacy random).
 
 #### B4e. Float conventions
-- [ ] Float32 pour tenseurs X_seq et y (mémoire).
-- [ ] Float64 pour calculs de métriques (précision).
+> Checklist : §R5. Preuve : lecture diff B2.
 
 #### B4f. Anti-patterns Python / numpy / pandas
-
-Vérifier l'absence de ces anti-patterns courants dans les fichiers modifiés :
-
-- [ ] **Mutable default arguments** : pas de `def f(x=[])` ni `def f(x={})` (prouvé par scan B1).
-- [ ] **Données désérialisées non validées** : après `json.loads()`, `yaml.safe_load()` ou lecture de fichier, les valeurs sont validées en type (`isinstance`) avant utilisation. Un `data["key"]` utilisé directement sans vérification de type est un **WARNING**.
-- [ ] **Path incomplet** : si un paramètre `path` est documenté comme acceptant directory OU fichier, l'implémentation gère les deux cas. Un `path.write_text()` sans vérifier `path.is_dir()` est un bug potentiel.
-- [ ] **open() sans context manager** : tout `open()` utilise `with`. Les raccourcis `Path.read_text()` / `Path.write_text()` sont acceptés.
-- [ ] **Comparaison float avec ==** : pas de `==` sur des floats numpy. Utiliser `np.isclose`, `np.testing.assert_allclose`, ou `pytest.approx`.
-- [ ] **`.values` perdant l'index** : pas de `.values` implicite sur un DataFrame/Series pandas sans raison documentée.
-- [ ] **f-string ou format** : pas de `str + str` dans les messages d'erreur — utiliser f-string.
-- [ ] **Side-effects dans les paramètres par défaut** : pas de `datetime.now()`, `time.time()`, ou appel de fonction dans les valeurs par défaut de paramètres.
+> Checklist : §R6. Preuve : scan B1 (mutable defaults, open) + lecture diff B2.
 
 ### B5. Qualité du code
+> Checklist : `.github/shared/coding_rules.md` §R7. Preuve : scan B1 + lecture diff B2.
 
-- [ ] Nommage snake_case cohérent.
-- [ ] Pas de code mort, commenté ou TODO orphelin (prouvé par scan B1).
-- [ ] Pas de `print()` de debug restant (prouvé par scan B1).
-- [ ] Imports propres (pas d'imports inutilisés, pas d'imports `*`).
-- [ ] **Imports intra-package relatifs** (prouvé par scan B1) : les `__init__.py` qui importent des sous-modules pour side-effect (peuplement de registres) doivent utiliser des imports relatifs (`from . import module`), jamais des imports absolus auto-référençants (`from ai_trading.package import module`).
-- [ ] Pas de fichiers générés ou temporaires inclus dans la PR.
+Compléments spécifiques PR :
 - [ ] `.gitignore` couvre les artefacts générés.
-- [ ] **DRY — pas de duplication de constantes/mappings** entre modules du même package. Si un dict, une constante ou un mapping est identique dans 2+ fichiers, exiger l'extraction vers un module partagé. Classer comme **bloquant** (risque de drift silencieux).
+- [ ] Pas de fichiers générés ou temporaires inclus dans la PR.
 
 ### B5-bis. Bonnes pratiques métier (concepts de domaine)
-
-- [ ] **Exactitude des concepts financiers** : les indicateurs techniques (RSI, EMA, volatilité, log-returns, etc.) sont implémentés conformément à leur définition canonique (formules standard de référence). Toute déviation par rapport à la formule standard doit être justifiée et documentée.
-- [ ] **Nommage métier cohérent** : les noms de variables, fonctions et classes reflètent fidèlement les concepts financiers qu'ils modélisent (ex. `log_return` et non `lr`, `equity_curve` et non `curve`). Pas d'abréviation ambiguë.
-- [ ] **Séparation des responsabilités métier** : chaque module encapsule un concept métier unique (ex. features ≠ labels ≠ backtest). Pas de mélange de responsabilités de domaine dans un même module.
-- [ ] **Invariants de domaine respectés** : les invariants propres au domaine financier sont vérifiés explicitement dans le code (ex. prix > 0, volume >= 0, equity curve monotone sur un trade, etc.).
-- [ ] **Cohérence des unités et échelles** : les grandeurs sont manipulées avec des unités cohérentes (returns en log vs arithmétique, prix en quote currency, timestamps en UTC). Pas de mélange implicite d'échelles.
-- [ ] **Patterns de calcul financier** : utilisation des bonnes pratiques pour les calculs numériques financiers (ex. `np.log` au lieu de `math.log` sur des Series, rolling windows via pandas natif, éviter les boucles Python sur les séries temporelles).
+> Checklist : `.github/shared/coding_rules.md` §R9. Preuve : lecture diff B2.
 
 ### B6. Cohérence avec les specs
 
@@ -255,18 +176,7 @@ Vérifier l'absence de ces anti-patterns courants dans les fichiers modifiés :
 - [ ] **Formules doc vs code** : si la tâche ou un critère d'acceptation contient une formule mathématique (intervalles, bornes, indices), vérifier qu'elle correspond **exactement** à l'implémentation et aux tests. Un off-by-one entre la doc et le code est **bloquant** (ambiguïté potentiellement masquant un bug).
 
 ### B7. Cohérence intermodule
-
-Vérifier que les changements de la PR ne créent pas de divergence avec les modules existants.
-
-- [ ] **Signatures et types de retour** : les fonctions/classes modifiées ou créées respectent les signatures attendues par les modules appelants existants (mêmes noms de paramètres, mêmes types, même ordre). Si une signature existante est modifiée, vérifier tous les appels dans le codebase (`grep_search`).
-- [ ] **Noms de colonnes DataFrame** : les colonnes produites ou consommées (ex : `close`, `logret_1`, `vol_24`) sont identiques à celles utilisées dans les modules amont/aval. Pas de renommage silencieux ni de divergence de convention.
-- [ ] **Clés de configuration** : les clés lues depuis `configs/default.yaml` correspondent aux noms définis dans le modèle Pydantic (`config.py`). Pas de clé orpheline (présente en YAML mais pas lue) ni manquante (lue mais absente du YAML).
-- [ ] **Registres et conventions partagées** : si le module s'inscrit dans un registre (ex : `FEATURE_REGISTRY`), vérifier que l'interface implémentée (méthodes, attributs comme `name`, `min_periods`) est cohérente avec les autres entrées du registre et avec le code qui itère dessus.
-- [ ] **Structures de données partagées** : les dataclasses, TypedDict ou NamedTuple partagées entre modules sont utilisées de manière identique (mêmes champs, mêmes types). Pas de champ ajouté dans un module sans mise à jour des consommateurs.
-- [ ] **Conventions numériques** : les dtypes (float32 vs float64), les conventions NaN (NaN en tête vs valeurs par défaut), et les index (DatetimeIndex, RangeIndex) sont cohérents avec les modules voisins.
-- [ ] **Imports croisés** : si le nouveau code importe des symboles d'autres modules du projet, vérifier que ces symboles existent bien dans la branche `Max6000i1` (pas de dépendance sur du code non encore mergé).
-
-Une incohérence intermodule est **bloquante** — elle provoque des bugs silencieux à l'intégration.
+> Checklist : `.github/shared/coding_rules.md` §R8. Preuve : `grep_search` des signatures + lecture diff B2.
 
 ## Format du rapport de revue
 
