@@ -183,7 +183,7 @@ L'orchestrateur interroge la PR via l'outil `github-pull-request_activePullReque
 **Stratégie de polling** :
 - **Délai initial** : attendre 60 secondes après le push avant le premier poll (la review GitHub prend typiquement 30s à 2min).
 - **Intervalle** : 30 secondes entre chaque tentative.
-- **Timeout** : 10 minutes maximum. Si aucun commentaire de review n'apparaît après 10 minutes, **abandonner le polling** et informer l'utilisateur.
+- **Timeout** : 15 minutes maximum. Si aucun commentaire de review n'apparaît après 15 minutes, **abandonner le polling** et informer l'utilisateur.
 - **Détection** : la review est considérée comme arrivée quand le champ `comments` de `activePullRequest` contient au moins un commentaire dont l'auteur est `copilot-pull-request-reviewer`.
 
 ### Étape 2 — Extraction et triage (orchestrateur)
@@ -290,7 +290,7 @@ Partie A : Agent TDD-Implementer (RED → GREEN)
 │               │           │
 │               ▼           ▼
 │       Partie C          Partie Post-PR
-│       TDD-Fixer          Poll review GitHub (timeout 10min)
+│       TDD-Fixer          Poll review GitHub (timeout 15min)
 │               │               │
 └───────────────┘           0 items ──┐
   (reboucle B, N+1)             │     │
