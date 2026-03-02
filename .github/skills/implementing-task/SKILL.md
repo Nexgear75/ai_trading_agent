@@ -343,148 +343,29 @@ RÉSULTAT PARTIE A :
 
 ## Instructions subagent Partie B — Revue de branche
 
-Le subagent de revue suit la grille d'audit complète du skill `pr-reviewer`. Il doit :
+> **Source de vérité unique** : `.github/skills/pr-reviewer/SKILL.md` contient la grille d'audit complète (Phase A compliance + Phase B code review adversariale), les commandes grep obligatoires, la grille de lecture diff, et le template de rapport. Ce skill ne duplique pas le pr-reviewer — il le **délègue** avec les adaptations suivantes.
 
-### 1. Lire le skill de revue
-Lire `.github/skills/pr-reviewer/SKILL.md` pour obtenir la grille d'audit complète.
+### 1. Exécuter le workflow pr-reviewer
 
-### 2. Identifier le périmètre
-- Lister les fichiers modifiés vs `Max6000i1` :
-  ```bash
-  git diff --name-only Max6000i1...HEAD
-  ```
-- Lire la tâche associée `docs/tasks/<milestone>/NNN__slug.md`.
+Lire **intégralement** `.github/skills/pr-reviewer/SKILL.md` et exécuter son workflow complet (Phase A + Phase B) avec les paramètres suivants :
 
-### 3. Exécuter les validations
-```bash
-ruff check ai_trading/ tests/
-pytest
-```
-Appeler `get_errors` sur chaque fichier modifié.
-
-### 4. Auditer selon la grille complète du pr-reviewer
-Suivre exhaustivement toutes les sections de la grille :
-- Structure branche & commits
-- Tâche associée (statut, critères, checklist)
-- Tests (couverture, cas nominaux/erreurs/bords, déterminisme)
-- Strict code (no fallbacks)
-- Config-driven
-- Anti-fuite (look-ahead)
-- Reproductibilité
-- Float conventions
-- Qualité du code
-- Cohérence intermodule
-- Conformité avec les specs
-- Bonnes pratiques métier
-
-### 5. Produire le rapport
-
-Écrire le rapport dans `docs/tasks/<milestone>/<NNN>/review_v<review_iteration>.md` au format suivant :
-
-```markdown
-# Revue tâche #NNN — v<review_iteration>
-
-**Branche** : `task/NNN-short-slug`
-**Tâche** : `docs/tasks/<milestone>/NNN__slug.md`
-**Date** : YYYY-MM-DD
-**Itération** : v<review_iteration>
-
-## Verdict : ✅ CLEAN | ⚠️ REQUEST CHANGES
-
-## Résultats d'exécution
-
-| Check | Résultat |
+| Paramètre | Valeur |
 |---|---|
-| `pytest` | **NNN passed** / X failed |
-| `ruff check ai_trading/ tests/` | **All checks passed** / N erreurs |
-| `get_errors` | **Clean** / N erreurs |
+| Branche source | `task/NNN-short-slug` |
+| Branche cible | `Max6000i1` |
+| Tâche associée | `docs/tasks/<milestone>/NNN__slug.md` |
 
-## Structure branche & commits
-| Critère | Verdict |
-|---|---|
-| Convention de branche | ✅/❌ |
-| Commit RED présent | ✅/❌ |
-| Commit GREEN présent | ✅/❌ |
-| Pas de commits parasites | ✅/❌ |
+### 2. Adaptations contexte tâche
 
-## Tâche
-| Critère | Verdict |
-|---|---|
-| Statut DONE | ✅/❌ |
-| Critères d'acceptation cochés | ✅/❌ |
-| Checklist cochée | ✅/❌ |
+En complément du workflow pr-reviewer standard :
 
-## Tests
-| Critère | Verdict |
-|---|---|
-| Couverture des critères | ✅/❌ |
-| Cas nominaux + erreurs + bords | ✅/❌ |
-| Tous GREEN | ✅/❌ |
-| Déterministes | ✅/❌ |
-| ruff clean | ✅/❌ |
+- **Vérification tâche (Phase A)** : vérifier que la tâche est marquée `Statut : DONE`, que tous les critères d'acceptation sont cochés `[x]`, et que la checklist est cochée `[x]`.
+- **Chemin du rapport** : écrire le rapport dans `docs/tasks/<milestone>/<NNN>/review_v<review_iteration>.md` (au lieu du chemin PR standard `docs/pr_review_copilot/`).
+- **Verdict** : utiliser les mêmes termes que le pr-reviewer :
+  - **CLEAN** = aucun BLOQUANT, WARNING, ni MINEUR.
+  - **REQUEST CHANGES** = au moins un item.
 
-## Code — Règles non négociables
-| Règle | Verdict | Commentaire |
-|---|---|---|
-| Strict code (no fallbacks) | ✅/❌ | |
-| Config-driven | ✅/❌ | |
-| Anti-fuite | ✅/❌ | |
-| Reproductibilité | ✅/❌ | |
-| Float conventions | ✅/❌ | |
-
-## Qualité du code
-| Critère | Verdict |
-|---|---|
-| Nommage et style | ✅/❌ |
-| Pas de code mort/debug | ✅/❌ |
-| Imports propres | ✅/❌ |
-| DRY | ✅/❌ |
-
-## Cohérence intermodule
-| Critère | Verdict |
-|---|---|
-| Signatures et types | ✅/❌ |
-| Colonnes DataFrame | ✅/❌ |
-| Clés de config | ✅/❌ |
-| Registres | ✅/❌ |
-
----
-
-## BLOQUANTS (N)
-
-### B-1. <Titre descriptif>
-**Fichiers** : `chemin/fichier.py` (LNNN)
-**Sévérité** : BLOQUANT — <impact>.
-<Description.>
-**Action** : <Action corrective>
-
----
-
-## WARNINGS (N)
-
-### W-1. <Titre descriptif>
-**Fichiers** : `chemin/fichier.py` (LNNN)
-**Sévérité** : WARNING — <risque>.
-<Description.>
-**Action** : <Action corrective>
-
----
-
-## MINEURS (N)
-
-### M-1. <Titre descriptif>
-**Fichiers** : `chemin/fichier.py`
-**Sévérité** : MINEUR — <amélioration>.
-<Description.>
-**Action** : <Action corrective>
-
----
-
-## Résumé
-<synthèse en 2-3 phrases>
-```
-
-### 6. Retourner le résultat à l'orchestrateur
+### 3. Retourner le résultat à l'orchestrateur
 
 ```
 RÉSULTAT PARTIE B :
