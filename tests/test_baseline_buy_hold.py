@@ -48,7 +48,7 @@ _X_VAL = _RNG.standard_normal((10, _L, _F)).astype(np.float32)
 _Y_VAL = _RNG.standard_normal((10,)).astype(np.float32)
 
 
-def _import_buy_hold():
+def _import_buy_hold() -> type:
     """Import the buy_hold module to trigger registration."""
     import ai_trading.baselines.buy_hold as mod
 

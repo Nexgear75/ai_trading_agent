@@ -1,6 +1,6 @@
 # Tâche — Baseline buy & hold
 
-Statut : TODO
+Statut : DONE
 Ordre : 038
 Workstream : WS-9
 Milestone : M4
@@ -36,29 +36,29 @@ Implémenter la classe `BuyHoldBaseline(BaseModel)` enregistrée dans le `MODEL_
 - Créer `tests/test_baseline_buy_hold.py`.
 
 ## Critères d'acceptation
-- [ ] `BuyHoldBaseline` hérite de `BaseModel` et est enregistrée `@register_model("buy_hold")`.
-- [ ] `output_type == "signal"`, `execution_mode == "single_trade"`.
-- [ ] `fit()` est un no-op.
-- [ ] `predict(X)` retourne `np.ones(N, dtype=np.float32)`.
-- [ ] Soumis au backtest en mode `single_trade` → `n_trades = 1`.
-- [ ] `net_return` cohérent avec `(1-f)^2 * Close_end*(1-s) / (Open_start*(1+s)) - 1`.
-- [ ] `exposure_time_frac = 1.0` exactement (Note I-08).
-- [ ] `"buy_hold"` est résolvable via `get_model_class("buy_hold")`.
-- [ ] Tests couvrent les scénarios nominaux + erreurs + bords.
-- [ ] Suite de tests verte après implémentation.
-- [ ] `ruff check` passe sans erreur.
+- [x] `BuyHoldBaseline` hérite de `BaseModel` et est enregistrée `@register_model("buy_hold")`.
+- [x] `output_type == "signal"`, `execution_mode == "single_trade"`.
+- [x] `fit()` est un no-op.
+- [x] `predict(X)` retourne `np.ones(N, dtype=np.float32)`.
+- [x] Soumis au backtest en mode `single_trade` → `n_trades = 1`.
+- [x] `net_return` cohérent avec `(1-f)^2 * Close_end*(1-s) / (Open_start*(1+s)) - 1`.
+- [x] `exposure_time_frac = 1.0` exactement (Note I-08).
+- [x] `"buy_hold"` est résolvable via `get_model_class("buy_hold")`.
+- [x] Tests couvrent les scénarios nominaux + erreurs + bords.
+- [x] Suite de tests verte après implémentation.
+- [x] `ruff check` passe sans erreur.
 
 ## Pré-condition de démarrage
 - **Tous les tests existants sont GREEN** avant de commencer.
 - **Créer une branche dédiée** `task/038-baseline-buy-hold` depuis `Max6000i1`.
 
 ## Checklist de fin de tâche
-- [ ] Branche `task/038-baseline-buy-hold` créée depuis `Max6000i1`.
-- [ ] Tests RED écrits avant implémentation.
-- [ ] **Commit RED** : `[WS-9] #038 RED: <résumé>` (fichiers de tests uniquement).
-- [ ] Tests GREEN passants et reproductibles.
-- [ ] Critères d'acceptation tous satisfaits.
-- [ ] `ruff check ai_trading/ tests/` passe sans erreur.
-- [ ] Fichier de tâche mis à jour (statut DONE, critères cochés).
+- [x] Branche `task/038-baseline-buy-hold` créée depuis `Max6000i1`.
+- [x] Tests RED écrits avant implémentation.
+- [x] **Commit RED** : `[WS-9] #038 RED: tests for BuyHoldBaseline`.
+- [x] Tests GREEN passants et reproductibles.
+- [x] Critères d'acceptation tous satisfaits.
+- [x] `ruff check ai_trading/ tests/` passe sans erreur.
+- [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
 - [ ] **Commit GREEN** : `[WS-9] #038 GREEN: <résumé>`.
 - [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-9] #038 — Baseline buy & hold`.
