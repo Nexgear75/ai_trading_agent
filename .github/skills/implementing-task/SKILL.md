@@ -195,6 +195,7 @@ Charger uniquement les parties référencées de la spécification et du plan. N
   2. **Priorité moyenne** : `param > taille_données`, `param = taille_données` (limite exacte), combinaison de minimums simultanés (ex : `fast=1, slow=1`).
   3. **Priorité basse** (si temps disponible) : `param = valeur_max` théorique, combinaisons croisées exhaustives.
   Ne pas viser l'exhaustivité combinatoire — viser la couverture des **classes d'équivalence à risque**.
+- **Fuzzing spécifique taux/proportions** : pour tout paramètre de type taux ou proportion (`fee_rate`, `slippage_rate`, `position_fraction`, ou tout paramètre apparaissant dans une formule `(1 - p)` ou `(1 + p)`) : le domaine mathématiquement valide est typiquement `[0, 1)`. Toujours tester et valider : `param = 0` (neutre), `param = 1` (boundary — souvent invalide, `(1-p)=0`), `param > 1` (invalide — doit lever une erreur). Si la validation ne couvre que `>= 0` sans borne supérieure → bug.
 - **Atomicité des tests** : chaque test doit vérifier **un seul scénario**. Ne pas empiler plusieurs `pytest.raises` ou assertions indépendantes dans un même test body. Si le premier échoue, les suivants ne s'exécutent pas.
 - Utiliser des données synthétiques (fixtures `conftest.py`), jamais de données réseau.
 - **Portabilité des chemins** : ne jamais utiliser de chemins hardcodés OS-spécifiques (ex : `Path("/tmp/...")`) dans les tests. Toujours utiliser la fixture pytest `tmp_path` pour tout chemin temporaire (y compris `run_dir` passé aux méthodes comme `fit()`).

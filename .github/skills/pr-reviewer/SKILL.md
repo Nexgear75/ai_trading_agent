@@ -67,7 +67,7 @@ Le workflow est organisé en deux phases. **Phase A** (compliance rapide) valide
 - [ ] `Statut` est passé à `DONE`.
 - [ ] Tous les critères d'acceptation sont cochés `[x]`.
 - [ ] Toute la checklist de fin de tâche est cochée `[x]`.
-- [ ] Les critères cochés correspondent à des preuves vérifiables (code, tests, artefacts).
+- [ ] Les critères cochés correspondent à des preuves vérifiables (code, tests, artefacts). **Pour chaque critère coché `[x]`**, le reviewer doit citer la **ligne de code exacte** (ou le test) qui le satisfait. Si un critère affirme une propriété (ex : « paramètres lus depuis config.X ») et qu'aucune ligne de code dans la PR ne l'implémente, le critère ne peut pas être validé — signaler comme **BLOQUANT** même si un test passe par voie indirecte.
 
 ### A4. Exécuter la suite de validation
 
@@ -153,10 +153,11 @@ Pour chaque hunk de diff, appliquer cette grille de lecture :
 
 1. **Type safety** : les valeurs lues depuis l'extérieur (JSON, YAML, fichiers, args) sont-elles validées en type ? Une valeur lue depuis un `json.loads()` ou `yaml.safe_load()` sans vérification de type est un **WARNING**.
 2. **Edge cases** : que se passe-t-il si l'entrée est `None`, vide, du mauvais type, très grande ?
-3. **Path handling** : si un paramètre `path` est manipulé, supporte-t-il tous les cas documentés par le contrat (directory ET fichier) ? Crée-t-il les parents si nécessaire ?
-4. **Return contract** : le type de retour est-il garanti en toute circonstance (shape, dtype, clés dict) ?
-5. **Resource cleanup** : fichiers ouverts, connections — sont-ils fermés en cas d'erreur ?
-6. **Cohérence doc/code** : la docstring correspond-elle au comportement réel ?
+3. **Domaine mathématique des paramètres** : pour chaque paramètre validé par une borne (ex : `>= 0`), vérifier que la **borne opposée** est également couverte. En particulier pour les **taux et proportions** (`fee_rate`, `slippage_rate`, `position_fraction`, tout paramètre utilisé comme multiplicateur `(1 - p)` ou `(1 + p)`) : le domaine valide est typiquement `[0, 1)` — une valeur `>= 1` rend le calcul mathématiquement incohérent (multiplicateur négatif ou nul). Si la validation ne couvre que `>= 0` sans borne supérieure → **BLOQUANT**.
+4. **Path handling** : si un paramètre `path` est manipulé, supporte-t-il tous les cas documentés par le contrat (directory ET fichier) ? Crée-t-il les parents si nécessaire ?
+5. **Return contract** : le type de retour est-il garanti en toute circonstance (shape, dtype, clés dict) ?
+6. **Resource cleanup** : fichiers ouverts, connections — sont-ils fermés en cas d'erreur ?
+7. **Cohérence doc/code** : la docstring correspond-elle au comportement réel ?
 
 Documenter **chaque observation** dans la section « Annotations par fichier » du rapport. Si un fichier n'a aucune observation, noter « RAS après lecture complète du diff (N lignes) ».
 
@@ -166,6 +167,7 @@ Documenter **chaque observation** dans la section « Annotations par fichier » 
 - [ ] Chaque critère d'acceptation est couvert par au moins un test.
 - [ ] Les tests couvrent : cas nominaux, cas d'erreur, cas de bords.
 - [ ] **Boundary fuzzing mental** : pour chaque paramètre numérique d'entrée (`n`, `L`, `H`, taille, etc.), vérifier qu'il existe un test pour chacune de ces situations : `param = 0`, `param = 1`, `param > n` (dépassement), `param = n` (limite exacte). Si une combinaison critique manque, la signaler comme bloquante.
+- [ ] **Boundary fuzzing — taux et proportions** : pour chaque paramètre de type taux/proportion/ratio (`fee_rate`, `slippage_rate`, `position_fraction`, ou tout paramètre apparaissant dans une formule `(1 - p)` ou `(1 + p)`), vérifier qu'il existe un test pour : `param = 0` (neutre), `param = 1` (boundary — souvent invalide), `param > 1` (invalide — doit lever une erreur). Si le code valide uniquement `>= 0` sans borne supérieure et qu'aucun test ne vérifie le rejet de `param >= 1` → **BLOQUANT**.
 - [ ] Pas de test désactivé (`@pytest.mark.skip`, `xfail`) sans justification explicite.
 - [ ] Les tests sont déterministes (seeds fixées si aléatoire).
 - [ ] Les tests utilisent des données synthétiques (pas de dépendance réseau).
