@@ -10,25 +10,11 @@ import pandas as pd
 import pytest
 
 from ai_trading.config import WindowConfig
+from tests.conftest import make_features_df, make_labels
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-
-def _make_features_df(n_bars: int, n_features: int, seed: int = 42) -> pd.DataFrame:
-    """Create a synthetic features DataFrame with known values."""
-    rng = np.random.default_rng(seed)
-    timestamps = pd.date_range("2024-01-01", periods=n_bars, freq="1h")
-    data = rng.standard_normal((n_bars, n_features))
-    columns = [f"feat_{i}" for i in range(n_features)]
-    return pd.DataFrame(data, index=timestamps, columns=columns)
-
-
-def _make_labels(n_bars: int, seed: int = 99) -> np.ndarray:
-    """Create synthetic label values (float64)."""
-    rng = np.random.default_rng(seed)
-    return rng.standard_normal(n_bars).astype(np.float64)
 
 
 def _make_window_config(seq_len: int = 4) -> WindowConfig:
@@ -49,8 +35,8 @@ class TestNominalShapes:
         from ai_trading.data.dataset import build_samples
 
         n_bars, n_features, seq_len = 20, 3, 4
-        features_df = _make_features_df(n_bars, n_features)
-        y = _make_labels(n_bars)
+        features_df = make_features_df(n_bars, n_features)
+        y = make_labels(n_bars)
         # All bars valid
         final_mask = np.ones(n_bars, dtype=bool)
         config = _make_window_config(seq_len)
@@ -66,8 +52,8 @@ class TestNominalShapes:
         from ai_trading.data.dataset import build_samples
 
         n_bars, n_features, seq_len = 20, 3, 4
-        features_df = _make_features_df(n_bars, n_features)
-        y = _make_labels(n_bars)
+        features_df = make_features_df(n_bars, n_features)
+        y = make_labels(n_bars)
         final_mask = np.ones(n_bars, dtype=bool)
         config = _make_window_config(seq_len)
 
@@ -80,8 +66,8 @@ class TestNominalShapes:
         from ai_trading.data.dataset import build_samples
 
         n_bars, n_features, seq_len = 20, 3, 4
-        features_df = _make_features_df(n_bars, n_features)
-        y = _make_labels(n_bars)
+        features_df = make_features_df(n_bars, n_features)
+        y = make_labels(n_bars)
         final_mask = np.ones(n_bars, dtype=bool)
         config = _make_window_config(seq_len)
 
@@ -102,8 +88,8 @@ class TestDtypeConventions:
         from ai_trading.data.dataset import build_samples
 
         n_bars, n_features, seq_len = 20, 3, 4
-        features_df = _make_features_df(n_bars, n_features)
-        y = _make_labels(n_bars)
+        features_df = make_features_df(n_bars, n_features)
+        y = make_labels(n_bars)
         final_mask = np.ones(n_bars, dtype=bool)
         config = _make_window_config(seq_len)
 
@@ -115,8 +101,8 @@ class TestDtypeConventions:
         from ai_trading.data.dataset import build_samples
 
         n_bars, n_features, seq_len = 20, 3, 4
-        features_df = _make_features_df(n_bars, n_features)
-        y = _make_labels(n_bars)
+        features_df = make_features_df(n_bars, n_features)
+        y = make_labels(n_bars)
         final_mask = np.ones(n_bars, dtype=bool)
         config = _make_window_config(seq_len)
 
@@ -137,8 +123,8 @@ class TestNoNaN:
         from ai_trading.data.dataset import build_samples
 
         n_bars, n_features, seq_len = 20, 3, 4
-        features_df = _make_features_df(n_bars, n_features)
-        y = _make_labels(n_bars)
+        features_df = make_features_df(n_bars, n_features)
+        y = make_labels(n_bars)
         final_mask = np.ones(n_bars, dtype=bool)
         config = _make_window_config(seq_len)
 
@@ -150,8 +136,8 @@ class TestNoNaN:
         from ai_trading.data.dataset import build_samples
 
         n_bars, n_features, seq_len = 20, 3, 4
-        features_df = _make_features_df(n_bars, n_features)
-        y = _make_labels(n_bars)
+        features_df = make_features_df(n_bars, n_features)
+        y = make_labels(n_bars)
         final_mask = np.ones(n_bars, dtype=bool)
         config = _make_window_config(seq_len)
 
@@ -173,8 +159,8 @@ class TestWindowContent:
         from ai_trading.data.dataset import build_samples
 
         n_bars, n_features, seq_len = 10, 2, 3
-        features_df = _make_features_df(n_bars, n_features, seed=7)
-        y = _make_labels(n_bars)
+        features_df = make_features_df(n_bars, n_features, seed=7)
+        y = make_labels(n_bars)
         final_mask = np.ones(n_bars, dtype=bool)
         config = _make_window_config(seq_len)
 
@@ -189,8 +175,8 @@ class TestWindowContent:
         from ai_trading.data.dataset import build_samples
 
         n_bars, n_features, seq_len = 10, 2, 3
-        features_df = _make_features_df(n_bars, n_features, seed=7)
-        y = _make_labels(n_bars)
+        features_df = make_features_df(n_bars, n_features, seed=7)
+        y = make_labels(n_bars)
         final_mask = np.ones(n_bars, dtype=bool)
         config = _make_window_config(seq_len)
 
@@ -205,8 +191,8 @@ class TestWindowContent:
         from ai_trading.data.dataset import build_samples
 
         n_bars, n_features, seq_len = 10, 2, 3
-        features_df = _make_features_df(n_bars, n_features)
-        y = _make_labels(n_bars, seed=123)
+        features_df = make_features_df(n_bars, n_features)
+        y = make_labels(n_bars, seed=123)
         final_mask = np.ones(n_bars, dtype=bool)
         config = _make_window_config(seq_len)
 
@@ -232,8 +218,8 @@ class TestTimestamps:
         from ai_trading.data.dataset import build_samples
 
         n_bars, n_features, seq_len = 10, 2, 3
-        features_df = _make_features_df(n_bars, n_features)
-        y = _make_labels(n_bars)
+        features_df = make_features_df(n_bars, n_features)
+        y = make_labels(n_bars)
         final_mask = np.ones(n_bars, dtype=bool)
         config = _make_window_config(seq_len)
 
@@ -257,8 +243,8 @@ class TestMaskFiltering:
         from ai_trading.data.dataset import build_samples
 
         n_bars, n_features, seq_len = 20, 3, 4
-        features_df = _make_features_df(n_bars, n_features)
-        y = _make_labels(n_bars)
+        features_df = make_features_df(n_bars, n_features)
+        y = make_labels(n_bars)
         final_mask = np.ones(n_bars, dtype=bool)
         # Invalidate positions 5 and 10
         final_mask[5] = False
@@ -276,8 +262,8 @@ class TestMaskFiltering:
         from ai_trading.data.dataset import build_samples
 
         n_bars, n_features, seq_len = 10, 2, 3
-        features_df = _make_features_df(n_bars, n_features)
-        y = _make_labels(n_bars)
+        features_df = make_features_df(n_bars, n_features)
+        y = make_labels(n_bars)
         final_mask = np.ones(n_bars, dtype=bool)
         # Invalidate t=5 (a decision position)
         final_mask[5] = False
@@ -293,8 +279,8 @@ class TestMaskFiltering:
         from ai_trading.data.dataset import build_samples
 
         n_bars, n_features, seq_len = 10, 2, 3
-        features_df = _make_features_df(n_bars, n_features)
-        y = _make_labels(n_bars)
+        features_df = make_features_df(n_bars, n_features)
+        y = make_labels(n_bars)
         final_mask = np.ones(n_bars, dtype=bool)
         # Invalidate t=4 → samples at t=4, t=5, t=6 should be excluded
         # (windows that include position 4)
@@ -312,8 +298,8 @@ class TestMaskFiltering:
         from ai_trading.data.dataset import build_samples
 
         n_bars, n_features, seq_len = 10, 2, 3
-        features_df = _make_features_df(n_bars, n_features)
-        y = _make_labels(n_bars)
+        features_df = make_features_df(n_bars, n_features)
+        y = make_labels(n_bars)
         y[5] = np.nan  # Invalid label
         final_mask = np.ones(n_bars, dtype=bool)
         config = _make_window_config(seq_len)
@@ -330,8 +316,8 @@ class TestMaskFiltering:
         from ai_trading.data.dataset import build_samples
 
         n_bars, n_features, seq_len = 10, 2, 3
-        features_df = _make_features_df(n_bars, n_features)
-        y = _make_labels(n_bars)
+        features_df = make_features_df(n_bars, n_features)
+        y = make_labels(n_bars)
         # Put NaN in features at position 3
         features_df.iloc[3, 0] = np.nan
         final_mask = np.ones(n_bars, dtype=bool)
@@ -358,8 +344,8 @@ class TestConfigDriven:
         from ai_trading.data.dataset import build_samples
 
         n_bars, n_features = 30, 2
-        features_df = _make_features_df(n_bars, n_features)
-        y = _make_labels(n_bars)
+        features_df = make_features_df(n_bars, n_features)
+        y = make_labels(n_bars)
         final_mask = np.ones(n_bars, dtype=bool)
 
         for seq_len in [2, 5, 10]:
@@ -384,8 +370,8 @@ class TestAntiLeakage:
 
         n_bars, n_features, seq_len = 15, 2, 4
         # Use sequential values so we can verify exact content
-        features_df = _make_features_df(n_bars, n_features, seed=0)
-        y = _make_labels(n_bars)
+        features_df = make_features_df(n_bars, n_features, seed=0)
+        y = make_labels(n_bars)
         final_mask = np.ones(n_bars, dtype=bool)
         config = _make_window_config(seq_len)
 
@@ -413,8 +399,8 @@ class TestEdgeCases:
         from ai_trading.data.dataset import build_samples
 
         n_bars, n_features, seq_len = 5, 2, 5
-        features_df = _make_features_df(n_bars, n_features)
-        y = _make_labels(n_bars)
+        features_df = make_features_df(n_bars, n_features)
+        y = make_labels(n_bars)
         final_mask = np.ones(n_bars, dtype=bool)
         config = _make_window_config(seq_len)
 
@@ -429,8 +415,8 @@ class TestEdgeCases:
         from ai_trading.data.dataset import build_samples
 
         n_bars, n_features, seq_len = 5, 2, 2
-        features_df = _make_features_df(n_bars, n_features)
-        y = _make_labels(n_bars)
+        features_df = make_features_df(n_bars, n_features)
+        y = make_labels(n_bars)
         final_mask = np.ones(n_bars, dtype=bool)
         config = _make_window_config(seq_len)
 
@@ -444,8 +430,8 @@ class TestEdgeCases:
         from ai_trading.data.dataset import build_samples
 
         n_bars, n_features, seq_len = 10, 2, 3
-        features_df = _make_features_df(n_bars, n_features)
-        y = _make_labels(n_bars)
+        features_df = make_features_df(n_bars, n_features)
+        y = make_labels(n_bars)
         final_mask = np.zeros(n_bars, dtype=bool)
         config = _make_window_config(seq_len)
 
@@ -460,7 +446,7 @@ class TestEdgeCases:
         from ai_trading.data.dataset import build_samples
 
         n_bars, n_features, seq_len = 10, 2, 3
-        features_df = _make_features_df(n_bars, n_features)
+        features_df = make_features_df(n_bars, n_features)
         y = np.full(n_bars, np.nan, dtype=np.float64)
         final_mask = np.ones(n_bars, dtype=bool)
         config = _make_window_config(seq_len)
@@ -476,8 +462,8 @@ class TestEdgeCases:
         from ai_trading.data.dataset import build_samples
 
         n_bars, n_features, seq_len = 10, 1, 3
-        features_df = _make_features_df(n_bars, n_features)
-        y = _make_labels(n_bars)
+        features_df = make_features_df(n_bars, n_features)
+        y = make_labels(n_bars)
         final_mask = np.ones(n_bars, dtype=bool)
         config = _make_window_config(seq_len)
 
@@ -498,8 +484,8 @@ class TestErrorCases:
         """y length must equal features_df length."""
         from ai_trading.data.dataset import build_samples
 
-        features_df = _make_features_df(10, 2)
-        y = _make_labels(8)  # Wrong length
+        features_df = make_features_df(10, 2)
+        y = make_labels(8)  # Wrong length
         final_mask = np.ones(10, dtype=bool)
         config = _make_window_config(3)
 
@@ -510,8 +496,8 @@ class TestErrorCases:
         """final_mask length must equal features_df length."""
         from ai_trading.data.dataset import build_samples
 
-        features_df = _make_features_df(10, 2)
-        y = _make_labels(10)
+        features_df = make_features_df(10, 2)
+        y = make_labels(10)
         final_mask = np.ones(8, dtype=bool)  # Wrong length
         config = _make_window_config(3)
 
@@ -522,8 +508,8 @@ class TestErrorCases:
         """final_mask must be boolean."""
         from ai_trading.data.dataset import build_samples
 
-        features_df = _make_features_df(10, 2)
-        y = _make_labels(10)
+        features_df = make_features_df(10, 2)
+        y = make_labels(10)
         final_mask = np.ones(10, dtype=np.float64)  # Wrong dtype
         config = _make_window_config(3)
 
@@ -534,7 +520,7 @@ class TestErrorCases:
         """y must be a floating-point array."""
         from ai_trading.data.dataset import build_samples
 
-        features_df = _make_features_df(10, 2)
+        features_df = make_features_df(10, 2)
         y = np.ones(10, dtype=np.int32)  # Wrong dtype
         final_mask = np.ones(10, dtype=bool)
         config = _make_window_config(3)
@@ -547,8 +533,8 @@ class TestErrorCases:
         from ai_trading.data.dataset import build_samples
 
         n_bars, n_features, seq_len = 3, 2, 10
-        features_df = _make_features_df(n_bars, n_features)
-        y = _make_labels(n_bars)
+        features_df = make_features_df(n_bars, n_features)
+        y = make_labels(n_bars)
         final_mask = np.ones(n_bars, dtype=bool)
         config = _make_window_config(seq_len)
 
@@ -583,7 +569,7 @@ class TestErrorCases:
         features_df = pd.DataFrame(
             index=pd.date_range("2024-01-01", periods=10, freq="1h"),
         )
-        y = _make_labels(10)
+        y = make_labels(10)
         final_mask = np.ones(10, dtype=bool)
         config = _make_window_config(3)
 
@@ -604,8 +590,8 @@ class TestComplexMaskScenario:
         from ai_trading.data.dataset import build_samples
 
         n_bars, n_features, seq_len = 12, 2, 3
-        features_df = _make_features_df(n_bars, n_features, seed=42)
-        y = _make_labels(n_bars, seed=42)
+        features_df = make_features_df(n_bars, n_features, seed=42)
+        y = make_labels(n_bars, seed=42)
         # Mark only some positions as valid
         final_mask = np.array(
             [True, True, True, False, True, True, True, False, True, True, True, True],

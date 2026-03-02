@@ -13,30 +13,13 @@ import pandas as pd
 import pytest
 
 from ai_trading.backtest.engine import build_equity_curve, save_equity_curve_csv
+from tests.conftest import make_ohlcv_random
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
 HORIZON = 4
-
-
-def _make_ohlcv(n: int, start: str = "2024-01-01") -> pd.DataFrame:
-    """Synthetic OHLCV DataFrame with *n* rows."""
-    idx = pd.date_range(start, periods=n, freq="1h")
-    rng = np.random.default_rng(42)
-    opens = 100.0 + rng.standard_normal(n).cumsum()
-    closes = opens + rng.standard_normal(n) * 0.5
-    return pd.DataFrame(
-        {
-            "open": opens,
-            "close": closes,
-            "high": np.maximum(opens, closes) + 0.5,
-            "low": np.minimum(opens, closes) - 0.5,
-            "volume": rng.uniform(100, 1000, n),
-        },
-        index=idx,
-    )
 
 
 def _make_enriched_trade(
@@ -97,13 +80,13 @@ class TestSingleTrade:
     """One trade: equity unchanged before/during, updated at exit candle."""
 
     def test_equity_starts_at_initial(self) -> None:
-        ohlcv = _make_ohlcv(20)
+        ohlcv = make_ohlcv_random(20)
         trade = _make_enriched_trade(ohlcv, signal_idx=5, horizon=HORIZON)
         curve = build_equity_curve([trade], ohlcv, 1.0, 1.0)
         assert curve["equity"].iloc[0] == pytest.approx(1.0)
 
     def test_equity_constant_before_trade(self) -> None:
-        ohlcv = _make_ohlcv(20)
+        ohlcv = make_ohlcv_random(20)
         trade = _make_enriched_trade(ohlcv, signal_idx=5, horizon=HORIZON)
         curve = build_equity_curve([trade], ohlcv, 1.0, 1.0)
         # Before entry (indices 0..5), equity must be 1.0
@@ -113,7 +96,7 @@ class TestSingleTrade:
 
     def test_equity_constant_during_trade(self) -> None:
         """No mark-to-market: equity stays at E_entry during the trade."""
-        ohlcv = _make_ohlcv(20)
+        ohlcv = make_ohlcv_random(20)
         trade = _make_enriched_trade(ohlcv, signal_idx=5, horizon=HORIZON)
         curve = build_equity_curve([trade], ohlcv, 1.0, 1.0)
         entry_idx = 6
@@ -123,7 +106,7 @@ class TestSingleTrade:
             assert curve["equity"].iloc[i] == pytest.approx(1.0), f"idx={i}"
 
     def test_equity_updated_at_exit(self) -> None:
-        ohlcv = _make_ohlcv(20)
+        ohlcv = make_ohlcv_random(20)
         trade = _make_enriched_trade(ohlcv, signal_idx=5, horizon=HORIZON)
         curve = build_equity_curve([trade], ohlcv, 1.0, 1.0)
         exit_idx = 9
@@ -131,7 +114,7 @@ class TestSingleTrade:
         assert curve["equity"].iloc[exit_idx] == pytest.approx(expected, abs=1e-12)
 
     def test_equity_constant_after_trade(self) -> None:
-        ohlcv = _make_ohlcv(20)
+        ohlcv = make_ohlcv_random(20)
         trade = _make_enriched_trade(ohlcv, signal_idx=5, horizon=HORIZON)
         curve = build_equity_curve([trade], ohlcv, 1.0, 1.0)
         exit_idx = 9
@@ -149,7 +132,7 @@ class TestMultiTrade:
     """Multiple trades: E_final = E_0 × Π(1 + w × r_net_i)."""
 
     def test_cumulative_equity(self) -> None:
-        ohlcv = _make_ohlcv(30)
+        ohlcv = make_ohlcv_random(30)
         t1 = _make_enriched_trade(ohlcv, signal_idx=2, horizon=HORIZON)
         # Second trade must start after first exits (idx 2+4=6, next signal >=7)
         t2 = _make_enriched_trade(ohlcv, signal_idx=10, horizon=HORIZON)
@@ -163,7 +146,7 @@ class TestMultiTrade:
         assert curve["equity"].iloc[-1] == pytest.approx(e_expected, abs=1e-8)
 
     def test_equity_between_trades_is_constant(self) -> None:
-        ohlcv = _make_ohlcv(30)
+        ohlcv = make_ohlcv_random(30)
         t1 = _make_enriched_trade(ohlcv, signal_idx=2, horizon=HORIZON)
         t2 = _make_enriched_trade(ohlcv, signal_idx=10, horizon=HORIZON)
         curve = build_equity_curve([t1, t2], ohlcv, 1.0, 1.0)
@@ -183,7 +166,7 @@ class TestPositionFraction:
     """w < 1.0 reduces the impact of each trade proportionally."""
 
     def test_w_half_reduces_impact(self) -> None:
-        ohlcv = _make_ohlcv(20)
+        ohlcv = make_ohlcv_random(20)
         trade = _make_enriched_trade(ohlcv, signal_idx=5, horizon=HORIZON)
         curve_full = build_equity_curve([trade], ohlcv, 1.0, 1.0)
         curve_half = build_equity_curve([trade], ohlcv, 1.0, 0.5)
@@ -198,7 +181,7 @@ class TestPositionFraction:
         assert e_half == pytest.approx(1 + 0.5 * r, abs=1e-12)
 
     def test_cumulative_with_w(self) -> None:
-        ohlcv = _make_ohlcv(30)
+        ohlcv = make_ohlcv_random(30)
         t1 = _make_enriched_trade(ohlcv, signal_idx=2, horizon=HORIZON)
         t2 = _make_enriched_trade(ohlcv, signal_idx=10, horizon=HORIZON)
         w = 0.3
@@ -261,7 +244,7 @@ class TestInTradeColumn:
     """in_trade: False at signal/decision bar, True from entry to exit (inclusive)."""
 
     def test_in_trade_single_trade(self) -> None:
-        ohlcv = _make_ohlcv(20)
+        ohlcv = make_ohlcv_random(20)
         trade = _make_enriched_trade(ohlcv, signal_idx=5, horizon=HORIZON)
         curve = build_equity_curve([trade], ohlcv, 1.0, 1.0)
 
@@ -281,7 +264,7 @@ class TestInTradeColumn:
             assert curve["in_trade"].iloc[i] == False, f"idx={i}"  # noqa: E712
 
     def test_in_trade_multi_trade(self) -> None:
-        ohlcv = _make_ohlcv(30)
+        ohlcv = make_ohlcv_random(30)
         t1 = _make_enriched_trade(ohlcv, signal_idx=2, horizon=HORIZON)
         t2 = _make_enriched_trade(ohlcv, signal_idx=10, horizon=HORIZON)
         curve = build_equity_curve([t1, t2], ohlcv, 1.0, 1.0)
@@ -304,7 +287,7 @@ class TestCsvRoundtrip:
     """save_equity_curve_csv writes correct CSV format."""
 
     def test_save_and_reload(self, tmp_path: Path) -> None:
-        ohlcv = _make_ohlcv(20)
+        ohlcv = make_ohlcv_random(20)
         trade = _make_enriched_trade(ohlcv, signal_idx=5, horizon=HORIZON)
         curve = build_equity_curve([trade], ohlcv, 1.0, 1.0)
         csv_path = tmp_path / "equity_curve.csv"
@@ -315,7 +298,7 @@ class TestCsvRoundtrip:
         assert len(loaded) == len(ohlcv)
 
     def test_csv_equity_values_match(self, tmp_path: Path) -> None:
-        ohlcv = _make_ohlcv(20)
+        ohlcv = make_ohlcv_random(20)
         trade = _make_enriched_trade(ohlcv, signal_idx=5, horizon=HORIZON)
         curve = build_equity_curve([trade], ohlcv, 1.0, 1.0)
         csv_path = tmp_path / "equity_curve.csv"
@@ -338,12 +321,12 @@ class TestNoTrades:
     """Empty trade list → equity constant at E_0, in_trade all False."""
 
     def test_no_trades_equity_constant(self) -> None:
-        ohlcv = _make_ohlcv(20)
+        ohlcv = make_ohlcv_random(20)
         curve = build_equity_curve([], ohlcv, 1.0, 1.0)
         np.testing.assert_allclose(np.asarray(curve["equity"].values), 1.0)
 
     def test_no_trades_in_trade_all_false(self) -> None:
-        ohlcv = _make_ohlcv(20)
+        ohlcv = make_ohlcv_random(20)
         curve = build_equity_curve([], ohlcv, 1.0, 1.0)
         assert not curve["in_trade"].any()
 
@@ -358,7 +341,7 @@ class TestTradeAtLastCandle:
 
     def test_exit_at_last_candle(self) -> None:
         n = 10
-        ohlcv = _make_ohlcv(n)
+        ohlcv = make_ohlcv_random(n)
         # signal_idx=5, horizon=4 → exit_idx=9 = last index
         trade = _make_enriched_trade(ohlcv, signal_idx=5, horizon=4)
         curve = build_equity_curve([trade], ohlcv, 1.0, 1.0)
@@ -474,27 +457,27 @@ class TestValidation:
             build_equity_curve([], empty_ohlcv, 1.0, 1.0)
 
     def test_invalid_initial_equity_raises(self) -> None:
-        ohlcv = _make_ohlcv(10)
+        ohlcv = make_ohlcv_random(10)
         with pytest.raises(ValueError, match="initial_equity must be > 0"):
             build_equity_curve([], ohlcv, 0.0, 1.0)
 
     def test_negative_initial_equity_raises(self) -> None:
-        ohlcv = _make_ohlcv(10)
+        ohlcv = make_ohlcv_random(10)
         with pytest.raises(ValueError, match="initial_equity must be > 0"):
             build_equity_curve([], ohlcv, -1.0, 1.0)
 
     def test_invalid_position_fraction_zero_raises(self) -> None:
-        ohlcv = _make_ohlcv(10)
+        ohlcv = make_ohlcv_random(10)
         with pytest.raises(ValueError, match="position_fraction must be in"):
             build_equity_curve([], ohlcv, 1.0, 0.0)
 
     def test_invalid_position_fraction_above_one_raises(self) -> None:
-        ohlcv = _make_ohlcv(10)
+        ohlcv = make_ohlcv_random(10)
         with pytest.raises(ValueError, match="position_fraction must be in"):
             build_equity_curve([], ohlcv, 1.0, 1.5)
 
     def test_trade_missing_r_net_raises(self) -> None:
-        ohlcv = _make_ohlcv(20)
+        ohlcv = make_ohlcv_random(20)
         bad_trade = {
             "signal_time": ohlcv.index[5],
             "entry_time": ohlcv.index[6],
@@ -504,7 +487,7 @@ class TestValidation:
             build_equity_curve([bad_trade], ohlcv, 1.0, 1.0)
 
     def test_trade_missing_entry_time_raises(self) -> None:
-        ohlcv = _make_ohlcv(20)
+        ohlcv = make_ohlcv_random(20)
         bad_trade = {
             "signal_time": ohlcv.index[5],
             "exit_time": ohlcv.index[9],
@@ -514,7 +497,7 @@ class TestValidation:
             build_equity_curve([bad_trade], ohlcv, 1.0, 1.0)
 
     def test_trade_missing_exit_time_raises(self) -> None:
-        ohlcv = _make_ohlcv(20)
+        ohlcv = make_ohlcv_random(20)
         bad_trade = {
             "signal_time": ohlcv.index[5],
             "entry_time": ohlcv.index[6],
@@ -524,7 +507,7 @@ class TestValidation:
             build_equity_curve([bad_trade], ohlcv, 1.0, 1.0)
 
     def test_entry_time_not_in_ohlcv_raises(self) -> None:
-        ohlcv = _make_ohlcv(20)
+        ohlcv = make_ohlcv_random(20)
         bad_trade = {
             "signal_time": ohlcv.index[5],
             "entry_time": pd.Timestamp("2099-01-01"),
@@ -535,7 +518,7 @@ class TestValidation:
             build_equity_curve([bad_trade], ohlcv, 1.0, 1.0)
 
     def test_exit_time_not_in_ohlcv_raises(self) -> None:
-        ohlcv = _make_ohlcv(20)
+        ohlcv = make_ohlcv_random(20)
         bad_trade = {
             "signal_time": ohlcv.index[5],
             "entry_time": ohlcv.index[6],
@@ -555,17 +538,17 @@ class TestOutputShape:
     """Equity curve DataFrame has correct shape and columns."""
 
     def test_columns(self) -> None:
-        ohlcv = _make_ohlcv(20)
+        ohlcv = make_ohlcv_random(20)
         curve = build_equity_curve([], ohlcv, 1.0, 1.0)
         assert list(curve.columns) == ["time_utc", "equity", "in_trade"]
 
     def test_length_matches_ohlcv(self) -> None:
-        ohlcv = _make_ohlcv(20)
+        ohlcv = make_ohlcv_random(20)
         curve = build_equity_curve([], ohlcv, 1.0, 1.0)
         assert len(curve) == len(ohlcv)
 
     def test_time_utc_matches_ohlcv_index(self) -> None:
-        ohlcv = _make_ohlcv(20)
+        ohlcv = make_ohlcv_random(20)
         curve = build_equity_curve([], ohlcv, 1.0, 1.0)
         np.testing.assert_array_equal(
             pd.DatetimeIndex(curve["time_utc"]).values, ohlcv.index.values

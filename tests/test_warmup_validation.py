@@ -15,10 +15,10 @@ Tests cover:
 """
 
 import numpy as np
-import pandas as pd
 import pytest
 
 from ai_trading.features.warmup import apply_warmup
+from tests.conftest import make_features_df
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -35,17 +35,6 @@ class _FakeFeature:
         return self._mp
 
 
-def _make_features_df(n: int, n_features: int = 3, nan_prefix: int = 0) -> pd.DataFrame:
-    """Build a features DataFrame with n rows and optional leading NaNs."""
-    rng = np.random.default_rng(42)
-    data = rng.standard_normal((n, n_features))
-    if nan_prefix > 0:
-        data[:nan_prefix, :] = np.nan
-    idx = pd.date_range("2024-01-01", periods=n, freq="1h")
-    cols = [f"feat_{i}" for i in range(n_features)]
-    return pd.DataFrame(data, index=idx, columns=cols)
-
-
 # ---------------------------------------------------------------------------
 # Nominal cases
 # ---------------------------------------------------------------------------
@@ -58,7 +47,7 @@ class TestNominal:
         """#014 AC: min_warmup=200, 500 bars no gaps → 300 valid samples."""
         n = 500
         min_warmup = 200
-        features_df = _make_features_df(n, nan_prefix=100)
+        features_df = make_features_df(n, nan_prefix=100)
         valid_mask = np.ones(n, dtype=bool)
         instances = [_FakeFeature(100)]
 
@@ -72,7 +61,7 @@ class TestNominal:
         """#014 AC: The first min_warmup rows are always False."""
         n = 100
         min_warmup = 30
-        features_df = _make_features_df(n, nan_prefix=10)
+        features_df = make_features_df(n, nan_prefix=10)
         valid_mask = np.ones(n, dtype=bool)
         instances = [_FakeFeature(10)]
 
@@ -85,7 +74,7 @@ class TestNominal:
         """#014 AC: final_mask = warmup_mask AND valid_mask."""
         n = 100
         min_warmup = 20
-        features_df = _make_features_df(n, nan_prefix=10)
+        features_df = make_features_df(n, nan_prefix=10)
         valid_mask = np.ones(n, dtype=bool)
         # Invalidate some rows in valid_mask beyond warmup
         valid_mask[50] = False
@@ -112,7 +101,7 @@ class TestCombinationWithGaps:
         """Gaps in valid_mask are combined with warmup."""
         n = 200
         min_warmup = 50
-        features_df = _make_features_df(n, nan_prefix=30)
+        features_df = make_features_df(n, nan_prefix=30)
         # Simulate a gap invalidating rows 80-90
         valid_mask = np.ones(n, dtype=bool)
         valid_mask[80:91] = False
@@ -132,7 +121,7 @@ class TestCombinationWithGaps:
         """If valid_mask is all False, final mask is all False."""
         n = 100
         min_warmup = 20
-        features_df = _make_features_df(n, nan_prefix=10)
+        features_df = make_features_df(n, nan_prefix=10)
         valid_mask = np.zeros(n, dtype=bool)
         instances = [_FakeFeature(10)]
 
@@ -153,7 +142,7 @@ class TestErrors:
         """#014 AC: NaN injected post-warmup → ValueError."""
         n = 100
         min_warmup = 20
-        features_df = _make_features_df(n, nan_prefix=10)
+        features_df = make_features_df(n, nan_prefix=10)
         # Inject NaN in the valid zone (post-warmup)
         features_df.iloc[50, 0] = np.nan
         valid_mask = np.ones(n, dtype=bool)
@@ -166,7 +155,7 @@ class TestErrors:
         """NaN in any column of valid zone → ValueError."""
         n = 100
         min_warmup = 20
-        features_df = _make_features_df(n, nan_prefix=10)
+        features_df = make_features_df(n, nan_prefix=10)
         # NaN in second column only
         features_df.iloc[60, 1] = np.nan
         valid_mask = np.ones(n, dtype=bool)
@@ -179,7 +168,7 @@ class TestErrors:
         """#014 AC: min_warmup < max(min_periods) → ValueError."""
         n = 100
         min_warmup = 10
-        features_df = _make_features_df(n, nan_prefix=20)
+        features_df = make_features_df(n, nan_prefix=20)
         valid_mask = np.ones(n, dtype=bool)
         # max(min_periods) = 20 > min_warmup = 10
         instances = [_FakeFeature(5), _FakeFeature(20)]
@@ -191,7 +180,7 @@ class TestErrors:
         """NaN in warmup zone (masked out) should NOT raise."""
         n = 100
         min_warmup = 30
-        features_df = _make_features_df(n, nan_prefix=25)
+        features_df = make_features_df(n, nan_prefix=25)
         valid_mask = np.ones(n, dtype=bool)
         instances = [_FakeFeature(25)]
 
@@ -203,7 +192,7 @@ class TestErrors:
         """NaN in a gap-masked zone should NOT raise."""
         n = 100
         min_warmup = 20
-        features_df = _make_features_df(n, nan_prefix=10)
+        features_df = make_features_df(n, nan_prefix=10)
         # Mark row 50 as invalid in valid_mask (simulating gap)
         valid_mask = np.ones(n, dtype=bool)
         valid_mask[50] = False
@@ -219,7 +208,7 @@ class TestErrors:
         """Feature needing params key but params={} → ValueError (not KeyError)."""
         n = 100
         min_warmup = 20
-        features_df = _make_features_df(n, nan_prefix=10)
+        features_df = make_features_df(n, nan_prefix=10)
         valid_mask = np.ones(n, dtype=bool)
 
         class _ParamFeature:
@@ -244,7 +233,7 @@ class TestEdgeCases:
         """min_warmup == max(min_periods) is valid (no error)."""
         n = 100
         min_warmup = 20
-        features_df = _make_features_df(n, nan_prefix=20)
+        features_df = make_features_df(n, nan_prefix=20)
         valid_mask = np.ones(n, dtype=bool)
         instances = [_FakeFeature(20), _FakeFeature(10)]
 
@@ -255,7 +244,7 @@ class TestEdgeCases:
         """min_warmup == n → all rows masked out (0 valid)."""
         n = 50
         min_warmup = 50
-        features_df = _make_features_df(n, nan_prefix=10)
+        features_df = make_features_df(n, nan_prefix=10)
         valid_mask = np.ones(n, dtype=bool)
         instances = [_FakeFeature(10)]
 
@@ -266,7 +255,7 @@ class TestEdgeCases:
         """min_warmup > n → all rows masked out (0 valid)."""
         n = 30
         min_warmup = 100
-        features_df = _make_features_df(n, nan_prefix=10)
+        features_df = make_features_df(n, nan_prefix=10)
         valid_mask = np.ones(n, dtype=bool)
         instances = [_FakeFeature(10)]
 
@@ -277,7 +266,7 @@ class TestEdgeCases:
         """Works with a single feature instance."""
         n = 50
         min_warmup = 10
-        features_df = _make_features_df(n, n_features=1, nan_prefix=5)
+        features_df = make_features_df(n, n_features=1, nan_prefix=5)
         valid_mask = np.ones(n, dtype=bool)
         instances = [_FakeFeature(5)]
 
@@ -288,7 +277,7 @@ class TestEdgeCases:
         """Empty feature_instances list → ValueError (max of empty)."""
         n = 50
         min_warmup = 10
-        features_df = _make_features_df(n)
+        features_df = make_features_df(n)
         valid_mask = np.ones(n, dtype=bool)
 
         with pytest.raises(ValueError, match="feature_instances"):
@@ -298,7 +287,7 @@ class TestEdgeCases:
         """Return value is a numpy bool array."""
         n = 50
         min_warmup = 10
-        features_df = _make_features_df(n, nan_prefix=5)
+        features_df = make_features_df(n, nan_prefix=5)
         valid_mask = np.ones(n, dtype=bool)
         instances = [_FakeFeature(5)]
 
@@ -310,7 +299,7 @@ class TestEdgeCases:
         """valid_mask length != features_df length → ValueError."""
         n = 50
         min_warmup = 10
-        features_df = _make_features_df(n, nan_prefix=5)
+        features_df = make_features_df(n, nan_prefix=5)
         valid_mask = np.ones(n + 5, dtype=bool)
         instances = [_FakeFeature(5)]
 
@@ -321,7 +310,7 @@ class TestEdgeCases:
         """With multiple features, the max(min_periods) is the constraint."""
         n = 100
         min_warmup = 30
-        features_df = _make_features_df(n, nan_prefix=25)
+        features_df = make_features_df(n, nan_prefix=25)
         valid_mask = np.ones(n, dtype=bool)
         # min_periods: 5, 25, 15 → max = 25 <= 30 → OK
         instances = [_FakeFeature(5), _FakeFeature(25), _FakeFeature(15)]
@@ -333,7 +322,7 @@ class TestEdgeCases:
         """min_warmup = max(min_periods) - 1 → ValueError (off-by-one check)."""
         n = 100
         min_warmup = 19
-        features_df = _make_features_df(n, nan_prefix=20)
+        features_df = make_features_df(n, nan_prefix=20)
         valid_mask = np.ones(n, dtype=bool)
         instances = [_FakeFeature(20)]
 

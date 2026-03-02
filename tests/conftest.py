@@ -139,6 +139,109 @@ def make_timestamps(
 
 
 # ---------------------------------------------------------------------------
+# OHLCV builder — QA tests (W-1: requires timestamp_utc column, tz-aware UTC)
+# ---------------------------------------------------------------------------
+
+
+def make_ohlcv_for_qa(
+    n: int = 10,
+    timeframe: str = "1h",
+    start: str = "2024-01-01",
+) -> pd.DataFrame:
+    """Create a clean synthetic OHLCV DataFrame for QA tests.
+
+    Returns a DataFrame with ``timestamp_utc`` column (tz-aware UTC),
+    and columns open/high/low/close/volume with deterministic values.
+    This format matches the expected input of ``run_qa_checks``.
+    """
+    freq_map = {
+        "1m": "1min",
+        "5m": "5min",
+        "15m": "15min",
+        "30m": "30min",
+        "1h": "1h",
+        "4h": "4h",
+        "1d": "1D",
+    }
+    freq = freq_map[timeframe]
+    timestamps = pd.date_range(start=start, periods=n, freq=freq, tz="UTC")
+    return pd.DataFrame({
+        "timestamp_utc": timestamps,
+        "open": [100.0 + i for i in range(n)],
+        "high": [105.0 + i for i in range(n)],
+        "low": [95.0 + i for i in range(n)],
+        "close": [102.0 + i for i in range(n)],
+        "volume": [1000.0 + i * 10 for i in range(n)],
+    })
+
+
+# ---------------------------------------------------------------------------
+# OHLCV builder — volume feature tests (W-1: custom volume, constant prices)
+# ---------------------------------------------------------------------------
+
+
+def make_ohlcv_with_volume(volume_values) -> pd.DataFrame:
+    """Build a minimal OHLCV DataFrame with custom volume values.
+
+    close/open/high/low are set to 100.0; volume comes from *volume_values*.
+    Index is hourly DatetimeIndex starting 2024-01-01.
+    """
+    n = len(volume_values)
+    timestamps = pd.date_range("2024-01-01", periods=n, freq="1h")
+    vol = np.array(volume_values, dtype=np.float64)
+    close = np.full(n, 100.0, dtype=np.float64)
+    return pd.DataFrame(
+        {
+            "open": close,
+            "high": close,
+            "low": close,
+            "close": close,
+            "volume": vol,
+        },
+        index=timestamps,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Features/labels builders (W-2: shared across sample_builder & warmup tests)
+# ---------------------------------------------------------------------------
+
+
+def make_features_df(
+    n_bars: int,
+    n_features: int = 3,
+    seed: int = 42,
+    nan_prefix: int = 0,
+) -> pd.DataFrame:
+    """Create a synthetic features DataFrame with known values.
+
+    Parameters
+    ----------
+    n_bars : int
+        Number of rows.
+    n_features : int
+        Number of feature columns.
+    seed : int
+        Random seed for reproducibility.
+    nan_prefix : int
+        If > 0, the first *nan_prefix* rows will be NaN.
+    """
+    rng = np.random.default_rng(seed)
+    timestamps = pd.date_range("2024-01-01", periods=n_bars, freq="1h")
+    data = rng.standard_normal((n_bars, n_features))
+    if nan_prefix > 0:
+        data[:nan_prefix, :] = np.nan
+    columns = [f"feat_{i}" for i in range(n_features)]
+    return pd.DataFrame(data, index=timestamps, columns=columns)
+
+
+def make_labels(n_bars: int, seed: int = 99) -> np.ndarray:
+    """Create synthetic label values (float64)."""
+    rng = np.random.default_rng(seed)
+    return rng.standard_normal(n_bars).astype(np.float64)
+
+
+# ---------------------------------------------------------------------------
 # Shared fixtures
 # ---------------------------------------------------------------------------
 
