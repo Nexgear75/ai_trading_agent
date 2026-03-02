@@ -113,20 +113,24 @@ Lancer un subagent de revue avec le prompt suivant :
 > `docs/tasks/<milestone>/<NNN>/review_v<review_iteration>.md`
 >
 > Le rapport doit suivre le format standard (voir ci-dessous) et se terminer par un verdict :
-> - **CLEAN** : aucune correction nécessaire (aucun BLOQUANT, WARNING, ni MINEUR).
-> - **REQUEST CHANGES** : au moins un item (BLOQUANT, WARNING, ou MINEUR) nécessite une correction.
+> - **CLEAN** : **zéro item** de quelque sévérité que ce soit — 0 BLOQUANT, 0 WARNING, **0 MINEUR**. Si tu identifies ne serait-ce qu'un seul item MINEUR, le verdict est obligatoirement REQUEST CHANGES.
+> - **REQUEST CHANGES** : au moins un item, **quelle que soit sa sévérité** (BLOQUANT, WARNING, **ou MINEUR**). Un item MINEUR seul suffit à déclencher REQUEST CHANGES.
+>
+> **RÈGLE NON NÉGOCIABLE** : il est **interdit** de retourner un verdict CLEAN tout en mentionnant des items (même « cosmétiques » ou « mineurs »). Tout item identifié = REQUEST CHANGES. Si tu hésites entre signaler un item ou l'ignorer, signale-le.
 >
 > **Important** : dans ton message de retour, indique clairement :
 > 1. Le verdict (CLEAN ou REQUEST CHANGES).
-> 2. Le nombre d'items par sévérité (N bloquants, N warnings, N mineurs).
+> 2. Le nombre d'items par sévérité (N bloquants, N warnings, N mineurs). Les trois compteurs doivent être **exactement 0** pour un verdict CLEAN.
 > 3. Le chemin du fichier de rapport créé.
 >
 > <Insérer ici le contenu complet du § « Instructions subagent Partie B » ci-dessous>
 
 ### Décision de l'orchestrateur après Partie B
 
-- **Si verdict = CLEAN** → passer à la Partie Finale (push + PR).
-- **Si verdict = REQUEST CHANGES** ET `review_iteration < 5` → lancer la Partie C.
+**Validation préalable obligatoire** : avant d'accepter un verdict CLEAN, l'orchestrateur **doit vérifier la cohérence** entre le verdict annoncé et les compteurs d'items retournés par le subagent. Si le subagent retourne `CLEAN` mais que le nombre de bloquants + warnings + mineurs > 0, **rejeter le verdict** et le traiter comme REQUEST CHANGES. Un verdict CLEAN n'est valide que si les trois compteurs sont **exactement 0**.
+
+- **Si verdict = CLEAN** (validé : 0 bloquants, 0 warnings, 0 mineurs) → passer à la Partie Finale (push + PR).
+- **Si verdict = REQUEST CHANGES** (ou verdict CLEAN invalidé car compteurs > 0) ET `review_iteration < 5` → lancer la Partie C.
 - **Si verdict = REQUEST CHANGES** ET `review_iteration >= 5` → **stopper les itérations**. Informer l'utilisateur que 5 itérations de revue ont été effectuées sans atteindre CLEAN. Lister les items restants. Laisser l'utilisateur décider de la suite.
 
 ---
@@ -370,8 +374,9 @@ En complément du workflow pr-reviewer standard :
 - **Vérification tâche (Phase A)** : vérifier que la tâche est marquée `Statut : DONE`, que tous les critères d'acceptation sont cochés `[x]`, et que la checklist est cochée `[x]`.
 - **Chemin du rapport** : écrire le rapport dans `docs/tasks/<milestone>/<NNN>/review_v<review_iteration>.md` (au lieu du chemin PR standard `docs/pr_review_copilot/`).
 - **Verdict** : utiliser les mêmes termes que le pr-reviewer :
-  - **CLEAN** = aucun BLOQUANT, WARNING, ni MINEUR.
-  - **REQUEST CHANGES** = au moins un item.
+  - **CLEAN** = **strictement 0 item** : 0 BLOQUANT, 0 WARNING, **0 MINEUR**. Un item MINEUR empêche le verdict CLEAN.
+  - **REQUEST CHANGES** = au moins un item, **quelle que soit sa sévérité** (y compris MINEUR seul).
+  - **INTERDIT** : retourner CLEAN en mentionnant des items « cosmétiques » ou « non bloquants ». Tout item identifié → REQUEST CHANGES.
 
 ### 3. Retourner le résultat à l'orchestrateur
 
