@@ -9,10 +9,11 @@ Task #035 — WS-8.
 
 from __future__ import annotations
 
-import math
 from pathlib import Path
 
 import pandas as pd
+
+from ai_trading.backtest.costs import validate_cost_rates
 
 _REQUIRED_TRADE_KEYS = frozenset(
     {
@@ -72,7 +73,7 @@ def export_trade_journal(
     pd.DataFrame
         Journal with columns in the order specified by §12.6.
     """
-    _validate_rates(fee_rate_per_side, slippage_rate_per_side)
+    validate_cost_rates(fee_rate_per_side, slippage_rate_per_side)
 
     rows: list[dict] = []
     for i, trade in enumerate(trades):
@@ -103,30 +104,11 @@ def export_trade_journal(
         )
 
     df = pd.DataFrame(rows, columns=_COLUMN_ORDER)
+    path.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(path, index=False)
     return df
 
 
-def _validate_rates(
-    fee_rate_per_side: float,
-    slippage_rate_per_side: float,
-) -> None:
-    if not math.isfinite(fee_rate_per_side):
-        raise ValueError(
-            f"fee_rate_per_side must be finite, got {fee_rate_per_side}"
-        )
-    if fee_rate_per_side < 0 or fee_rate_per_side >= 1:
-        raise ValueError(
-            f"fee_rate_per_side must be in [0, 1), got {fee_rate_per_side}"
-        )
-    if not math.isfinite(slippage_rate_per_side):
-        raise ValueError(
-            f"slippage_rate_per_side must be finite, got {slippage_rate_per_side}"
-        )
-    if slippage_rate_per_side < 0 or slippage_rate_per_side >= 1:
-        raise ValueError(
-            f"slippage_rate_per_side must be in [0, 1), got {slippage_rate_per_side}"
-        )
 
 
 def _validate_trade(trade: dict, index: int) -> None:
