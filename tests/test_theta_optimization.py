@@ -249,10 +249,10 @@ class TestCalibrateThresholdTiebreaker:
 
 
 class TestCalibrateThresholdNoFeasible:
-    """#031 — No θ meets constraints → result indicates no selection."""
+    """#031 — No θ meets both constraints → fallback E.2.2 applies (#032)."""
 
-    def test_no_feasible_theta_returns_none_theta(self) -> None:
-        """min_trades impossibly high → no feasible θ."""
+    def test_no_feasible_theta_triggers_fallback(self) -> None:
+        """min_trades impossibly high + tight mdd_cap → fallback θ = +∞."""
         n = 50
         ohlcv = _make_ohlcv(n)
         y_hat_val = _make_y_hat_val(n)
@@ -271,15 +271,14 @@ class TestCalibrateThresholdNoFeasible:
             min_trades=10000,  # impossible
         )
 
-        # theta is None when no feasible candidate
-        assert result["theta"] is None
-        assert result["quantile"] is None
-        assert result["net_pnl"] is None
-        assert result["mdd"] is None
-        assert result["n_trades"] is None
+        # Fallback applies: either relaxed or θ = +∞
+        assert result["theta"] is not None
+        assert result["method"] in (
+            "fallback_relax_min_trades",
+            "fallback_no_trade",
+        )
         # Details still populated for traceability
         assert len(result["details"]) == 2
-        assert result["method"] == "quantile_grid"
 
 
 # ---------------------------------------------------------------------------

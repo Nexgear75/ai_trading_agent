@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import math
 
 import numpy as np
@@ -10,6 +11,8 @@ from numpy.typing import NDArray
 
 from ai_trading.backtest.costs import apply_cost_model
 from ai_trading.backtest.engine import build_equity_curve, execute_trades
+
+logger = logging.getLogger(__name__)
 
 
 def compute_quantile_thresholds(
@@ -237,28 +240,60 @@ def calibrate_threshold(
     # --- Select best feasible θ ---
     feasible_candidates = [d for d in details if d["feasible"]]
 
-    if len(feasible_candidates) == 0:
+    if len(feasible_candidates) > 0:
+        # Normal path: select best P&L, tiebreaker = highest quantile
+        feasible_candidates.sort(key=lambda d: (-d["net_pnl"], -d["quantile"]))
+        best = feasible_candidates[0]
         return {
-            "theta": None,
-            "quantile": None,
+            "theta": best["theta"],
+            "quantile": best["quantile"],
             "method": "quantile_grid",
-            "net_pnl": None,
-            "mdd": None,
-            "n_trades": None,
+            "net_pnl": best["net_pnl"],
+            "mdd": best["mdd"],
+            "n_trades": best["n_trades"],
             "details": details,
         }
 
-    # Sort by (-net_pnl, -quantile) to get best P&L first,
-    # then highest quantile as tiebreaker
-    feasible_candidates.sort(key=lambda d: (-d["net_pnl"], -d["quantile"]))
-    best = feasible_candidates[0]
+    # --- Fallback E.2.2 step 1: relax min_trades to 0 ---
+    mdd_feasible = [d for d in details if d["mdd"] <= mdd_cap]
 
+    if len(mdd_feasible) > 0:
+        # Pick highest quantile (most conservative) among mdd-feasible
+        mdd_feasible.sort(key=lambda d: -d["quantile"])
+        best = mdd_feasible[0]
+        logger.warning(
+            "Fallback E.2.2 step 1: no θ satisfies both mdd_cap=%.4f and "
+            "min_trades=%d. Relaxing min_trades to 0. Selected θ=%.6f "
+            "(quantile=%.2f, mdd=%.4f, n_trades=%d).",
+            mdd_cap,
+            min_trades,
+            best["theta"],
+            best["quantile"],
+            best["mdd"],
+            best["n_trades"],
+        )
+        return {
+            "theta": best["theta"],
+            "quantile": best["quantile"],
+            "method": "fallback_relax_min_trades",
+            "net_pnl": best["net_pnl"],
+            "mdd": best["mdd"],
+            "n_trades": best["n_trades"],
+            "details": details,
+        }
+
+    # --- Fallback E.2.2 step 2: θ = +∞ (no-trade) ---
+    logger.warning(
+        "Fallback E.2.2 step 2: no θ satisfies mdd_cap=%.4f. "
+        "Setting θ=+∞ (no-trade for this fold).",
+        mdd_cap,
+    )
     return {
-        "theta": best["theta"],
-        "quantile": best["quantile"],
-        "method": "quantile_grid",
-        "net_pnl": best["net_pnl"],
-        "mdd": best["mdd"],
-        "n_trades": best["n_trades"],
+        "theta": float("inf"),
+        "quantile": None,
+        "method": "fallback_no_trade",
+        "net_pnl": 0.0,
+        "mdd": 0.0,
+        "n_trades": 0,
         "details": details,
     }

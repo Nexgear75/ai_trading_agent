@@ -1,6 +1,6 @@
 # Tâche — Fallback θ (aucun quantile valide)
 
-Statut : TODO
+Statut : DONE
 Ordre : 032
 Workstream : WS-7
 Milestone : M3
@@ -44,26 +44,26 @@ Intégrée à `calibrate_threshold()` (ou fonction dédiée) :
    - Pas de suppression du fold des agrégations
 
 ## Critères d'acceptation
-- [ ] Cas nominal : relaxation `min_trades → 0` quand aucun θ ne satisfait les deux contraintes, mais certains satisfont `mdd <= mdd_cap`
-- [ ] Cas extrême : `θ = +∞` quand aucun θ ne satisfait `mdd <= mdd_cap`
-- [ ] Warning émis (vérifiable via `logging` ou capture) à chaque étape de relaxation
-- [ ] Le fold est conservé dans les résultats avec `n_trades = 0` et `net_pnl = 0`
-- [ ] La logique de fallback ne modifie PAS le comportement quand un θ faisable existe (pas de régression)
-- [ ] Tests couvrent les scénarios nominaux + erreurs + bords
-- [ ] Suite de tests verte après implémentation
-- [ ] `ruff check` passe sans erreur
+- [x] Cas nominal : relaxation `min_trades → 0` quand aucun θ ne satisfait les deux contraintes, mais certains satisfont `mdd <= mdd_cap`
+- [x] Cas extrême : `θ = +∞` quand aucun θ ne satisfait `mdd <= mdd_cap`
+- [x] Warning émis (vérifiable via `logging` ou capture) à chaque étape de relaxation
+- [x] Le fold est conservé dans les résultats avec `n_trades = 0` et `net_pnl = 0`
+- [x] La logique de fallback ne modifie PAS le comportement quand un θ faisable existe (pas de régression)
+- [x] Tests couvrent les scénarios nominaux + erreurs + bords
+- [x] Suite de tests verte après implémentation
+- [x] `ruff check` passe sans erreur
 
 ## Pré-condition de démarrage
 - **Tous les tests existants sont GREEN** avant de commencer.
 - **Créer une branche dédiée** `task/032-theta-fallback` depuis `Max6000i1`.
 
 ## Checklist de fin de tâche
-- [ ] Branche `task/032-theta-fallback` créée depuis `Max6000i1`.
-- [ ] Tests RED écrits avant implémentation.
-- [ ] **Commit RED** : `[WS-7] #032 RED: tests fallback θ` (fichiers de tests uniquement).
-- [ ] Tests GREEN passants et reproductibles.
-- [ ] Critères d'acceptation tous satisfaits.
-- [ ] `ruff check ai_trading/ tests/` passe sans erreur.
-- [ ] Fichier de tâche mis à jour (statut DONE, critères cochés).
+- [x] Branche `task/032-theta-fallback` créée depuis `Max6000i1`.
+- [x] Tests RED écrits avant implémentation.
+- [x] **Commit RED** : `[WS-7] #032 RED: tests fallback θ` (fichiers de tests uniquement).
+- [x] Tests GREEN passants et reproductibles.
+- [x] Critères d'acceptation tous satisfaits.
+- [x] `ruff check ai_trading/ tests/` passe sans erreur.
+- [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
 - [ ] **Commit GREEN** : `[WS-7] #032 GREEN: fallback θ aucun quantile valide`.
 - [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-7] #032 — Fallback θ (aucun quantile valide)`.
