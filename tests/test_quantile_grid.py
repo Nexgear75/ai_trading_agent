@@ -114,6 +114,13 @@ class TestComputeQuantileThresholdsErrors:
         with pytest.raises(ValueError, match="q_grid"):
             compute_quantile_thresholds(np.arange(10, dtype=np.float64), [1.1])
 
+    def test_duplicate_q_grid_raises(self) -> None:
+        """Duplicate values in q_grid raises ValueError."""
+        with pytest.raises(ValueError, match="duplicates"):
+            compute_quantile_thresholds(
+                np.arange(10, dtype=np.float64), [0.5, 0.7, 0.5]
+            )
+
 
 # ---------------------------------------------------------------------------
 # apply_threshold — nominal

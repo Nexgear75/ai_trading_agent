@@ -33,6 +33,8 @@ def compute_quantile_thresholds(
         raise ValueError("y_hat_val must not be empty")
     if len(q_grid) == 0:
         raise ValueError("q_grid must not be empty")
+    if len(q_grid) != len(set(q_grid)):
+        raise ValueError("q_grid must not contain duplicates")
     for q in q_grid:
         if q < 0.0 or q > 1.0:
             raise ValueError(
