@@ -1,6 +1,6 @@
 # Tâche — Objectif d'optimisation et sélection du seuil θ
 
-Statut : TODO
+Statut : DONE
 Ordre : 031
 Workstream : WS-7
 Milestone : M3
@@ -52,29 +52,29 @@ Pour chaque `θ` dans les candidats (issus de WS-7.1) :
 - Détails de tous les candidats évalués (pour traçabilité)
 
 ## Critères d'acceptation
-- [ ] Le θ retenu respecte `mdd <= mdd_cap` ET `n_trades >= min_trades`
-- [ ] Le θ retenu maximise `net_pnl` parmi les θ faisables
-- [ ] En cas d'ex-aequo sur `net_pnl` : le quantile le plus haut est préféré
-- [ ] Test : données synthétiques où un seul θ est faisable → sélection correcte
-- [ ] Test : plusieurs θ faisables → celui avec le meilleur `net_pnl` est retenu
-- [ ] Equity réinitialisée à `E_0 = 1.0` pour chaque candidat (pas d'effet de bord entre candidats)
-- [ ] Anti-fuite : modifier `y_hat_test` arbitrairement → θ identique
-- [ ] Paramètres lus depuis `config.thresholding` — pas de valeurs hardcodées
-- [ ] Tests couvrent les scénarios nominaux + erreurs + bords
-- [ ] Suite de tests verte après implémentation
-- [ ] `ruff check` passe sans erreur
+- [x] Le θ retenu respecte `mdd <= mdd_cap` ET `n_trades >= min_trades`
+- [x] Le θ retenu maximise `net_pnl` parmi les θ faisables
+- [x] En cas d'ex-aequo sur `net_pnl` : le quantile le plus haut est préféré
+- [x] Test : données synthétiques où un seul θ est faisable → sélection correcte
+- [x] Test : plusieurs θ faisables → celui avec le meilleur `net_pnl` est retenu
+- [x] Equity réinitialisée à `E_0 = 1.0` pour chaque candidat (pas d'effet de bord entre candidats)
+- [x] Anti-fuite : modifier `y_hat_test` arbitrairement → θ identique
+- [x] Paramètres lus depuis `config.thresholding` — pas de valeurs hardcodées
+- [x] Tests couvrent les scénarios nominaux + erreurs + bords
+- [x] Suite de tests verte après implémentation
+- [x] `ruff check` passe sans erreur
 
 ## Pré-condition de démarrage
 - **Tous les tests existants sont GREEN** avant de commencer.
 - **Créer une branche dédiée** `task/031-theta-optimization` depuis `Max6000i1`.
 
 ## Checklist de fin de tâche
-- [ ] Branche `task/031-theta-optimization` créée depuis `Max6000i1`.
-- [ ] Tests RED écrits avant implémentation.
-- [ ] **Commit RED** : `[WS-7] #031 RED: tests objectif d'optimisation et sélection θ` (fichiers de tests uniquement).
-- [ ] Tests GREEN passants et reproductibles.
-- [ ] Critères d'acceptation tous satisfaits.
-- [ ] `ruff check ai_trading/ tests/` passe sans erreur.
-- [ ] Fichier de tâche mis à jour (statut DONE, critères cochés).
-- [ ] **Commit GREEN** : `[WS-7] #031 GREEN: objectif d'optimisation et sélection θ`.
+- [x] Branche `task/031-theta-optimization` créée depuis `Max6000i1`.
+- [x] Tests RED écrits avant implémentation.
+- [x] **Commit RED** : `[WS-7] #031 RED: tests objectif d'optimisation et sélection θ` (fichiers de tests uniquement).
+- [x] Tests GREEN passants et reproductibles.
+- [x] Critères d'acceptation tous satisfaits.
+- [x] `ruff check ai_trading/ tests/` passe sans erreur.
+- [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
+- [x] **Commit GREEN** : `[WS-7] #031 GREEN: objectif d'optimisation et sélection θ`.
 - [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-7] #031 — Objectif d'optimisation et sélection du seuil θ`.
