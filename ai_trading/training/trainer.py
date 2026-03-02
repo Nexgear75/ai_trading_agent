@@ -48,9 +48,9 @@ class FoldTrainer:
         y_val: np.ndarray,
         X_test: np.ndarray,
         run_dir: Path,
-        meta_train: Any,
-        meta_val: Any,
-        ohlcv: Any,
+        meta_train: Any = None,
+        meta_val: Any = None,
+        ohlcv: Any = None,
     ) -> dict[str, Any]:
         """Run the full fold workflow.
 
@@ -70,30 +70,32 @@ class FoldTrainer:
             Test features, shape ``(N_test, L, F)``, float32.
         run_dir : Path
             Directory for run artifacts.
-        meta_train : Any
-            Metadata for training samples (passed to model).
-        meta_val : Any
-            Metadata for validation samples (passed to model).
-        ohlcv : Any
-            Raw OHLCV data (passed to model for RL context).
+        meta_train : Any, optional
+            Metadata for training samples (passed to model). Default ``None``.
+        meta_val : Any, optional
+            Metadata for validation samples (passed to model). Default ``None``.
+        ohlcv : Any, optional
+            Raw OHLCV data (passed to model for RL context). Default ``None``.
 
         Returns
         -------
         dict
             Keys: ``y_hat_val``, ``y_hat_test``, ``artifacts``, ``scaler``.
         """
+        run_dir.mkdir(parents=True, exist_ok=True)
+
         # --- 1. Scaling (trainer is sole owner) ---
         scaler = create_scaler(self._config.scaling)
         scaler.fit(X_train)
-        X_train_scaled = scaler.transform(X_train)
-        X_val_scaled = scaler.transform(X_val)
-        X_test_scaled = scaler.transform(X_test)
+        x_train_scaled = scaler.transform(X_train)
+        x_val_scaled = scaler.transform(X_val)
+        x_test_scaled = scaler.transform(X_test)
 
         # --- 2. Fit ---
         artifacts = model.fit(
-            X_train=X_train_scaled,
+            X_train=x_train_scaled,
             y_train=y_train,
-            X_val=X_val_scaled,
+            X_val=x_val_scaled,
             y_val=y_val,
             config=self._config,
             run_dir=run_dir,
@@ -103,8 +105,8 @@ class FoldTrainer:
         )
 
         # --- 3. Predict ---
-        y_hat_val = model.predict(X=X_val_scaled)
-        y_hat_test = model.predict(X=X_test_scaled)
+        y_hat_val = model.predict(X=x_val_scaled, meta=meta_val, ohlcv=ohlcv)
+        y_hat_test = model.predict(X=x_test_scaled, ohlcv=ohlcv)
 
         # --- 4. Save ---
         model.save(run_dir / "model")

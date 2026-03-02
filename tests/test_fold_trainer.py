@@ -494,9 +494,6 @@ class TestFoldTrainerPredict:
                 y_val=y_val,
                 X_test=X_test,
                 run_dir=tmp_path,
-                meta_train=None,
-                meta_val=None,
-                ohlcv=None,
             )
 
             assert mock_predict.call_count == 2
@@ -524,9 +521,6 @@ class TestFoldTrainerPredict:
                 y_val=y_val,
                 X_test=X_test,
                 run_dir=tmp_path,
-                meta_train=None,
-                meta_val=None,
-                ohlcv=None,
             )
 
             # Second call: test prediction
@@ -537,6 +531,37 @@ class TestFoldTrainerPredict:
             scaler.fit(X_train)
             expected_X_test = scaler.transform(X_test)
             np.testing.assert_allclose(test_call_X, expected_X_test, rtol=1e-5)
+
+    def test_predict_passes_context(self, config, make_fold_data, tmp_path):
+        """#028 — model.predict() receives meta_val/ohlcv for val, ohlcv for test."""
+        X_train, y_train, X_val, y_val, X_test = make_fold_data()
+        model = DummyModel(seed=7)
+        trainer = FoldTrainer(config=config)
+
+        meta_val = {"decision_time": "2024-01-01"}
+        ohlcv = "ohlcv_placeholder"
+
+        with patch.object(model, "predict", wraps=model.predict) as mock_predict:
+            trainer.train_fold(
+                model=model,
+                X_train=X_train,
+                y_train=y_train,
+                X_val=X_val,
+                y_val=y_val,
+                X_test=X_test,
+                run_dir=tmp_path,
+                meta_val=meta_val,
+                ohlcv=ohlcv,
+            )
+
+            assert mock_predict.call_count == 2
+            # Val predict: meta=meta_val, ohlcv=ohlcv
+            val_kw = mock_predict.call_args_list[0][1]
+            assert val_kw["meta"] is meta_val
+            assert val_kw["ohlcv"] is ohlcv
+            # Test predict: meta=None (no meta_test), ohlcv=ohlcv
+            test_kw = mock_predict.call_args_list[1][1]
+            assert test_kw["ohlcv"] is ohlcv
 
 
 # ---------------------------------------------------------------------------
@@ -677,3 +702,46 @@ class TestFoldTrainerEdgeCases:
 
         assert result["y_hat_val"].shape == (10,)
         assert result["y_hat_test"].shape == (5,)
+
+    def test_run_dir_created_if_missing(self, config, make_fold_data, tmp_path):
+        """#028 — run_dir is created automatically if it doesn't exist."""
+        X_train, y_train, X_val, y_val, X_test = make_fold_data()
+        model = DummyModel(seed=7)
+        trainer = FoldTrainer(config=config)
+
+        nested_dir = tmp_path / "nested" / "run"
+        assert not nested_dir.exists()
+
+        trainer.train_fold(
+            model=model,
+            X_train=X_train,
+            y_train=y_train,
+            X_val=X_val,
+            y_val=y_val,
+            X_test=X_test,
+            run_dir=nested_dir,
+        )
+
+        assert nested_dir.exists()
+
+    def test_optional_params_default_none(self, config, make_fold_data, tmp_path):
+        """#028 — meta_train, meta_val, ohlcv default to None when omitted."""
+        X_train, y_train, X_val, y_val, X_test = make_fold_data()
+        model = DummyModel(seed=7)
+        trainer = FoldTrainer(config=config)
+
+        with patch.object(model, "fit", wraps=model.fit) as mock_fit:
+            trainer.train_fold(
+                model=model,
+                X_train=X_train,
+                y_train=y_train,
+                X_val=X_val,
+                y_val=y_val,
+                X_test=X_test,
+                run_dir=tmp_path,
+            )
+
+            _, kwargs = mock_fit.call_args
+            assert kwargs["meta_train"] is None
+            assert kwargs["meta_val"] is None
+            assert kwargs["ohlcv"] is None
