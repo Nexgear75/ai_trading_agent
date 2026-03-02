@@ -78,4 +78,4 @@ Implémenter la classe abstraite `BaseModel(ABC)` dans `ai_trading/models/base.p
 - [x] `ruff check ai_trading/ tests/` passe sans erreur.
 - [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
 - [x] **Commit GREEN** : `[WS-6] #024 GREEN: BaseModel ABC et MODEL_REGISTRY`.
-- [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-6] #024 — Interface abstraite BaseModel et registre MODEL_REGISTRY`.
+- [x] **Pull Request ouverte** vers `Max6000i1` : `[WS-6] #024 — Interface abstraite BaseModel et registre MODEL_REGISTRY` (PR #37).

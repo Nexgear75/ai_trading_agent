@@ -107,11 +107,12 @@ def get_model_class(name: str) -> type[BaseModel]:
         If *name* is not found in ``MODEL_REGISTRY``.
     """
     if name not in MODEL_REGISTRY:
-        available = ", ".join(sorted(MODEL_REGISTRY)) or "(none)"
-        raise ValueError(
-            f"Model '{name}' is not registered in MODEL_REGISTRY. "
-            f"Available: {available}."
-        )
+        if MODEL_REGISTRY:
+            available = ", ".join(sorted(MODEL_REGISTRY))
+            msg = f"Model '{name}' is not registered in MODEL_REGISTRY. Available: {available}."
+        else:
+            msg = f"Model '{name}' is not registered in MODEL_REGISTRY (registry is empty)."
+        raise ValueError(msg)
     return MODEL_REGISTRY[name]
 
 
