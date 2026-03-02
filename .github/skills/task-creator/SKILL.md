@@ -13,7 +13,7 @@ Générer des fichiers de tâches clairs, actionnables et traçables à partir d
 
 - **Spécification** : `docs/specifications/Specification_Pipeline_Commun_AI_Trading_v1.0.md` (v1.0 + addendum v1.1 + v1.2)
 - **Plan de réalisation** : `docs/plan/implementation.md` (WS-1..WS-12, M1..M5)
-- **Répertoire des tâches** : `docs/tasks/` (à créer si absent)
+- **Répertoire des tâches** : `docs/tasks/<milestone>/` (ex : `docs/tasks/M1/`, `docs/tasks/M2/`, etc. — à créer si absent)
 - **Configs** : `configs/default.yaml`
 - **Code source** : `ai_trading/`
 - **Tests** : `tests/`
@@ -39,7 +39,7 @@ Tu dois :
    - Respecter les gates intra-milestone et milestone.
 
 3. **Auditer les tâches existantes**
-   - Lister `docs/tasks/`.
+   - Lister `docs/tasks/` et ses sous-répertoires par milestone (`M1/`, `M2/`, …).
    - Identifier : numérotation max, doublons, trous de couverture (spec/plan non adressés), dépendances.
 
 4. **Générer les tâches manquantes**
@@ -104,17 +104,19 @@ Dépendances :
 
 ## Convention de nommage
 
+Répertoire : `docs/tasks/<milestone>/` — un sous-répertoire par milestone (`M1`, `M2`, `M3`, `M4`, `M5`).
+
 Fichiers : `NNN__short_slug.md`
 
-- `NNN` : numéro séquentiel sur 3 chiffres (001, 002, ...)
+- `NNN` : numéro séquentiel sur 3 chiffres (001, 002, ...), **global** à tout le projet (pas par milestone)
 - `__` : séparateur fixe
 - `short_slug` : minuscule, underscores, orienté action
 
 Exemples :
-- `001__ws1_config_loader.md`
-- `002__ws1_config_validation.md`
-- `003__ws2_ingestion_ohlcv.md`
-- `010__ws3_feature_pipeline.md`
+- `docs/tasks/M1/001__ws1_config_loader.md`
+- `docs/tasks/M1/002__ws1_config_validation.md`
+- `docs/tasks/M2/003__ws2_ingestion_ohlcv.md`
+- `docs/tasks/M2/010__ws3_feature_pipeline.md`
 
 ## Principes clés
 
@@ -181,4 +183,4 @@ Sujets typiquement à couvrir en tâches :
 ## Limites
 - Ne pas inventer d'exigences hors documents source.
 - Signaler explicitement toute ambiguïté ou section absente.
-- Si `docs/tasks/` n'existe pas, le créer avant génération des tâches.
+- Si `docs/tasks/<milestone>/` n'existe pas, le créer avant génération des tâches.

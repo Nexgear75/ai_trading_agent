@@ -26,6 +26,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 logger = logging.getLogger(__name__)
 
 VALID_STRATEGIES: dict[str, str] = {
+    "dummy": "model",
     "xgboost_reg": "model",
     "cnn1d_reg": "model",
     "gru_reg": "model",

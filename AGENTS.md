@@ -87,6 +87,7 @@ Les skills `.github/skills/*/SKILL.md` fournissent des workflows spécialisés i
 | `gate-validator` | « valide le gate M2 » | Audit Go/No-Go des gates M1–M5, G-* |
 | `global-review` | « revue globale », « audit du code », « revue de la branche » | Revue complète de branche : cohérence inter-modules, conformité spec, qualité |
 | `test-adherence` | « vérifie l'adhérence des tests », « tests vs spec », « matrice couverture » | Audit croisé tests ↔ spec ↔ tâches : formules, critères, anti-patterns |
+| `plan-coherence` | « revue du plan », « cohérence du plan », « audit plan » | Revue de cohérence intrinsèque du plan d'implémentation + correction séquentielle |
 | `markdown-redaction` | « rédige un document Markdown » | Conventions GFM, mode Corporate FR, templates |
 
 ## Instructions automatiques
