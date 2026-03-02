@@ -78,8 +78,14 @@ def _make_ohlcv(close_prices: np.ndarray, freq: str = "1h") -> pd.DataFrame:
 
 
 def _make_meta(ohlcv: pd.DataFrame, sample_indices: np.ndarray) -> dict:
-    """Build meta dict with decision_time aligned to the given sample indices."""
-    return {"decision_time": ohlcv.index[sample_indices]}
+    """Build meta dict with decision_time as close_time (open_time + interval).
+
+    Matches the real pipeline semantics from ``build_meta``:
+    ``decision_time = open_time + interval`` (= close_time of the candle).
+    """
+    interval = ohlcv.index[1] - ohlcv.index[0]
+    open_times = ohlcv.index[sample_indices]
+    return {"decision_time": open_times + interval}
 
 
 def _make_config(fast: int = 20, slow: int = 50):
@@ -522,7 +528,7 @@ class TestSmaRuleEdgeCases:
         sample_idx = np.arange(10, 30)
         x_dummy = _RNG.standard_normal((len(sample_idx), _L, _F)).astype(np.float32)
         meta = _make_meta(ohlcv, sample_idx)
-        with pytest.raises((ValueError, AttributeError, RuntimeError)):
+        with pytest.raises(ValueError):
             model.predict(x_dummy, meta=meta, ohlcv=ohlcv)
 
     def test_single_sample(self, tmp_path):

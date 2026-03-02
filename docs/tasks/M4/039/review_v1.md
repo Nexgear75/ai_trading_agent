@@ -86,7 +86,7 @@ L'implémentation de `SmaRuleBaseline` est correcte, conforme à la spec §13.3 
 - **L108-113** : Validations explicites : RuntimeError si pas appelé après fit, ValueError si ohlcv/meta is None. ✅
 - **L116-118** : SMA calculée via `pd.Series.rolling(window).mean()` — backward-looking par construction, conforme §13.3. ✅
 - **L120** : `raw_signal[nan_mask] = 0.0` — assignation par masque booléen sur Series pandas, pas de collision dict. Faux positif grep. ✅
-- **L124** : `aligned = raw_signal.loc[decision_times].values.astype(np.float32)` — `.loc` correct pour indexation par timestamps. Si un timestamp n'est pas dans l'index, `KeyError` sera levé — c'est le comportement strict attendu (pas de fallback silencieux). ✅
+- **L124** : `aligned = raw_signal.loc[decision_times].values.astype(np.float32)` — `.loc` indexation par timestamps. **ATTENTION** : `decision_time` est close_time (`open_time + interval`, cf. `build_meta` L314 de `dataset.py`), mais `raw_signal` est indexé par `ohlcv.index` (open_time). Un mapping `open_times = decision_times - interval` est nécessaire pour aligner correctement. Sans ce mapping, `KeyError` avec des meta réels du pipeline.
 
 **RAS après lecture complète du diff (126 lignes source).**
 
