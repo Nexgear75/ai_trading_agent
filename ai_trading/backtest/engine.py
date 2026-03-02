@@ -64,6 +64,8 @@ def _validate_inputs(
             f"execution_mode must be one of {sorted(_VALID_EXECUTION_MODES)}, "
             f"got '{execution_mode}'"
         )
+    if len(ohlcv) == 0:
+        raise ValueError("ohlcv must not be empty")
     if horizon < 1:
         raise ValueError(f"horizon must be >= 1, got {horizon}")
     for col in ("open", "close"):
@@ -103,7 +105,7 @@ def _execute_standard(
     exit_idx = -1
 
     for t in range(n):
-        if position_open and t > exit_idx:
+        if position_open and t >= exit_idx:
             position_open = False
 
         if signals[t] == 1 and not position_open:

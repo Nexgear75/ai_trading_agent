@@ -130,13 +130,13 @@ class TestOneAtATime:
         trades = execute_trades(signals, ohlcv_20, HORIZON, "standard")
         assert len(trades) == 1
 
-    def test_go_at_exact_exit_bar_is_ignored(self, ohlcv_20: pd.DataFrame) -> None:
-        """Go at t=H (the exit bar of first trade) is still during active → ignored."""
+    def test_go_at_exact_exit_bar_is_accepted(self, ohlcv_20: pd.DataFrame) -> None:
+        """Go at t=H (the exit bar of first trade): position freed at t>=exit → accepted."""
         signals = np.zeros(len(ohlcv_20), dtype=np.int64)
         signals[0] = 1  # trade from bar 1 to bar 4
-        signals[HORIZON] = 1  # t=4 = exit bar → still active
+        signals[HORIZON] = 1  # t=4 = exit bar → position freed → new trade
         trades = execute_trades(signals, ohlcv_20, HORIZON, "standard")
-        assert len(trades) == 1
+        assert len(trades) == 2
 
     def test_go_after_exit_bar_is_accepted(self, ohlcv_20: pd.DataFrame) -> None:
         """Go at t=H+1 (after trade exit) should start a new trade."""
@@ -285,3 +285,9 @@ class TestInputValidation:
         signals = np.zeros(len(ohlcv_20), dtype=np.int64)
         with pytest.raises(ValueError, match="horizon"):
             execute_trades(signals, ohlcv_20, -1, "standard")
+
+    def test_empty_ohlcv_raises(self) -> None:
+        ohlcv = pd.DataFrame({"open": [], "close": []}, index=pd.DatetimeIndex([]))
+        signals = np.array([], dtype=np.int64)
+        with pytest.raises(ValueError, match="ohlcv must not be empty"):
+            execute_trades(signals, ohlcv, HORIZON, "standard")
