@@ -17,8 +17,6 @@ import pandas as pd
 
 from ai_trading.features.registry import BaseFeature, register_feature
 
-_FEATURE_NAME = "ema_ratio_12_26"
-
 
 def _compute_ema(close: np.ndarray, span: int) -> np.ndarray:
     """Compute EMA with SMA initialisation.
@@ -54,7 +52,7 @@ def _compute_ema(close: np.ndarray, span: int) -> np.ndarray:
     return result
 
 
-@register_feature(_FEATURE_NAME)
+@register_feature("ema_ratio_12_26")
 class EmaRatio1226(BaseFeature):
     """EMA ratio feature: EMA_fast / EMA_slow - 1 (spec §6.4).
 
@@ -123,4 +121,4 @@ class EmaRatio1226(BaseFeature):
         for i in range(slow - 1, length):
             result[i] = ema_fast_arr[i] / ema_slow_arr[i] - 1.0
 
-        return pd.Series(result, index=ohlcv.index, name=_FEATURE_NAME)
+        return pd.Series(result, index=ohlcv.index, name="ema_ratio_12_26")
