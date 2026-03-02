@@ -11,10 +11,10 @@ Orchestrer l'implémentation de tâches décrites dans `docs/tasks/<milestone>/N
 - **Partie A** : Agent `TDD-Implementer` (TDD strict RED→GREEN).
 - **Partie B** : Agent `TDD-Reviewer` (revue de branche + rapport).
 - **Partie C** (conditionnel) : Agent `TDD-Fixer` (corrections si la revue relève des items).
-- **Partie Post-PR** : Agent `PR-Review-Fixer` (attend la review GitHub automatique, corrige les commentaires).
+- **Partie Post-PR** : Agent `PR-Review-Fixer` (attend la review GitHub automatique, corrige les commentaires, push unique).
 
 Les parties B+C sont itérées jusqu'à 5 fois maximum, ou jusqu'à obtention d'un verdict CLEAN.
-La partie Post-PR est itérée jusqu'à 3 fois maximum après la création de la PR.
+La partie Post-PR est exécutée une seule fois (pas de re-review GitHub après push sur PR existante).
 
 ## Agents workers
 
@@ -170,13 +170,11 @@ git push -u origin task/NNN-short-slug
 4. **Cocher l'item PR dans la checklist** :
 Mettre à jour le fichier de tâche. Commiter et pousser l'update.
 
-5. **Initialiser le compteur Post-PR** : `pr_review_iteration = 0`.
-
 ---
 
 ## Partie Post-PR — Review GitHub automatique (orchestrateur + agent PR-Review-Fixer)
 
-Après la création de la PR, GitHub déclenche une review automatique (Copilot PR reviewer). L'orchestrateur attend cette review, puis délègue les corrections éventuelles.
+Après la création de la PR, GitHub déclenche une review automatique (Copilot PR reviewer). L'orchestrateur attend cette review, corrige les commentaires, pousse les corrections, et termine. **Pas de re-polling** : la review GitHub n'est pas ré-exécutée automatiquement après un push sur une PR existante.
 
 ### Étape 1 — Polling de la review (orchestrateur)
 
@@ -197,11 +195,9 @@ Une fois les commentaires récupérés :
    - **BLOQUANT** : le commentaire signale un bug, une régression potentielle, une violation de convention, ou une faille.
    - **MINEUR** : le commentaire concerne le style, la documentation, ou une suggestion d'amélioration.
    - **IGNORÉ** : le commentaire est un faux positif, non pertinent, ou contredit les conventions du repo (ex : le reviewer suggère un pattern interdit par AGENTS.md). Documenter la raison.
-3. **Si 0 items actionnables** (tout IGNORÉ ou aucun commentaire) : **FIN**. Informer l'utilisateur que la review GitHub est clean.
+3. **Si 0 items actionnables** (tout IGNORÉ ou aucun commentaire) : passer directement à l'Étape 5 (merge).
 
 ### Étape 3 — Corrections (agent PR-Review-Fixer)
-
-Incrémenter : `pr_review_iteration += 1`.
 
 Formuler un rapport structuré à partir des commentaires extraits et lancer l'agent `PR-Review-Fixer` :
 
@@ -229,13 +225,23 @@ L'agent retourne :
 - Le résultat de `ruff check ai_trading/ tests/`.
 - Confirmation des commits PR-FIX effectués.
 
-### Étape 4 — Push et re-polling (orchestrateur)
+### Étape 4 — Push (orchestrateur)
 
 Après les corrections :
 
 1. **Push** : `git push` (la branche est déjà trackée).
-2. **Si `pr_review_iteration < 3`** : reboucler sur l'Étape 1 (la nouvelle review GitHub se déclenche automatiquement sur le push).
-3. **Si `pr_review_iteration >= 3`** : **stopper les itérations**. Informer l'utilisateur que 3 itérations de correction post-PR ont été effectuées. Lister les items restants.
+2. Passer à l'Étape 5.
+
+### Étape 5 — Merge automatique (orchestrateur)
+
+Vérifier l'état de mergeabilité de la PR via `gh pr view --json mergeable` :
+
+- **Si `mergeable == "MERGEABLE"`** (pas de conflits avec la branche de base) : exécuter le merge :
+  ```bash
+  gh pr merge --squash --delete-branch
+  ```
+  Confirmer le merge à l'utilisateur. **FIN**.
+- **Si conflits ou statut non-mergeable** : informer l'utilisateur que le merge automatique n'est pas possible (conflits détectés). Laisser l'utilisateur résoudre manuellement. **FIN**.
 
 ---
 
@@ -284,18 +290,21 @@ Partie A : Agent TDD-Implementer (RED → GREEN)
 │               │           │
 │               ▼           ▼
 │       Partie C          Partie Post-PR
-│       TDD-Fixer       ┌─► Poll review GitHub (timeout 10min)
-│               │       │       │
-└───────────────┘       │   0 items → FIN
-  (reboucle B, N+1)     │       │
-                        │   items → Agent PR-Review-Fixer
-                        │       │
-                        │   push → re-poll (M+1)
-                        │       │
-                        └───────┘ (max 3 itérations)
+│       TDD-Fixer          Poll review GitHub (timeout 10min)
+│               │               │
+└───────────────┘           0 items ──┐
+  (reboucle B, N+1)             │     │
+                            items → Agent PR-Review-Fixer
+                                │     │
+                            push ─────┤
+                                      │
+                                      ▼
+                              Merge si MERGEABLE
+                                      │
+                                      ▼
+                                     FIN
 
 Si N >= 5 et toujours REQUEST CHANGES → STOP.
-Si M >= 3 et toujours des commentaires → STOP.
 ```
 
 ## Conventions Python / AI Trading

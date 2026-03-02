@@ -80,7 +80,7 @@ Les skills `.github/skills/*/SKILL.md` fournissent des workflows spécialisés i
 
 | Skill | Déclencheur | Description |
 |---|---|---|
-| `implementing-task` | « implémente la tâche #NNN » | Orchestre 4 agents workers : TDD-Implementer (RED→GREEN), TDD-Reviewer (revue), TDD-Fixer (corrections), PR-Review-Fixer (corrections post-review GitHub). Boucle B+C jusqu'à 5× max, puis Post-PR jusqu'à 3×. |
+| `implementing-task` | « implémente la tâche #NNN » | Orchestre 4 agents workers : TDD-Implementer (RED→GREEN), TDD-Reviewer (revue), TDD-Fixer (corrections), PR-Review-Fixer (corrections post-review GitHub). Boucle B+C jusqu'à 5× max, puis Post-PR en passe unique. |
 | `implementing-request-change` | « implémente les request changes 0001 », « corrige les bloquants » | Corrections issues d'un rapport request_changes, par sévérité |
 | `pr-reviewer` | « review la PR », « vérifie avant merge » | Revue systématique de PR |
 | `task-creator` | « crée les tâches pour WS-X » | Génération de tâches structurées depuis spec/plan |
