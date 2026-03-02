@@ -11,6 +11,7 @@ from numpy.typing import NDArray
 
 from ai_trading.backtest.costs import apply_cost_model
 from ai_trading.backtest.engine import build_equity_curve, execute_trades
+from ai_trading.models.base import VALID_OUTPUT_TYPES
 
 logger = logging.getLogger(__name__)
 
@@ -125,6 +126,7 @@ def compute_max_drawdown(equity: NDArray[np.floating]) -> float:
     return float(np.max(drawdowns))
 
 
+
 def calibrate_threshold(
     y_hat_val: NDArray[np.floating],
     ohlcv_val: pd.DataFrame,
@@ -137,12 +139,16 @@ def calibrate_threshold(
     objective: str,
     mdd_cap: float,
     min_trades: int,
+    output_type: str,
 ) -> dict:
     """Calibrate threshold θ on validation data (§11.3).
 
     For each quantile in q_grid, compute θ, generate signals, run backtest,
     compute metrics, filter by constraints, and select the θ that maximizes
     net P&L. Tiebreaker: prefer highest quantile (most conservative).
+
+    When ``output_type="signal"``, the model already produces binary Go/No-Go
+    signals — calibration is bypassed entirely (§11.4, §11.5).
 
     Parameters
     ----------
@@ -157,11 +163,34 @@ def calibrate_threshold(
     objective : Optimization objective name.
     mdd_cap : Maximum allowed drawdown.
     min_trades : Minimum number of trades required.
+    output_type : Model output type — ``"regression"`` runs full
+        calibration, ``"signal"`` bypasses calibration entirely.
 
     Returns
     -------
     dict with keys: theta, quantile, method, net_pnl, mdd, n_trades, details.
+        For ``output_type="signal"``: method="none", theta=None, quantile=None,
+        details=None.
     """
+    # --- Validate output_type ---
+    if output_type not in VALID_OUTPUT_TYPES:
+        raise ValueError(
+            f"output_type must be one of {sorted(VALID_OUTPUT_TYPES)}, "
+            f"got '{output_type}'"
+        )
+
+    # --- Bypass for signal models (§11.4, §11.5) ---
+    if output_type == "signal":
+        return {
+            "theta": None,
+            "quantile": None,
+            "method": "none",
+            "net_pnl": None,
+            "mdd": None,
+            "n_trades": None,
+            "details": None,
+        }
+
     # --- Input validation ---
     if y_hat_val.ndim != 1:
         raise ValueError(

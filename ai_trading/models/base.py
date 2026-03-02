@@ -48,7 +48,7 @@ import numpy as np
 # Empty at import time; populated when model modules are imported.
 MODEL_REGISTRY: dict[str, type[BaseModel]] = {}
 
-_VALID_OUTPUT_TYPES = frozenset({"regression", "signal"})
+VALID_OUTPUT_TYPES = frozenset({"regression", "signal"})
 _VALID_EXECUTION_MODES = frozenset({"standard", "single_trade"})
 
 
@@ -159,9 +159,9 @@ class BaseModel(ABC):
                 f"{cls.__name__}: output_type must be a string, "
                 f"got {type(ot).__name__}."
             )
-        if ot not in _VALID_OUTPUT_TYPES:
+        if ot not in VALID_OUTPUT_TYPES:
             raise ValueError(
-                f"{cls.__name__}: output_type must be one of {sorted(_VALID_OUTPUT_TYPES)}, "
+                f"{cls.__name__}: output_type must be one of {sorted(VALID_OUTPUT_TYPES)}, "
                 f"got '{ot}'."
             )
 

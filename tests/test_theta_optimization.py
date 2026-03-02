@@ -21,32 +21,13 @@ from ai_trading.calibration.threshold import (
     compute_max_drawdown,
 )
 from ai_trading.config import load_config
+from tests.conftest import make_calibration_ohlcv
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
 HORIZON = 4
-
-
-def _make_ohlcv(n: int, start: str = "2024-01-01") -> pd.DataFrame:
-    """Synthetic OHLCV with deterministic prices."""
-    idx = pd.date_range(start, periods=n, freq="1h")
-    rng = np.random.default_rng(42)
-    close = 100.0 + np.cumsum(rng.standard_normal(n) * 0.5)
-    close = np.abs(close) + 50.0  # ensure positive
-    opens = close + rng.standard_normal(n) * 0.1
-    opens = np.abs(opens) + 50.0
-    return pd.DataFrame(
-        {
-            "open": opens,
-            "high": np.maximum(opens, close) + 0.5,
-            "low": np.minimum(opens, close) - 0.5,
-            "close": close,
-            "volume": rng.uniform(100, 1000, n),
-        },
-        index=idx,
-    )
 
 
 def _make_y_hat_val(n: int, seed: int = 123) -> np.ndarray:
@@ -119,7 +100,7 @@ class TestCalibrateThresholdSingleFeasible:
         """Construct scenario where only one quantile produces
         trades that pass mdd_cap and min_trades constraints."""
         n = 200
-        ohlcv = _make_ohlcv(n)
+        ohlcv = make_calibration_ohlcv(n)
         # Predictions linearly spaced — lower quantiles produce more signals
         y_hat_val = np.linspace(0.0, 1.0, n)
 
@@ -139,6 +120,7 @@ class TestCalibrateThresholdSingleFeasible:
             objective="max_net_pnl_with_mdd_cap",
             mdd_cap=1.0,  # very permissive
             min_trades=1,
+            output_type="regression",
         )
 
         # Result must be a dict with expected keys
@@ -167,7 +149,7 @@ class TestCalibrateThresholdBestPnl:
     def test_best_pnl_selected(self) -> None:
         """With permissive constraints, best net_pnl candidate is selected."""
         n = 200
-        ohlcv = _make_ohlcv(n)
+        ohlcv = make_calibration_ohlcv(n)
         y_hat_val = _make_y_hat_val(n)
 
         q_grid = [0.3, 0.5, 0.7, 0.9]
@@ -184,6 +166,7 @@ class TestCalibrateThresholdBestPnl:
             objective="max_net_pnl_with_mdd_cap",
             mdd_cap=1.0,  # very permissive
             min_trades=0,
+            output_type="regression",
         )
 
         # Among feasible candidates, the selected one must have the best net_pnl
@@ -237,6 +220,7 @@ class TestCalibrateThresholdTiebreaker:
             objective="max_net_pnl_with_mdd_cap",
             mdd_cap=1.0,
             min_trades=0,
+            output_type="regression",
         )
 
         # All θ identical → all net_pnl identical → tiebreaker = highest quantile
@@ -254,7 +238,7 @@ class TestCalibrateThresholdNoFeasible:
     def test_no_feasible_theta_triggers_fallback(self) -> None:
         """min_trades impossibly high + tight mdd_cap → fallback applies."""
         n = 50
-        ohlcv = _make_ohlcv(n)
+        ohlcv = make_calibration_ohlcv(n)
         y_hat_val = _make_y_hat_val(n)
 
         result = calibrate_threshold(
@@ -269,6 +253,7 @@ class TestCalibrateThresholdNoFeasible:
             objective="max_net_pnl_with_mdd_cap",
             mdd_cap=0.01,  # very tight
             min_trades=10000,  # impossible
+            output_type="regression",
         )
 
         # Fallback applies: either relaxed or θ = +∞
@@ -293,7 +278,7 @@ class TestCalibrateThresholdEquityReset:
         """Candidate metrics are identical whether evaluated alone or
         alongside other candidates (no cross-contamination)."""
         n = 200
-        ohlcv = _make_ohlcv(n)
+        ohlcv = make_calibration_ohlcv(n)
         y_hat_val = _make_y_hat_val(n)
 
         q_grid = [0.3, 0.5, 0.7]
@@ -308,6 +293,7 @@ class TestCalibrateThresholdEquityReset:
             objective="max_net_pnl_with_mdd_cap",
             mdd_cap=1.0,
             min_trades=0,
+                output_type="regression",
         )
 
         # Run with all candidates together
@@ -337,7 +323,7 @@ class TestCalibrateThresholdAntiLeak:
     def test_theta_invariant_to_test_data(self) -> None:
         """calibrate_threshold does not accept or use test data."""
         n = 200
-        ohlcv = _make_ohlcv(n)
+        ohlcv = make_calibration_ohlcv(n)
         y_hat_val = _make_y_hat_val(n)
         q_grid = [0.5, 0.7, 0.9]
 
@@ -353,6 +339,7 @@ class TestCalibrateThresholdAntiLeak:
             objective="max_net_pnl_with_mdd_cap",
             mdd_cap=1.0,
             min_trades=0,
+            output_type="regression",
         )
         result2 = calibrate_threshold(
             y_hat_val=y_hat_val,
@@ -366,6 +353,7 @@ class TestCalibrateThresholdAntiLeak:
             objective="max_net_pnl_with_mdd_cap",
             mdd_cap=1.0,
             min_trades=0,
+            output_type="regression",
         )
 
         assert result1["theta"] == result2["theta"]
@@ -400,7 +388,7 @@ class TestCalibrateThresholdConstraints:
     def test_mdd_constraint_filters(self) -> None:
         """θ with MDD > mdd_cap must not be selected."""
         n = 200
-        ohlcv = _make_ohlcv(n)
+        ohlcv = make_calibration_ohlcv(n)
         y_hat_val = _make_y_hat_val(n)
 
         result = calibrate_threshold(
@@ -415,6 +403,7 @@ class TestCalibrateThresholdConstraints:
             objective="max_net_pnl_with_mdd_cap",
             mdd_cap=1.0,
             min_trades=0,
+            output_type="regression",
         )
 
         if result["theta"] is not None:
@@ -423,7 +412,7 @@ class TestCalibrateThresholdConstraints:
     def test_min_trades_constraint_filters(self) -> None:
         """θ with n_trades < min_trades must not be selected."""
         n = 200
-        ohlcv = _make_ohlcv(n)
+        ohlcv = make_calibration_ohlcv(n)
         y_hat_val = _make_y_hat_val(n)
 
         result = calibrate_threshold(
@@ -438,6 +427,7 @@ class TestCalibrateThresholdConstraints:
             objective="max_net_pnl_with_mdd_cap",
             mdd_cap=1.0,
             min_trades=1,
+            output_type="regression",
         )
 
         if result["theta"] is not None:
@@ -454,7 +444,7 @@ class TestCalibrateThresholdErrors:
 
     def test_empty_y_hat_val_raises(self) -> None:
         """Empty y_hat_val raises ValueError."""
-        ohlcv = _make_ohlcv(10)
+        ohlcv = make_calibration_ohlcv(10)
         with pytest.raises(ValueError, match="y_hat_val"):
             calibrate_threshold(
                 y_hat_val=np.array([], dtype=np.float64),
@@ -468,11 +458,12 @@ class TestCalibrateThresholdErrors:
                 objective="max_net_pnl_with_mdd_cap",
                 mdd_cap=0.25,
                 min_trades=1,
+            output_type="regression",
             )
 
     def test_length_mismatch_raises(self) -> None:
         """y_hat_val length != ohlcv length raises ValueError."""
-        ohlcv = _make_ohlcv(50)
+        ohlcv = make_calibration_ohlcv(50)
         y_hat = np.ones(30, dtype=np.float64)  # mismatch
         with pytest.raises(ValueError, match="length"):
             calibrate_threshold(
@@ -487,12 +478,13 @@ class TestCalibrateThresholdErrors:
                 objective="max_net_pnl_with_mdd_cap",
                 mdd_cap=0.25,
                 min_trades=1,
+            output_type="regression",
             )
 
     def test_empty_q_grid_raises(self) -> None:
         """Empty q_grid raises ValueError."""
         n = 50
-        ohlcv = _make_ohlcv(n)
+        ohlcv = make_calibration_ohlcv(n)
         y_hat = _make_y_hat_val(n)
         with pytest.raises(ValueError, match="q_grid"):
             calibrate_threshold(
@@ -507,12 +499,13 @@ class TestCalibrateThresholdErrors:
                 objective="max_net_pnl_with_mdd_cap",
                 mdd_cap=0.25,
                 min_trades=1,
+            output_type="regression",
             )
 
     def test_invalid_objective_raises(self) -> None:
         """Unknown objective raises ValueError."""
         n = 50
-        ohlcv = _make_ohlcv(n)
+        ohlcv = make_calibration_ohlcv(n)
         y_hat = _make_y_hat_val(n)
         with pytest.raises(ValueError, match="objective"):
             calibrate_threshold(
@@ -527,11 +520,12 @@ class TestCalibrateThresholdErrors:
                 objective="unknown_objective",
                 mdd_cap=0.25,
                 min_trades=1,
+            output_type="regression",
             )
 
     def test_2d_y_hat_val_raises(self) -> None:
         """2D y_hat_val raises ValueError."""
-        ohlcv = _make_ohlcv(10)
+        ohlcv = make_calibration_ohlcv(10)
         with pytest.raises(ValueError, match="1D"):
             calibrate_threshold(
                 y_hat_val=np.ones((5, 2), dtype=np.float64),
@@ -545,6 +539,7 @@ class TestCalibrateThresholdErrors:
                 objective="max_net_pnl_with_mdd_cap",
                 mdd_cap=0.25,
                 min_trades=1,
+            output_type="regression",
             )
 
 
@@ -559,7 +554,7 @@ class TestCalibrateThresholdDetails:
     def test_details_keys(self) -> None:
         """Each detail entry has quantile, theta, net_pnl, mdd, n_trades, feasible."""
         n = 100
-        ohlcv = _make_ohlcv(n)
+        ohlcv = make_calibration_ohlcv(n)
         y_hat_val = _make_y_hat_val(n)
         q_grid = [0.3, 0.7]
 
@@ -575,6 +570,7 @@ class TestCalibrateThresholdDetails:
             objective="max_net_pnl_with_mdd_cap",
             mdd_cap=1.0,
             min_trades=0,
+            output_type="regression",
         )
 
         for detail in result["details"]:
@@ -588,7 +584,7 @@ class TestCalibrateThresholdDetails:
     def test_details_count_matches_q_grid(self) -> None:
         """One detail entry per quantile in q_grid."""
         n = 100
-        ohlcv = _make_ohlcv(n)
+        ohlcv = make_calibration_ohlcv(n)
         y_hat_val = _make_y_hat_val(n)
         q_grid = [0.2, 0.4, 0.6, 0.8]
 
@@ -604,6 +600,7 @@ class TestCalibrateThresholdDetails:
             objective="max_net_pnl_with_mdd_cap",
             mdd_cap=1.0,
             min_trades=0,
+            output_type="regression",
         )
 
         assert len(result["details"]) == len(q_grid)
@@ -620,7 +617,7 @@ class TestCalibrateThresholdZeroTrades:
     def test_very_high_theta_zero_trades(self) -> None:
         """θ higher than all predictions → 0 signals → 0 trades."""
         n = 100
-        ohlcv = _make_ohlcv(n)
+        ohlcv = make_calibration_ohlcv(n)
         # All predictions very low
         y_hat_val = np.full(n, -10.0)
 
@@ -636,6 +633,7 @@ class TestCalibrateThresholdZeroTrades:
             objective="max_net_pnl_with_mdd_cap",
             mdd_cap=1.0,
             min_trades=0,
+            output_type="regression",
         )
 
         # With min_trades=0, the theta is feasible even with 0 trades
@@ -674,7 +672,7 @@ class TestCalibrateThresholdFallbackRelax:
         mdd_cap alone, relax min_trades to 0 and select highest quantile
         with mdd <= mdd_cap."""
         n = 200
-        ohlcv = _make_ohlcv(n)
+        ohlcv = make_calibration_ohlcv(n)
         y_hat_val = _make_y_hat_val(n)
         q_grid = [0.3, 0.5, 0.7, 0.9]
 
@@ -690,6 +688,7 @@ class TestCalibrateThresholdFallbackRelax:
             objective="max_net_pnl_with_mdd_cap",
             mdd_cap=1.0,  # permissive → all θ satisfy mdd_cap
             min_trades=10000,  # impossible → triggers fallback
+            output_type="regression",
         )
 
         # Must select a θ (not None) via fallback relaxation
@@ -703,7 +702,7 @@ class TestCalibrateThresholdFallbackRelax:
     def test_fallback_relax_picks_highest_quantile_among_feasible(self) -> None:
         """Among mdd-feasible candidates only, highest quantile is chosen."""
         n = 200
-        ohlcv = _make_ohlcv(n)
+        ohlcv = make_calibration_ohlcv(n)
         y_hat_val = _make_y_hat_val(n)
         q_grid = [0.1, 0.5, 0.9]
 
@@ -719,6 +718,7 @@ class TestCalibrateThresholdFallbackRelax:
             objective="max_net_pnl_with_mdd_cap",
             mdd_cap=1.0,
             min_trades=10000,  # impossible → fallback
+            output_type="regression",
         )
 
         assert result["quantile"] == 0.9
@@ -726,7 +726,7 @@ class TestCalibrateThresholdFallbackRelax:
     def test_fallback_relax_emits_warning(self, caplog) -> None:
         """Warning emitted when min_trades is relaxed."""
         n = 200
-        ohlcv = _make_ohlcv(n)
+        ohlcv = make_calibration_ohlcv(n)
         y_hat_val = _make_y_hat_val(n)
 
         with caplog.at_level(logging.WARNING, logger="ai_trading.calibration.threshold"):
@@ -742,6 +742,7 @@ class TestCalibrateThresholdFallbackRelax:
                 objective="max_net_pnl_with_mdd_cap",
                 mdd_cap=1.0,
                 min_trades=10000,
+            output_type="regression",
             )
 
         warning_msgs = [r.message for r in caplog.records if r.levelno == logging.WARNING]
@@ -769,6 +770,7 @@ class TestCalibrateThresholdFallbackRelax:
             objective="max_net_pnl_with_mdd_cap",
             mdd_cap=0.50,  # moderate: some pass, some don't
             min_trades=10000,  # impossible → triggers fallback
+            output_type="regression",
         )
 
         assert result["method"] == "fallback_relax_min_trades"
@@ -792,7 +794,7 @@ class TestCalibrateThresholdFallbackRelax:
     def test_fallback_relax_details_preserved(self) -> None:
         """Details list still contains all candidate evaluations."""
         n = 200
-        ohlcv = _make_ohlcv(n)
+        ohlcv = make_calibration_ohlcv(n)
         y_hat_val = _make_y_hat_val(n)
         q_grid = [0.3, 0.5, 0.7]
 
@@ -808,6 +810,7 @@ class TestCalibrateThresholdFallbackRelax:
             objective="max_net_pnl_with_mdd_cap",
             mdd_cap=1.0,
             min_trades=10000,
+            output_type="regression",
         )
 
         assert len(result["details"]) == len(q_grid)
@@ -842,6 +845,7 @@ class TestCalibrateThresholdFallbackNoTrade:
             objective="max_net_pnl_with_mdd_cap",
             mdd_cap=0.001,  # impossibly tight for crashing prices
             min_trades=1,
+            output_type="regression",
         )
 
         assert result["theta"] == float("inf")
@@ -870,6 +874,7 @@ class TestCalibrateThresholdFallbackNoTrade:
                 objective="max_net_pnl_with_mdd_cap",
                 mdd_cap=0.001,
                 min_trades=1,
+            output_type="regression",
             )
 
         warning_msgs = [r.message for r in caplog.records if r.levelno == logging.WARNING]
@@ -894,6 +899,7 @@ class TestCalibrateThresholdFallbackNoTrade:
             objective="max_net_pnl_with_mdd_cap",
             mdd_cap=0.001,
             min_trades=1,
+            output_type="regression",
         )
 
         # Fold is present (theta is not None, it's +∞)
@@ -923,6 +929,7 @@ class TestCalibrateThresholdFallbackNoTrade:
             objective="max_net_pnl_with_mdd_cap",
             mdd_cap=0.001,
             min_trades=1,
+            output_type="regression",
         )
 
         assert result["quantile"] is None
@@ -939,7 +946,7 @@ class TestCalibrateThresholdFallbackNoRegression:
     def test_feasible_theta_method_unchanged(self) -> None:
         """When a feasible θ exists, method is 'quantile_grid' (no fallback)."""
         n = 200
-        ohlcv = _make_ohlcv(n)
+        ohlcv = make_calibration_ohlcv(n)
         y_hat_val = _make_y_hat_val(n)
         q_grid = [0.3, 0.5, 0.7, 0.9]
 
@@ -955,6 +962,7 @@ class TestCalibrateThresholdFallbackNoRegression:
             objective="max_net_pnl_with_mdd_cap",
             mdd_cap=1.0,  # permissive
             min_trades=0,
+            output_type="regression",
         )
 
         assert result["method"] == "quantile_grid"
@@ -965,7 +973,7 @@ class TestCalibrateThresholdFallbackNoRegression:
     def test_feasible_no_warning_emitted(self, caplog) -> None:
         """When a feasible θ exists, no fallback warning is emitted."""
         n = 200
-        ohlcv = _make_ohlcv(n)
+        ohlcv = make_calibration_ohlcv(n)
         y_hat_val = _make_y_hat_val(n)
 
         with caplog.at_level(logging.WARNING, logger="ai_trading.calibration.threshold"):
@@ -981,6 +989,7 @@ class TestCalibrateThresholdFallbackNoRegression:
                 objective="max_net_pnl_with_mdd_cap",
                 mdd_cap=1.0,
                 min_trades=0,
+            output_type="regression",
             )
 
         warning_msgs = [r.message for r in caplog.records if r.levelno == logging.WARNING]

@@ -98,6 +98,39 @@ def make_ohlcv_random(
 # ---------------------------------------------------------------------------
 
 
+# ---------------------------------------------------------------------------
+# OHLCV builder — calibration & label tests (M-3, M-4)
+# ---------------------------------------------------------------------------
+
+
+def make_calibration_ohlcv(
+    n: int,
+    seed: int = 42,
+    start: str = "2024-01-01",
+) -> pd.DataFrame:
+    """Synthetic OHLCV with deterministic prices for calibration & label tests.
+
+    Produces distinct open/close values with positive prices.
+    Used by test_theta_optimization, test_theta_bypass, test_label_target.
+    """
+    idx = pd.date_range(start, periods=n, freq="1h")
+    rng = np.random.default_rng(seed)
+    close = 100.0 + np.cumsum(rng.standard_normal(n) * 0.5)
+    close = np.abs(close) + 50.0
+    opens = close + rng.standard_normal(n) * 0.1
+    opens = np.abs(opens) + 50.0
+    return pd.DataFrame(
+        {
+            "open": opens,
+            "high": np.maximum(opens, close) + 0.5,
+            "low": np.minimum(opens, close) - 0.5,
+            "close": close,
+            "volume": rng.uniform(100, 1000, n),
+        },
+        index=idx,
+    )
+
+
 def make_timestamps(
     n: int, freq: str = "1h", start: str = "2024-01-01"
 ) -> pd.Series:

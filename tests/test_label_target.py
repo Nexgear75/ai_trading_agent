@@ -12,32 +12,15 @@ Covers:
 """
 
 import numpy as np
-import pandas as pd
 import pytest
 
 from ai_trading.config import LabelConfig
 from ai_trading.data.labels import compute_labels
+from tests.conftest import make_calibration_ohlcv
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-
-def _make_ohlcv(n: int, seed: int = 42) -> pd.DataFrame:
-    """Create synthetic OHLCV with distinct open/close values."""
-    rng = np.random.default_rng(seed)
-    timestamps = pd.date_range("2024-01-01", periods=n, freq="1h")
-    close = 100.0 + np.cumsum(rng.standard_normal(n) * 0.5)
-    close = np.abs(close) + 10.0  # ensure positive
-    open_ = close + rng.uniform(-1.0, 1.0, n)
-    open_ = np.abs(open_) + 10.0
-    high = np.maximum(open_, close) + rng.uniform(0, 1, n)
-    low = np.minimum(open_, close) - rng.uniform(0, 1, n)
-    volume = rng.uniform(100, 10000, n)
-    return pd.DataFrame(
-        {"open": open_, "high": high, "low": low, "close": close, "volume": volume},
-        index=timestamps,
-    )
 
 
 def _label_config(
@@ -58,7 +41,7 @@ class TestLogReturnTrade:
     def test_values_are_correct(self):
         """#015 — Exact numerical values for log_return_trade."""
         n = 20
-        ohlcv = _make_ohlcv(n)
+        ohlcv = make_calibration_ohlcv(n)
         cfg = _label_config(horizon=4, target_type="log_return_trade")
         candle_mask = np.ones(n, dtype=bool)
 
@@ -77,7 +60,7 @@ class TestLogReturnTrade:
         """#015 — Positions where t+H >= N must be NaN and masked out."""
         n = 10
         h = 4
-        ohlcv = _make_ohlcv(n)
+        ohlcv = make_calibration_ohlcv(n)
         cfg = _label_config(horizon=h)
         candle_mask = np.ones(n, dtype=bool)
 
@@ -96,7 +79,7 @@ class TestLogReturnTrade:
     def test_horizon_1(self):
         """#015 — Edge case H=1: y_t = log(Close[t+1] / Open[t+1])."""
         n = 10
-        ohlcv = _make_ohlcv(n)
+        ohlcv = make_calibration_ohlcv(n)
         cfg = _label_config(horizon=1)
         candle_mask = np.ones(n, dtype=bool)
 
@@ -124,7 +107,7 @@ class TestLogReturnCloseToClose:
     def test_values_are_correct(self):
         """#015 — Exact numerical values for log_return_close_to_close."""
         n = 20
-        ohlcv = _make_ohlcv(n)
+        ohlcv = make_calibration_ohlcv(n)
         cfg = _label_config(horizon=4, target_type="log_return_close_to_close")
         candle_mask = np.ones(n, dtype=bool)
 
@@ -140,7 +123,7 @@ class TestLogReturnCloseToClose:
         """#015 — Positions where t+H >= N must be NaN."""
         n = 10
         h = 4
-        ohlcv = _make_ohlcv(n)
+        ohlcv = make_calibration_ohlcv(n)
         cfg = _label_config(horizon=h, target_type="log_return_close_to_close")
         candle_mask = np.ones(n, dtype=bool)
 
@@ -153,7 +136,7 @@ class TestLogReturnCloseToClose:
     def test_horizon_1(self):
         """#015 — Edge case H=1 close-to-close."""
         n = 10
-        ohlcv = _make_ohlcv(n)
+        ohlcv = make_calibration_ohlcv(n)
         cfg = _label_config(horizon=1, target_type="log_return_close_to_close")
         candle_mask = np.ones(n, dtype=bool)
 
@@ -179,7 +162,7 @@ class TestTargetTypeSwitching:
     def test_different_values_same_data(self):
         """log_return_trade != log_return_close_to_close on same OHLCV."""
         n = 20
-        ohlcv = _make_ohlcv(n)
+        ohlcv = make_calibration_ohlcv(n)
         candle_mask = np.ones(n, dtype=bool)
 
         cfg_trade = _label_config(target_type="log_return_trade")
@@ -208,7 +191,7 @@ class TestGapInvalidation:
         """#015 — Gap at t+1 invalidates label at t for log_return_trade."""
         n = 20
         h = 4
-        ohlcv = _make_ohlcv(n)
+        ohlcv = make_calibration_ohlcv(n)
         cfg = _label_config(horizon=h, target_type="log_return_trade")
         candle_mask = np.ones(n, dtype=bool)
 
@@ -224,7 +207,7 @@ class TestGapInvalidation:
         """#015 — Gap at t+H invalidates label at t."""
         n = 20
         h = 4
-        ohlcv = _make_ohlcv(n)
+        ohlcv = make_calibration_ohlcv(n)
         cfg = _label_config(horizon=h, target_type="log_return_trade")
         candle_mask = np.ones(n, dtype=bool)
 
@@ -240,7 +223,7 @@ class TestGapInvalidation:
         """#015 — Gap anywhere in [t+1, t+H] invalidates the label."""
         n = 20
         h = 4
-        ohlcv = _make_ohlcv(n)
+        ohlcv = make_calibration_ohlcv(n)
         cfg = _label_config(horizon=h, target_type="log_return_trade")
         candle_mask = np.ones(n, dtype=bool)
 
@@ -259,7 +242,7 @@ class TestGapInvalidation:
         (Open[t+1] and Close[t+H] may still be valid)."""
         n = 20
         h = 4
-        ohlcv = _make_ohlcv(n)
+        ohlcv = make_calibration_ohlcv(n)
         cfg = _label_config(horizon=h, target_type="log_return_trade")
         candle_mask = np.ones(n, dtype=bool)
 
@@ -284,7 +267,7 @@ class TestGapInvalidation:
         """#015 — For close_to_close, gap at t invalidates y_t since we need Close[t]."""
         n = 20
         h = 4
-        ohlcv = _make_ohlcv(n)
+        ohlcv = make_calibration_ohlcv(n)
         cfg = _label_config(horizon=h, target_type="log_return_close_to_close")
         candle_mask = np.ones(n, dtype=bool)
 
@@ -298,7 +281,7 @@ class TestGapInvalidation:
     def test_all_gaps_produces_all_false(self):
         """#015 — All positions gaps → all labels invalid."""
         n = 10
-        ohlcv = _make_ohlcv(n)
+        ohlcv = make_calibration_ohlcv(n)
         cfg = _label_config(horizon=4)
         candle_mask = np.zeros(n, dtype=bool)
 
@@ -319,7 +302,7 @@ class TestErrorCases:
     def test_unknown_target_type_raises_valueerror(self):
         """#015 — Unknown target_type raises ValueError."""
         n = 10
-        ohlcv = _make_ohlcv(n)
+        ohlcv = make_calibration_ohlcv(n)
         cfg = _label_config(target_type="unknown_type")
         candle_mask = np.ones(n, dtype=bool)
 
@@ -329,7 +312,7 @@ class TestErrorCases:
     def test_candle_mask_wrong_shape_raises(self):
         """#015 — candle_mask with wrong shape raises ValueError."""
         n = 10
-        ohlcv = _make_ohlcv(n)
+        ohlcv = make_calibration_ohlcv(n)
         cfg = _label_config()
         candle_mask = np.ones(n + 5, dtype=bool)
 
@@ -339,7 +322,7 @@ class TestErrorCases:
     def test_candle_mask_wrong_dtype_raises(self):
         """#015 — candle_mask with non-bool dtype raises ValueError."""
         n = 10
-        ohlcv = _make_ohlcv(n)
+        ohlcv = make_calibration_ohlcv(n)
         cfg = _label_config()
         candle_mask = np.ones(n, dtype=np.int32)
 
@@ -358,7 +341,7 @@ class TestConfigDriven:
     def test_different_horizon_gives_different_results(self):
         """#015 — Changing horizon H changes label values."""
         n = 30
-        ohlcv = _make_ohlcv(n)
+        ohlcv = make_calibration_ohlcv(n)
         candle_mask = np.ones(n, dtype=bool)
 
         y_h2, mask_h2 = compute_labels(
@@ -388,7 +371,7 @@ class TestAntiLeakage:
         n = 30
         h = 4
         t_check = 10
-        ohlcv_orig = _make_ohlcv(n)
+        ohlcv_orig = make_calibration_ohlcv(n)
         cfg = _label_config(horizon=h)
         candle_mask = np.ones(n, dtype=bool)
 
@@ -420,7 +403,7 @@ class TestOutputShape:
     def test_output_shapes(self):
         """y and label_mask have shape (N,)."""
         n = 20
-        ohlcv = _make_ohlcv(n)
+        ohlcv = make_calibration_ohlcv(n)
         cfg = _label_config()
         candle_mask = np.ones(n, dtype=bool)
 
@@ -432,7 +415,7 @@ class TestOutputShape:
     def test_y_dtype_float64(self):
         """y array uses float64 (metric-level precision)."""
         n = 20
-        ohlcv = _make_ohlcv(n)
+        ohlcv = make_calibration_ohlcv(n)
         cfg = _label_config()
         candle_mask = np.ones(n, dtype=bool)
 
@@ -443,7 +426,7 @@ class TestOutputShape:
     def test_label_mask_dtype_bool(self):
         """label_mask is boolean."""
         n = 20
-        ohlcv = _make_ohlcv(n)
+        ohlcv = make_calibration_ohlcv(n)
         cfg = _label_config()
         candle_mask = np.ones(n, dtype=bool)
 
@@ -464,7 +447,7 @@ class TestEdgeCases:
         """#015 — If N < H+1 for trade or N < H+1 for c2c, all labels invalid."""
         n = 3
         h = 4
-        ohlcv = _make_ohlcv(n)
+        ohlcv = make_calibration_ohlcv(n)
         cfg = _label_config(horizon=h)
         candle_mask = np.ones(n, dtype=bool)
 
@@ -477,7 +460,7 @@ class TestEdgeCases:
         """#015 — N = H+2: two valid labels for trade, two for close_to_close."""
         h = 4
         n = h + 2  # Need t+1 and t+H both valid for trade label; min is t=0 → t+H=H → need n>H
-        ohlcv = _make_ohlcv(n)
+        ohlcv = make_calibration_ohlcv(n)
         candle_mask = np.ones(n, dtype=bool)
 
         # For log_return_trade: need t+1 < n AND t+H < n
@@ -501,7 +484,7 @@ class TestEdgeCases:
         """#015 — candle_mask all True: only boundary labels are invalid."""
         n = 20
         h = 4
-        ohlcv = _make_ohlcv(n)
+        ohlcv = make_calibration_ohlcv(n)
         cfg = _label_config(horizon=h)
         candle_mask = np.ones(n, dtype=bool)
 
