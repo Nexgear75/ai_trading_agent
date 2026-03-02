@@ -65,5 +65,5 @@ Intégrée à `calibrate_threshold()` (ou fonction dédiée) :
 - [x] Critères d'acceptation tous satisfaits.
 - [x] `ruff check ai_trading/ tests/` passe sans erreur.
 - [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
-- [ ] **Commit GREEN** : `[WS-7] #032 GREEN: fallback θ aucun quantile valide`.
+- [x] **Commit GREEN** : `[WS-7] #032 GREEN: fallback θ aucun quantile valide`.
 - [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-7] #032 — Fallback θ (aucun quantile valide)`.

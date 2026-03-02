@@ -252,7 +252,7 @@ class TestCalibrateThresholdNoFeasible:
     """#031 — No θ meets both constraints → fallback E.2.2 applies (#032)."""
 
     def test_no_feasible_theta_triggers_fallback(self) -> None:
-        """min_trades impossibly high + tight mdd_cap → fallback θ = +∞."""
+        """min_trades impossibly high + tight mdd_cap → fallback applies."""
         n = 50
         ohlcv = _make_ohlcv(n)
         y_hat_val = _make_y_hat_val(n)
@@ -746,6 +746,48 @@ class TestCalibrateThresholdFallbackRelax:
 
         warning_msgs = [r.message for r in caplog.records if r.levelno == logging.WARNING]
         assert any("min_trades" in msg for msg in warning_msgs)
+
+    def test_fallback_relax_partial_mdd_filtering(self) -> None:
+        """Only some candidates pass mdd <= mdd_cap; highest quantile among
+        those is selected (exercises real step 1 filtering)."""
+        n = 200
+        # Crashing prices: low quantiles → many trades → high MDD,
+        # high quantiles → few/no trades → low MDD.
+        ohlcv = _make_crashing_ohlcv(n)
+        y_hat_val = np.linspace(0, 1, n)
+        q_grid = [0.1, 0.3, 0.5, 0.7, 0.9]
+
+        result = calibrate_threshold(
+            y_hat_val=y_hat_val,
+            ohlcv_val=ohlcv,
+            q_grid=q_grid,
+            horizon=HORIZON,
+            fee_rate_per_side=0.0005,
+            slippage_rate_per_side=0.00025,
+            initial_equity=1.0,
+            position_fraction=1.0,
+            objective="max_net_pnl_with_mdd_cap",
+            mdd_cap=0.50,  # moderate: some pass, some don't
+            min_trades=10000,  # impossible → triggers fallback
+        )
+
+        assert result["method"] == "fallback_relax_min_trades"
+        assert result["theta"] is not None
+        assert result["quantile"] is not None
+        assert result["mdd"] <= 0.50
+        # Verify that at least one candidate was filtered out (MDD > mdd_cap)
+        details = result["details"]
+        mdd_values = [d["mdd"] for d in details]
+        assert any(m > 0.50 for m in mdd_values), (
+            "Expected at least one candidate with mdd > mdd_cap to exercise "
+            "real partial filtering"
+        )
+        # Among mdd-feasible, highest quantile was picked
+        mdd_feasible_qs = [
+            d["quantile"] for d in details if d["mdd"] <= 0.50
+        ]
+        assert len(mdd_feasible_qs) >= 1
+        assert result["quantile"] == max(mdd_feasible_qs)
 
     def test_fallback_relax_details_preserved(self) -> None:
         """Details list still contains all candidate evaluations."""
