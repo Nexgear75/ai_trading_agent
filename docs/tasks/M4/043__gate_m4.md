@@ -1,6 +1,6 @@
 # Tâche — Validation du gate M4
 
-Statut : TODO
+Statut : DONE
 Ordre : 043
 Workstream : WS-10
 Milestone : M4
@@ -38,26 +38,26 @@ Dépendances :
 - Le critère (e) vérifie l'égalité exacte de l'ensemble des clés du registre.
 
 ## Critères d'acceptation
-- [ ] Critère (a) — Déterminisme : delta Sharpe `<= 0.02`, delta MDD `<= 0.5 pp` entre 2 runs identiques.
-- [ ] Critère (b) — Pipeline sans crash pour DummyModel + 3 baselines.
-- [ ] Critère (c) — Cohérence métriques : no_trade (pnl=0, trades=0, mdd=0), buy_hold (trades=1), sma_rule (trades>=0).
-- [ ] Critère (d) — Couverture `>= 95%` sur WS-8.4/WS-9/WS-10.
-- [ ] Critère (e) — `set(MODEL_REGISTRY.keys()) == {"dummy", "no_trade", "buy_hold", "sma_rule"}`.
-- [ ] Tests couvrent les scénarios nominaux + erreurs + bords.
-- [ ] Suite de tests verte après implémentation.
-- [ ] `ruff check` passe sans erreur.
+- [x] Critère (a) — Déterminisme : delta Sharpe `<= 0.02`, delta MDD `<= 0.5 pp` entre 2 runs identiques.
+- [x] Critère (b) — Pipeline sans crash pour DummyModel + 3 baselines.
+- [x] Critère (c) — Cohérence métriques : no_trade (pnl=0, trades=0, mdd=0), buy_hold (trades=1), sma_rule (trades>=0).
+- [x] Critère (d) — Couverture `>= 95%` sur WS-8.4/WS-9/WS-10.
+- [x] Critère (e) — `set(MODEL_REGISTRY.keys()) == {"dummy", "no_trade", "buy_hold", "sma_rule"}`.
+- [x] Tests couvrent les scénarios nominaux + erreurs + bords.
+- [x] Suite de tests verte après implémentation.
+- [x] `ruff check` passe sans erreur.
 
 ## Pré-condition de démarrage
 - **Tous les tests existants sont GREEN** avant de commencer.
 - **Créer une branche dédiée** `task/043-gate-m4` depuis `Max6000i1`.
 
 ## Checklist de fin de tâche
-- [ ] Branche `task/043-gate-m4` créée depuis `Max6000i1`.
-- [ ] Tests RED écrits avant implémentation.
-- [ ] **Commit RED** : `[WS-10] #043 RED: <résumé>` (fichiers de tests uniquement).
-- [ ] Tests GREEN passants et reproductibles.
-- [ ] Critères d'acceptation tous satisfaits.
-- [ ] `ruff check ai_trading/ tests/` passe sans erreur.
-- [ ] Fichier de tâche mis à jour (statut DONE, critères cochés).
-- [ ] **Commit GREEN** : `[WS-10] #043 GREEN: <résumé>`.
+- [x] Branche `task/043-gate-m4` créée depuis `Max6000i1`.
+- [x] Tests RED écrits avant implémentation.
+- [x] **Commit RED** : `[WS-10] #043 RED: <résumé>` (fichiers de tests uniquement).
+- [x] Tests GREEN passants et reproductibles.
+- [x] Critères d'acceptation tous satisfaits.
+- [x] `ruff check ai_trading/ tests/` passe sans erreur.
+- [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
+- [x] **Commit GREEN** : `[WS-10] #043 GREEN: <résumé>`.
 - [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-10] #043 — Validation du gate M4`.
