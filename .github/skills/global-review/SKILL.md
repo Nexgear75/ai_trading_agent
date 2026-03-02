@@ -132,13 +132,104 @@ C'est le cœur de la revue globale. Pour chaque paire de modules qui interagisse
 - [ ] Seeds déterministes.
 - [ ] Données synthétiques uniquement (pas de réseau).
 
-### 6. Conformité avec la spécification
+### 6. Conformité avec la spécification (source de vérité)
 
-- [ ] Formules implémentées vs spec (§5 labels, §6 features, §8 splits, §12 backtest).
-- [ ] Colonnes canoniques (§4.1) respectées.
-- [ ] QA checks (§4.2) conformes.
-- [ ] Missing candles policy (§4.3) conforme.
-- [ ] Invariants de domaine financier vérifiés (prix > 0, volume >= 0, etc.).
+> **Principe** : la spécification (`docs/specifications/Specification_Pipeline_Commun_AI_Trading_v1.0.md`) est la source de vérité absolue. Pour chaque section de la spec, l'agent doit **lire la section**, puis **lire le code correspondant**, puis comparer. Les 5 checkboxes génériques ne suffisent pas — il faut un audit **section par section**.
+
+#### 6a. Workflow obligatoire
+
+1. **Charger la spec** : lire `docs/specifications/Specification_Pipeline_Commun_AI_Trading_v1.0.md`.
+2. **Pour chaque section §4 à §17** (voir grille ci-dessous), identifier le module `ai_trading/` correspondant et comparer l'implémentation à la spec.
+3. **Construire la matrice** spec → code → verdict (voir template rapport §8).
+4. **Signaler** toute divergence, toute section spec non implémentée, toute implémentation sans ancrage spec.
+
+#### 6b. Grille section-par-section
+
+Pour chaque section, **lire la spec puis le code** et vérifier :
+
+| Section spec | Module(s) attendu(s) | Vérifications |
+|---|---|---|
+| **§4.1** Source et format | `data/ingestion.py` | Colonnes canoniques (timestamp, open, high, low, close, volume), types, tz-aware UTC |
+| **§4.2** Contrôles qualité | `data/qa.py` | Chaque QA check listé dans la spec est implémenté (duplicatas, NaN, OHLC cohérence, gaps) |
+| **§4.3** Missing candles | `data/missing.py` | Politique forward-fill conforme, seuil max_missing_ratio |
+| **§5.2** Label par défaut | `data/labels.py` | Formule $y_t = \log(C_{t+H} / O_{t+1})$ exacte, colonnes utilisées, H = horizon config |
+| **§5.3** Label alternatif | `data/labels.py` | Formule $y_t = \log(C_{t+H} / C_t)$ si implémentée |
+| **§6.2** Features MVP | `features/log_returns.py`, `features/volume.py` | Formules logret_k, logvol, dlogvol exactes, k = config |
+| **§6.3** RSI Wilder | `features/rsi.py` | SMA init + lissage récursif Wilder (pas EMA classique), période = config |
+| **§6.4** EMA ratio | `features/ema.py` | Formule $\text{EMA}_{fast} / \text{EMA}_{slow} - 1$, SMA init, périodes = config |
+| **§6.5** Volatilité | `features/volatility.py` | Fenêtres fixes (24, 72 doc §6.5), ddof conforme à la spec |
+| **§6.6** Warm-up | `features/warmup.py` | min_warmup >= max(min_periods), invalidation des samples, erreur si insuffisant |
+| **§7.1** Dataset (N,L,F) | `data/dataset.py` | Shape, dtype float32, sliding window, ordering |
+| **§7.2** Adapter XGBoost | `data/dataset.py` | Flatten (N, L×F), cohérent avec §7.1 |
+| **§7.3** Métadonnées | `data/dataset.py` | meta dict conforme |
+| **§8.1–§8.4** Walk-forward | `data/splitter.py` | n_splits, ratios, embargo_bars >= H, purge, séquentialité train < val < test |
+| **§9.1** Standard scaler | `data/scaler.py` | Formule $(x - \mu) / (\sigma + \varepsilon)$, fit sur train uniquement, inverse_transform |
+| **§9.2** Robust scaler | `data/scaler.py` | Median/IQR, clip conforme |
+| **§10.1–§10.4** Interface modèle | `models/base.py`, `models/dummy.py` | ABC conforme (fit, predict, get_params), conventions I/O, déterminisme |
+| **§11.1–§11.3** Calibration θ | `calibration/threshold.py` | Grille quantiles, objectif max_net_pnl_with_mdd_cap, θ calibré sur val |
+| **§12.1–§12.6** Backtest | `backtest/engine.py`, `backtest/costs.py` | Règles Go/No-Go, coûts, rendement net, equity curve, buy&hold, journal |
+| **§13.1–§13.3** Baselines | `baselines/` | no-trade, buy&hold, SMA rule conformes |
+| **§14.1–§14.3** Métriques | `metrics/` | Prédiction (MSE, MAE, R², IC), trading (Sharpe, MDD, WR, P&L), agrégation inter-fold |
+| **§15.1–§15.4** Artefacts | `artifacts/` | Arborescence run, manifest.json, metrics.json, schemas |
+| **§16.1–§16.3** Reproductibilité | `utils/`, config | Seeds, hashes SHA-256, versionning features |
+
+#### 6c. Formules à vérifier explicitement
+
+Pour chaque formule ci-dessous, **comparer le code source** (pas les tests) avec la spec :
+
+| ID | Section | Formule spec | Fichier code | Quoi vérifier |
+|---|---|---|---|---|
+| F-1 | §5.2 | $y_t = \log(C_{t+H} / O_{t+1})$ | `data/labels.py` | Colonnes `close` shift vs `open` shift, horizon H |
+| F-2 | §6.2 | $\text{logret}_k(t) = \log(C_t / C_{t-k})$ | `features/log_returns.py` | `np.log`, shift direction, paramètre k |
+| F-3 | §6.2 | $\text{logvol}(t) = \log(V_t + \varepsilon)$ | `features/volume.py` | Epsilon, colonne volume |
+| F-4 | §6.2 | $\text{dlogvol}(t) = \text{logvol}(t) - \text{logvol}(t-1)$ | `features/volume.py` | Diff sur logvol, pas sur volume brut |
+| F-5 | §6.3 | RSI Wilder (SMA init + récursif $\alpha = 1/n$) | `features/rsi.py` | SMA init (pas EMA init), lissage récursif, alpha |
+| F-6 | §6.4 | $\text{EMA\_ratio} = \text{EMA}_{fast} / \text{EMA}_{slow} - 1$ | `features/ema.py` | Ratio - 1 (pas ratio seul), SMA init |
+| F-7 | §6.5 | $\text{vol}_w(t) = \text{std}(\text{logret}_1[t-w+1:t], \text{ddof})$ | `features/volatility.py` | Fenêtre, ddof, input = logret_1 |
+| F-8 | §8.2 | $\text{embargo\_bars} \geq H$ | `data/splitter.py` | Purge cutoff, embargo appliqué |
+| F-9 | §9.1 | $x' = (x - \mu) / (\sigma + \varepsilon)$ | `data/scaler.py` | Epsilon, fit train only |
+| F-10 | §9.2 | Robust : $(x - \text{median}) / (\text{IQR} + \varepsilon)$ + clip | `data/scaler.py` | IQR = Q75 - Q25, clip bounds |
+| F-11 | §11.2 | Grille quantiles sur val predictions | `calibration/threshold.py` | Quantiles, support, objectif |
+| F-12 | §12.3 | $r_{net} = \log(C_{t+H}/O_{t+1}) - 2 \times \text{fee} - \text{slippage}$ | `backtest/engine.py`, `backtest/costs.py` | Formule coûts exacte |
+| F-13 | §12.4 | $\text{equity}_{t+1} = \text{equity}_t \times \exp(r_{net})$ si Go | `backtest/engine.py` | Mise à jour equity curve |
+| F-14 | §14.2 | Sharpe = $\mu(r) / \sigma(r) \times \sqrt{N_{ann}}$ | `metrics/` | Annualisation, ddof |
+
+Pour chaque formule, produire un verdict :
+- **✅ Conforme** : code = spec
+- **❌ Divergent** : code ≠ spec (décrire l'écart)
+- **⚠️ Non implémenté** : section spec sans code correspondant
+- **🔍 Ambigu** : spec ambiguë, implémentation raisonnable mais non vérifiable
+
+#### 6d. Détection des implémentations orphelines
+
+Rechercher dans `ai_trading/` tout comportement significatif (formule, algorithme, heuristique) qui **n'a pas d'ancrage dans la spec**. Ce n'est pas forcément un bug, mais ça doit être signalé :
+- [ ] Constantes ou seuils non documentés dans la spec.
+- [ ] Algorithmes alternatifs non prévus par la spec.
+- [ ] Paramètres config sans correspondance dans la spec (sauf implementation-defined explicites).
+
+### 6bis. Conformité avec le plan d'implémentation
+
+> **Principe** : le plan (`docs/plan/implementation.md`) détaille le découpage en WS et tâches. Le code doit refléter ce découpage et les tâches DONE doivent avoir du code correspondant.
+
+#### 6bis-a. Workflow
+
+1. **Charger le plan** : lire `docs/plan/implementation.md`.
+2. **Lister les tâches** : parcourir `docs/tasks/<milestone>/` et identifier les statuts (DONE, IN_PROGRESS, TODO).
+3. **Croiser** chaque tâche DONE avec le code source.
+
+#### 6bis-b. Vérifications
+
+- [ ] **Tâche DONE sans code** : une tâche marquée DONE n'a pas de module/fonction correspondant dans `ai_trading/`.
+- [ ] **Tâche DONE sans test** : une tâche marquée DONE n'a pas de fichier de test correspondant dans `tests/`.
+- [ ] **Code sans tâche** : un module existe dans `ai_trading/` mais ne correspond à aucune tâche du plan.
+- [ ] **Critères d'acceptation non vérifiables** : les `[x]` de la tâche ne correspondent pas à ce que le code fait réellement.
+- [ ] **Ordonnancement respecté** : les dépendances entre WS décrites dans le plan sont reflétées dans les imports du code.
+- [ ] **Modules attendus par le plan** : les noms de modules listés dans le plan (WS-1 → config, WS-2 → ingestion/qa, WS-3 → features, etc.) correspondent aux modules réels.
+- [ ] **Gates** : les critères de gate listés dans le plan pour le milestone en cours sont satisfaits par le code.
+
+#### 6bis-c. Matrice plan → code
+
+Construire une matrice de couverture plan → code (voir template rapport §8).
 
 ### 7. Bonnes pratiques métier
 
@@ -151,6 +242,8 @@ C'est le cœur de la revue globale. Pour chaque paire de modules qui interagisse
 ### 8. Produire le rapport
 
 Écrire le rapport dans `docs/request_changes/NNNN_slug.md` (prochain numéro séquentiel). Utiliser le format ci-dessous.
+
+> **Obligation** : les sections « Conformité formules métier », « Conformité spec section-par-section » et « Conformité plan → code » du rapport **doivent être remplies intégralement**. Un rapport sans ces matrices est incomplet et ne sera pas accepté.
 
 ## Niveaux de sévérité
 
@@ -251,12 +344,68 @@ Ordre : NNNN
 
 ---
 
-## Conformité formules métier
+## Conformité formules métier (§6c)
 
-| Feature/Module | Section spec | Verdict |
-|---|---|---|
-| `logret_k` | §6.2 | ✅ Correct / ❌ Incorrect |
-| ... | ... | ... |
+| ID | Section spec | Formule | Fichier code | Verdict |
+|---|---|---|---|---|
+| F-1 | §5.2 | $y_t = \log(C_{t+H} / O_{t+1})$ | `data/labels.py` | ✅ / ❌ / ⚠️ / 🔍 |
+| F-2 | §6.2 | logret_k | `features/log_returns.py` | ✅ / ❌ / ⚠️ / 🔍 |
+| F-3 | §6.2 | logvol | `features/volume.py` | ✅ / ❌ / ⚠️ / 🔍 |
+| F-4 | §6.2 | dlogvol | `features/volume.py` | ✅ / ❌ / ⚠️ / 🔍 |
+| F-5 | §6.3 | RSI Wilder | `features/rsi.py` | ✅ / ❌ / ⚠️ / 🔍 |
+| F-6 | §6.4 | EMA_ratio | `features/ema.py` | ✅ / ❌ / ⚠️ / 🔍 |
+| F-7 | §6.5 | vol_w rolling | `features/volatility.py` | ✅ / ❌ / ⚠️ / 🔍 |
+| F-8 | §8.2 | embargo >= H | `data/splitter.py` | ✅ / ❌ / ⚠️ / 🔍 |
+| F-9 | §9.1 | standard scaler | `data/scaler.py` | ✅ / ❌ / ⚠️ / 🔍 |
+| F-10 | §9.2 | robust scaler | `data/scaler.py` | ✅ / ❌ / ⚠️ / 🔍 |
+| F-11 | §11.2 | grille quantiles θ | `calibration/threshold.py` | ✅ / ❌ / ⚠️ / 🔍 |
+| F-12 | §12.3 | rendement net trade | `backtest/engine.py` | ✅ / ❌ / ⚠️ / 🔍 |
+| F-13 | §12.4 | equity curve update | `backtest/engine.py` | ✅ / ❌ / ⚠️ / 🔍 |
+| F-14 | §14.2 | Sharpe annualisé | `metrics/` | ✅ / ❌ / ⚠️ / 🔍 |
+
+> Légende : ✅ Conforme — ❌ Divergent (décrire dans BLOQUANTS) — ⚠️ Non encore implémenté — 🔍 Spec ambiguë
+
+**Écarts détaillés** (pour chaque ❌ ou 🔍) :
+- F-N : <description de l'écart, citation spec vs code>
+
+---
+
+## Conformité spec section-par-section (§6b)
+
+| Section spec | Module code | Implémenté | Conforme | Remarques |
+|---|---|---|---|---|
+| §4.1 Source/format | `data/ingestion.py` | ✅/❌ | ✅/❌ | |
+| §4.2 QA checks | `data/qa.py` | ✅/❌ | ✅/❌ | |
+| §4.3 Missing candles | `data/missing.py` | ✅/❌ | ✅/❌ | |
+| §5.2 Label trade | `data/labels.py` | ✅/❌ | ✅/❌ | |
+| §6.2–§6.5 Features | `features/` | ✅/❌ | ✅/❌ | |
+| §6.6 Warm-up | `features/warmup.py` | ✅/❌ | ✅/❌ | |
+| §7.1–§7.3 Dataset | `data/dataset.py` | ✅/❌ | ✅/❌ | |
+| §8.1–§8.4 Splits | `data/splitter.py` | ✅/❌ | ✅/❌ | |
+| §9.1–§9.2 Scaling | `data/scaler.py` | ✅/❌ | ✅/❌ | |
+| §10.1–§10.4 Modèle | `models/` | ✅/❌ | ✅/❌ | |
+| §11.1–§11.3 Calibration | `calibration/` | ✅/❌ | ✅/❌ | |
+| §12.1–§12.6 Backtest | `backtest/` | ✅/❌ | ✅/❌ | |
+| §13.1–§13.3 Baselines | `baselines/` | ✅/❌ | ✅/❌ | |
+| §14.1–§14.3 Métriques | `metrics/` | ✅/❌ | ✅/❌ | |
+| §15.1–§15.4 Artefacts | `artifacts/` | ✅/❌ | ✅/❌ | |
+| §16.1–§16.3 Repro | `utils/` | ✅/❌ | ✅/❌ | |
+
+---
+
+## Conformité plan → code (§6bis)
+
+| WS | Tâches DONE | Module(s) code | Code présent | Tests présents | Remarques |
+|---|---|---|---|---|---|
+| WS-1 | #NNN, ... | `config.py` | ✅/❌ | ✅/❌ | |
+| WS-2 | #NNN, ... | `data/ingestion.py`, `data/qa.py` | ✅/❌ | ✅/❌ | |
+| WS-3 | #NNN, ... | `features/` | ✅/❌ | ✅/❌ | |
+| ... | ... | ... | ... | ... | |
+
+**Anomalies plan ↔ code** :
+- Tâches DONE sans code : <liste>
+- Code sans tâche : <liste>
+- Critères d'acceptation [x] non vérifiables : <liste>
 
 ---
 
@@ -310,6 +459,8 @@ Ordre : NNNN
 | Skill | Relation |
 |---|---|
 | `pr-reviewer` | La revue globale **complète** la revue PR en détectant les problèmes inter-modules invisibles PR par PR. |
+| `test-adherence` | `test-adherence` audite tests ↔ spec en profondeur (formule par formule). La revue globale audite **code** ↔ spec (complémentaire : test-adherence vérifie que les tests valident la spec, global-review vérifie que le code implémente la spec). |
+| `plan-coherence` | `plan-coherence` audite la cohérence **interne** du plan. La revue globale audite la cohérence **plan ↔ code** (le plan dit-il la vérité sur ce qui est implémenté ?). |
 | `gate-validator` | La revue globale est un **prérequis informel** avant le gate. Les constats WARNING+ doivent être résolus avant de passer un gate. |
 | `implementing-task` | Les constats de la revue globale peuvent générer des **tâches correctives** via `task-creator`. |
 | `task-creator` | Les résultats de la revue globale alimentent la création de tâches de correction. |
