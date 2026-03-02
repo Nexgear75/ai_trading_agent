@@ -10,7 +10,6 @@ Validates the 5 criteria of gate M4 (Evaluation Engine):
 
 from __future__ import annotations
 
-import importlib
 from pathlib import Path
 
 import numpy as np
@@ -18,6 +17,7 @@ import pandas as pd
 import pytest
 
 import ai_trading.baselines  # noqa: F401 — side-effect: populate MODEL_REGISTRY
+import ai_trading.models  # noqa: F401 — side-effect: register DummyModel
 from ai_trading.backtest.costs import apply_cost_model
 from ai_trading.backtest.engine import build_equity_curve, execute_trades
 from ai_trading.config import load_config
@@ -51,7 +51,9 @@ SEED = 42
 # ---------------------------------------------------------------------------
 
 
-def _run_pipeline_dummy(ohlcv: pd.DataFrame, seed: int) -> dict:
+def _run_pipeline_dummy(
+    ohlcv: pd.DataFrame, seed: int, config: object, run_dir: Path,
+) -> dict:
     """Run full pipeline with DummyModel and return trading metrics dict."""
     n = len(ohlcv)
 
@@ -59,9 +61,21 @@ def _run_pipeline_dummy(ohlcv: pd.DataFrame, seed: int) -> dict:
     close = ohlcv["close"].to_numpy(dtype=np.float32)
     x_seq = close.reshape(n, 1, 1)
 
-    # Predict
+    # Build dummy train/val arrays for fit()
+    rng = np.random.default_rng(42)
+    x_train = rng.standard_normal((50, 10, 5)).astype(np.float32)
+    y_train = rng.standard_normal(50).astype(np.float32)
+    x_val = rng.standard_normal((20, 10, 5)).astype(np.float32)
+    y_val = rng.standard_normal(20).astype(np.float32)
+
+    # Fit + Predict
     model_cls = MODEL_REGISTRY["dummy"]
     model = model_cls(seed=seed)  # type: ignore[call-arg]
+    model.fit(
+        X_train=x_train, y_train=y_train,
+        X_val=x_val, y_val=y_val,
+        config=config, run_dir=run_dir,
+    )
     y_hat = model.predict(x_seq)
 
     # Threshold: simple binarization at 0
@@ -106,6 +120,7 @@ def _run_pipeline_baseline(
     name: str,
     ohlcv: pd.DataFrame,
     config: object,
+    run_dir: Path,
 ) -> dict:
     """Run full pipeline for a baseline and return trading metrics dict."""
     n = len(ohlcv)
@@ -121,7 +136,7 @@ def _run_pipeline_baseline(
         X_val=x_seq,
         y_val=y_dummy,
         config=config,
-        run_dir=Path("/tmp/gate_m4_unused"),
+        run_dir=run_dir,
         ohlcv=ohlcv,
     )
 
@@ -133,7 +148,7 @@ def _run_pipeline_baseline(
     signals = model.predict(x_seq, meta=meta, ohlcv=ohlcv)
     signals_int = signals.astype(int)
 
-    execution_mode = getattr(model, "execution_mode", "standard")
+    execution_mode = model.execution_mode
     trades = execute_trades(
         signals=signals_int,
         ohlcv=ohlcv,
@@ -182,11 +197,12 @@ def _run_pipeline_baseline(
 class TestGateM4Determinism:
     """#043 — Criterion (a): determinism of 2 identical DummyModel runs."""
 
-    def test_determinism_sharpe_delta(self) -> None:
+    def test_determinism_sharpe_delta(self, tmp_path: Path) -> None:
         """#043 — Two identical DummyModel runs produce delta Sharpe <= 0.02."""
         ohlcv = make_ohlcv_random(N_CANDLES, seed=SEED)
-        m1 = _run_pipeline_dummy(ohlcv, seed=SEED)
-        m2 = _run_pipeline_dummy(ohlcv, seed=SEED)
+        config = load_config(CONFIG_PATH)
+        m1 = _run_pipeline_dummy(ohlcv, seed=SEED, config=config, run_dir=tmp_path)
+        m2 = _run_pipeline_dummy(ohlcv, seed=SEED, config=config, run_dir=tmp_path)
 
         sharpe_1 = m1["sharpe"]
         sharpe_2 = m2["sharpe"]
@@ -195,21 +211,23 @@ class TestGateM4Determinism:
         assert sharpe_2 is not None, "sharpe run 2 is None"
         assert abs(sharpe_1 - sharpe_2) <= 0.02
 
-    def test_determinism_mdd_delta(self) -> None:
+    def test_determinism_mdd_delta(self, tmp_path: Path) -> None:
         """#043 — Two identical DummyModel runs produce delta MDD <= 0.005 (0.5 pp)."""
         ohlcv = make_ohlcv_random(N_CANDLES, seed=SEED)
-        m1 = _run_pipeline_dummy(ohlcv, seed=SEED)
-        m2 = _run_pipeline_dummy(ohlcv, seed=SEED)
+        config = load_config(CONFIG_PATH)
+        m1 = _run_pipeline_dummy(ohlcv, seed=SEED, config=config, run_dir=tmp_path)
+        m2 = _run_pipeline_dummy(ohlcv, seed=SEED, config=config, run_dir=tmp_path)
 
         mdd_1 = m1["max_drawdown"]
         mdd_2 = m2["max_drawdown"]
         assert abs(mdd_1 - mdd_2) <= 0.005
 
-    def test_determinism_exact_equality(self) -> None:
+    def test_determinism_exact_equality(self, tmp_path: Path) -> None:
         """#043 — Identical seed + data should yield exactly equal metrics."""
         ohlcv = make_ohlcv_random(N_CANDLES, seed=SEED)
-        m1 = _run_pipeline_dummy(ohlcv, seed=SEED)
-        m2 = _run_pipeline_dummy(ohlcv, seed=SEED)
+        config = load_config(CONFIG_PATH)
+        m1 = _run_pipeline_dummy(ohlcv, seed=SEED, config=config, run_dir=tmp_path)
+        m2 = _run_pipeline_dummy(ohlcv, seed=SEED, config=config, run_dir=tmp_path)
 
         for key in ("net_pnl", "max_drawdown", "n_trades"):
             assert m1[key] == m2[key], f"Mismatch on {key}: {m1[key]} vs {m2[key]}"
@@ -223,18 +241,19 @@ class TestGateM4Determinism:
 class TestGateM4PipelineNocrash:
     """#043 — Criterion (b): full pipeline runs without error for all models."""
 
-    def test_dummy_model_pipeline_no_crash(self) -> None:
+    def test_dummy_model_pipeline_no_crash(self, tmp_path: Path) -> None:
         """#043 — DummyModel runs full pipeline without exception."""
         ohlcv = make_ohlcv_random(N_CANDLES, seed=SEED)
-        metrics = _run_pipeline_dummy(ohlcv, seed=SEED)
+        config = load_config(CONFIG_PATH)
+        metrics = _run_pipeline_dummy(ohlcv, seed=SEED, config=config, run_dir=tmp_path)
         assert isinstance(metrics, dict)
 
     @pytest.mark.parametrize("name", ["no_trade", "buy_hold", "sma_rule"])
-    def test_baseline_pipeline_no_crash(self, name: str) -> None:
+    def test_baseline_pipeline_no_crash(self, name: str, tmp_path: Path) -> None:
         """#043 — Baseline {name} runs full pipeline without exception."""
         ohlcv = make_ohlcv_random(N_CANDLES, seed=SEED)
         config = load_config(CONFIG_PATH)
-        metrics = _run_pipeline_baseline(name, ohlcv, config)
+        metrics = _run_pipeline_baseline(name, ohlcv, config, run_dir=tmp_path)
         assert isinstance(metrics, dict)
 
 
@@ -246,39 +265,39 @@ class TestGateM4PipelineNocrash:
 class TestGateM4MetricsCoherence:
     """#043 — Criterion (c): metrics coherence per model type."""
 
-    def test_no_trade_net_pnl_zero(self) -> None:
+    def test_no_trade_net_pnl_zero(self, tmp_path: Path) -> None:
         """#043 — no_trade baseline produces net_pnl = 0."""
         ohlcv = make_ohlcv_random(N_CANDLES, seed=SEED)
         config = load_config(CONFIG_PATH)
-        metrics = _run_pipeline_baseline("no_trade", ohlcv, config)
+        metrics = _run_pipeline_baseline("no_trade", ohlcv, config, run_dir=tmp_path)
         assert metrics["net_pnl"] == 0.0
 
-    def test_no_trade_n_trades_zero(self) -> None:
+    def test_no_trade_n_trades_zero(self, tmp_path: Path) -> None:
         """#043 — no_trade baseline produces n_trades = 0."""
         ohlcv = make_ohlcv_random(N_CANDLES, seed=SEED)
         config = load_config(CONFIG_PATH)
-        metrics = _run_pipeline_baseline("no_trade", ohlcv, config)
+        metrics = _run_pipeline_baseline("no_trade", ohlcv, config, run_dir=tmp_path)
         assert metrics["n_trades"] == 0
 
-    def test_no_trade_mdd_zero(self) -> None:
+    def test_no_trade_mdd_zero(self, tmp_path: Path) -> None:
         """#043 — no_trade baseline produces max_drawdown = 0."""
         ohlcv = make_ohlcv_random(N_CANDLES, seed=SEED)
         config = load_config(CONFIG_PATH)
-        metrics = _run_pipeline_baseline("no_trade", ohlcv, config)
+        metrics = _run_pipeline_baseline("no_trade", ohlcv, config, run_dir=tmp_path)
         assert metrics["max_drawdown"] == 0.0
 
-    def test_buy_hold_one_trade(self) -> None:
+    def test_buy_hold_one_trade(self, tmp_path: Path) -> None:
         """#043 — buy_hold baseline produces exactly 1 trade."""
         ohlcv = make_ohlcv_random(N_CANDLES, seed=SEED)
         config = load_config(CONFIG_PATH)
-        metrics = _run_pipeline_baseline("buy_hold", ohlcv, config)
+        metrics = _run_pipeline_baseline("buy_hold", ohlcv, config, run_dir=tmp_path)
         assert metrics["n_trades"] == 1
 
-    def test_sma_rule_n_trades_non_negative(self) -> None:
+    def test_sma_rule_n_trades_non_negative(self, tmp_path: Path) -> None:
         """#043 — sma_rule baseline produces n_trades >= 0."""
         ohlcv = make_ohlcv_random(N_CANDLES, seed=SEED)
         config = load_config(CONFIG_PATH)
-        metrics = _run_pipeline_baseline("sma_rule", ohlcv, config)
+        metrics = _run_pipeline_baseline("sma_rule", ohlcv, config, run_dir=tmp_path)
         assert metrics["n_trades"] >= 0
 
 
@@ -316,9 +335,6 @@ class TestGateM4RegistryCompleteness:
 
     def test_model_registry_keys(self) -> None:
         """#043 — MODEL_REGISTRY keys == {dummy, no_trade, buy_hold, sma_rule}."""
-        # Trigger imports to populate registry
-        importlib.import_module("ai_trading.models")
-        importlib.import_module("ai_trading.baselines")
         expected = {"dummy", "no_trade", "buy_hold", "sma_rule"}
         assert set(MODEL_REGISTRY.keys()) == expected
 
@@ -326,8 +342,6 @@ class TestGateM4RegistryCompleteness:
         """#043 — All registered classes are BaseModel subclasses."""
         from ai_trading.models.base import BaseModel
 
-        importlib.import_module("ai_trading.models")
-        importlib.import_module("ai_trading.baselines")
         for name, cls in MODEL_REGISTRY.items():
             assert issubclass(cls, BaseModel), (
                 f"MODEL_REGISTRY['{name}'] = {cls!r} is not a BaseModel subclass"
@@ -335,8 +349,6 @@ class TestGateM4RegistryCompleteness:
 
     def test_model_registry_output_types_valid(self) -> None:
         """#043 — All registered models have a valid output_type attribute."""
-        importlib.import_module("ai_trading.models")
-        importlib.import_module("ai_trading.baselines")
         valid_types = {"regression", "signal"}
         for name, cls in MODEL_REGISTRY.items():
             assert hasattr(cls, "output_type"), (
