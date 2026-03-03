@@ -424,11 +424,13 @@ class TestGateM6:
     """Verify gate-m6 target specifics. #058"""
 
     def test_gate_m6_runs_fullscale_pytest(self) -> None:
-        """#058 — gate-m6 runs pytest -m fullscale."""
+        """#058 — gate-m6 runs pytest -m fullscale with timeout."""
         result = _run_make("gate-m6")
         assert result.returncode == 0
-        assert "fullscale" in result.stdout
+        assert "-m fullscale" in result.stdout
         assert "test_fullscale_btc" in result.stdout
+        assert "-v" in result.stdout
+        assert "--timeout=600" in result.stdout
 
     def test_gate_m6_creates_report(self) -> None:
         """#058 — gate-m6 creates gate_report_M6.json."""
