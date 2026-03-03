@@ -56,7 +56,7 @@ Dépendances :
 - [x] La fixture `synthetic_ohlcv` génère un DataFrame OHLCV valide (500 bougies, colonnes conformes §4.1).
 - [x] Le test d'intégration passe avec DummyModel sur données synthétiques → arborescence §15.1, JSON valides.
 - [x] Le test d'intégration passe avec no_trade → bypass θ, net_pnl=0, n_trades=0.
-- [x] `make lint` et `make test` fonctionnent dans le CI.
+- [ ] `make lint` et `make test` fonctionnent dans le CI. *(Le CI utilise actuellement les commandes directes `ruff check` et `pytest`. Le Makefile sera créé par la tâche 053 ; cet AC sera validé à ce moment-là.)*
 - [x] Tests couvrent les scénarios nominaux + erreurs + bords.
 - [x] Suite de tests verte après implémentation.
 - [x] `ruff check` passe sans erreur.

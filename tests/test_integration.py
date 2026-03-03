@@ -397,3 +397,48 @@ class TestIntegrationNoTrade:
         run_dir = run_pipeline(config)
         validate_manifest(json.loads((run_dir / "manifest.json").read_text()))
         validate_metrics(json.loads((run_dir / "metrics.json").read_text()))
+
+
+# ---------------------------------------------------------------------------
+# 4. Error scenarios
+# ---------------------------------------------------------------------------
+
+
+class TestIntegrationErrors:
+    """#051 — AC: error scenarios for integration tests."""
+
+    def test_missing_parquet_raises(self, tmp_path, synthetic_ohlcv):
+        """Pipeline raises FileNotFoundError when raw parquet file is missing."""
+        from ai_trading.config import load_config
+        from ai_trading.pipeline.runner import run_pipeline
+
+        cfg_path = _make_integration_config(
+            tmp_path, synthetic_ohlcv, strategy_name="dummy", strategy_type="model"
+        )
+        config = load_config(str(cfg_path))
+
+        # Delete the parquet file that _make_integration_config created
+        raw_dir = Path(config.dataset.raw_dir)
+        for f in raw_dir.glob("*.parquet"):
+            f.unlink()
+
+        with pytest.raises(FileNotFoundError, match="Raw OHLCV file not found"):
+            run_pipeline(config)
+
+    def test_invalid_strategy_name_raises(self, tmp_path, synthetic_ohlcv):
+        """Pipeline raises ValueError for an unknown strategy name."""
+        from pydantic import ValidationError
+
+        from ai_trading.config import load_config
+
+        cfg_path = _make_integration_config(
+            tmp_path, synthetic_ohlcv, strategy_name="dummy", strategy_type="model"
+        )
+
+        # Patch config YAML to use an invalid strategy name
+        cfg_text = cfg_path.read_text(encoding="utf-8")
+        cfg_text = cfg_text.replace("name: dummy", "name: nonexistent_model_xyz")
+        cfg_path.write_text(cfg_text, encoding="utf-8")
+
+        with pytest.raises(ValidationError):
+            load_config(str(cfg_path))
