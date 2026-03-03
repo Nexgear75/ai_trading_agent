@@ -25,44 +25,15 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pytest
-import yaml
+
+from tests.conftest import build_ohlcv_df, write_config, write_parquet
 
 # ---------------------------------------------------------------------------
-# Helpers — synthetic OHLCV on disk
+# Constants
 # ---------------------------------------------------------------------------
 
 _N_BARS = 3000  # Enough for walk-forward with short windows
 _SEED = 42
-
-
-def _build_ohlcv_df(n: int = _N_BARS, seed: int = _SEED) -> pd.DataFrame:
-    """Synthetic OHLCV (UTC-aware, hourly, positive prices)."""
-    rng = np.random.default_rng(seed)
-    ts = pd.date_range("2024-01-01", periods=n, freq="1h", tz="UTC")
-    close = 100.0 + np.cumsum(rng.standard_normal(n) * 0.3)
-    close = np.abs(close) + 50.0
-    opens = close + rng.standard_normal(n) * 0.05
-    opens = np.abs(opens) + 50.0
-    high = np.maximum(opens, close) + rng.uniform(0.01, 0.5, n)
-    low = np.minimum(opens, close) - rng.uniform(0.01, 0.5, n)
-    volume = rng.uniform(100, 10000, n)
-    return pd.DataFrame(
-        {
-            "timestamp_utc": ts,
-            "open": opens,
-            "high": high,
-            "low": low,
-            "close": close,
-            "volume": volume,
-        },
-    )
-
-
-def _write_parquet(ohlcv_df: pd.DataFrame, raw_dir: Path, symbol: str) -> None:
-    """Write a parquet file matching the ingestion convention."""
-    raw_dir.mkdir(parents=True, exist_ok=True)
-    path = raw_dir / f"{symbol}_1h.parquet"
-    ohlcv_df.to_parquet(path, index=False)
 
 
 def _make_config_dict(
@@ -85,8 +56,8 @@ def _make_config_dict(
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Write OHLCV parquet
-    ohlcv = _build_ohlcv_df(n=n_bars)
-    _write_parquet(ohlcv, raw_dir, "BTCUSDT")
+    ohlcv = build_ohlcv_df(n=n_bars)
+    write_parquet(ohlcv, raw_dir, "BTCUSDT")
 
     # Compute dataset date range from OHLCV timestamps
     start_ts = ohlcv["timestamp_utc"].iloc[0]
@@ -240,13 +211,6 @@ def _make_config_dict(
     }
 
 
-def _write_config(tmp_path: Path, cfg_dict: dict) -> Path:
-    """Write config dict to a YAML file and return its path."""
-    cfg_path = tmp_path / "config.yaml"
-    cfg_path.write_text(yaml.dump(cfg_dict, default_flow_style=False), encoding="utf-8")
-    return cfg_path
-
-
 # ---------------------------------------------------------------------------
 # 1. Module importability
 # ---------------------------------------------------------------------------
@@ -315,7 +279,7 @@ class TestFullRunDummy:
     def setup(self, tmp_path):
         self.tmp = tmp_path
         self.cfg_dict = _make_config_dict(tmp_path, strategy_name="dummy")
-        self.cfg_path = _write_config(tmp_path, self.cfg_dict)
+        self.cfg_path = write_config(tmp_path, self.cfg_dict)
 
     def test_run_returns_path(self):
         from ai_trading.config import load_config
@@ -449,7 +413,7 @@ class TestFullRunNoTrade:
         self.cfg_dict = _make_config_dict(
             tmp_path, strategy_name="no_trade", strategy_type="baseline"
         )
-        self.cfg_path = _write_config(tmp_path, self.cfg_dict)
+        self.cfg_path = write_config(tmp_path, self.cfg_dict)
 
     def test_no_trade_run_completes(self):
         from ai_trading.config import load_config
@@ -496,7 +460,7 @@ class TestThetaBypassInfoLog:
         self.cfg_dict = _make_config_dict(
             tmp_path, strategy_name="no_trade", strategy_type="baseline"
         )
-        self.cfg_path = _write_config(tmp_path, self.cfg_dict)
+        self.cfg_path = write_config(tmp_path, self.cfg_dict)
 
     def test_theta_bypass_logged_info(self, caplog):
         from ai_trading.config import load_config
@@ -526,7 +490,7 @@ class TestAcceptanceWarnings:
         self.cfg_dict = _make_config_dict(
             tmp_path, strategy_name="no_trade", strategy_type="baseline"
         )
-        self.cfg_path = _write_config(tmp_path, self.cfg_dict)
+        self.cfg_path = write_config(tmp_path, self.cfg_dict)
 
     def test_warnings_emitted(self, caplog):
         from ai_trading.config import load_config
@@ -560,7 +524,7 @@ class TestConditionalArtifactsFalse:
             save_model=False,
             save_trades=False,
         )
-        self.cfg_path = _write_config(tmp_path, self.cfg_dict)
+        self.cfg_path = write_config(tmp_path, self.cfg_dict)
 
     def test_no_predictions_when_flag_false(self):
         from ai_trading.config import load_config
@@ -620,7 +584,7 @@ class TestJsonSchemaValidation:
     def setup(self, tmp_path):
         self.tmp = tmp_path
         self.cfg_dict = _make_config_dict(tmp_path, strategy_name="dummy")
-        self.cfg_path = _write_config(tmp_path, self.cfg_dict)
+        self.cfg_path = write_config(tmp_path, self.cfg_dict)
 
     def test_manifest_passes_schema(self):
         from ai_trading.artifacts.validation import validate_manifest
@@ -663,7 +627,7 @@ class TestErrorPaths:
         raw_dir = Path(cfg_dict["dataset"]["raw_dir"])
         for f in raw_dir.glob("*.parquet"):
             f.unlink()
-        cfg_path = _write_config(tmp_path, cfg_dict)
+        cfg_path = write_config(tmp_path, cfg_dict)
         config = load_config(str(cfg_path))
         with pytest.raises(FileNotFoundError):
             run_pipeline(config)
@@ -674,7 +638,7 @@ class TestErrorPaths:
         from ai_trading.pipeline.runner import run_pipeline
 
         cfg_dict = _make_config_dict(tmp_path, strategy_name="dummy")
-        cfg_path = _write_config(tmp_path, cfg_dict)
+        cfg_path = write_config(tmp_path, cfg_dict)
         config = load_config(str(cfg_path))
 
         # Temporarily inject a bogus entry into MODEL_REGISTRY
@@ -717,7 +681,7 @@ class TestCausality:
         cfg_dict_1 = _make_config_dict(
             tmp_path / "run1", strategy_name="sma_rule", strategy_type="baseline"
         )
-        cfg_path_1 = _write_config(tmp_path / "run1", cfg_dict_1)
+        cfg_path_1 = write_config(tmp_path / "run1", cfg_dict_1)
         config_1 = load_config(str(cfg_path_1))
         run_dir_1 = run_pipeline(config_1)
 
@@ -733,7 +697,7 @@ class TestCausality:
             1.0 + rng.uniform(-0.1, 0.1, 200)
         )
         df.to_parquet(pq_path, index=False)
-        cfg_path_2 = _write_config(tmp_path / "run2", cfg_dict_2)
+        cfg_path_2 = write_config(tmp_path / "run2", cfg_dict_2)
         config_2 = load_config(str(cfg_path_2))
         run_dir_2 = run_pipeline(config_2)
 
@@ -770,7 +734,7 @@ class TestEdgeCaseFolds:
         # With 2200 bars (~92 raw days), warmup+window eats ~228 bars,
         # leaving ~83 days of samples → only 1 fold with default split params.
         cfg_dict = _make_config_dict(tmp_path, strategy_name="dummy", n_bars=2200)
-        cfg_path = _write_config(tmp_path, cfg_dict)
+        cfg_path = write_config(tmp_path, cfg_dict)
         config = load_config(str(cfg_path))
         run_dir = run_pipeline(config)
         metrics = json.loads((run_dir / "metrics.json").read_text())
@@ -783,7 +747,7 @@ class TestEdgeCaseFolds:
 
         # 500 bars (~21 days) with train_days=60 → 0 folds
         cfg_dict = _make_config_dict(tmp_path, strategy_name="dummy", n_bars=500)
-        cfg_path = _write_config(tmp_path, cfg_dict)
+        cfg_path = write_config(tmp_path, cfg_dict)
         config = load_config(str(cfg_path))
         with pytest.raises((ValueError, IndexError)):
             run_pipeline(config)
@@ -803,7 +767,7 @@ class TestFullRunBuyHold:
         self.cfg_dict = _make_config_dict(
             tmp_path, strategy_name="buy_hold", strategy_type="baseline"
         )
-        self.cfg_path = _write_config(tmp_path, self.cfg_dict)
+        self.cfg_path = write_config(tmp_path, self.cfg_dict)
 
     def test_buy_hold_completes(self):
         from ai_trading.config import load_config

@@ -250,6 +250,48 @@ def make_labels(n_bars: int, seed: int = 99) -> np.ndarray:
 
 
 # ---------------------------------------------------------------------------
+# Pipeline integration helpers (shared by test_runner.py, test_xgboost_integration.py)
+# ---------------------------------------------------------------------------
+
+
+def build_ohlcv_df(n: int, seed: int = 42) -> pd.DataFrame:
+    """Synthetic OHLCV (UTC-aware, hourly, positive prices) with timestamp_utc column."""
+    rng = np.random.default_rng(seed)
+    ts = pd.date_range("2024-01-01", periods=n, freq="1h", tz="UTC")
+    close = 100.0 + np.cumsum(rng.standard_normal(n) * 0.3)
+    close = np.abs(close) + 50.0
+    opens = close + rng.standard_normal(n) * 0.05
+    opens = np.abs(opens) + 50.0
+    high = np.maximum(opens, close) + rng.uniform(0.01, 0.5, n)
+    low = np.minimum(opens, close) - rng.uniform(0.01, 0.5, n)
+    volume = rng.uniform(100, 10000, n)
+    return pd.DataFrame(
+        {
+            "timestamp_utc": ts,
+            "open": opens,
+            "high": high,
+            "low": low,
+            "close": close,
+            "volume": volume,
+        },
+    )
+
+
+def write_parquet(ohlcv_df: pd.DataFrame, raw_dir: Path, symbol: str) -> None:
+    """Write a parquet file matching the ingestion convention."""
+    raw_dir.mkdir(parents=True, exist_ok=True)
+    path = raw_dir / f"{symbol}_1h.parquet"
+    ohlcv_df.to_parquet(path, index=False)
+
+
+def write_config(tmp_path: Path, cfg_dict: dict) -> Path:
+    """Write config dict to a YAML file and return its path."""
+    cfg_path = tmp_path / "config.yaml"
+    cfg_path.write_text(yaml.dump(cfg_dict, default_flow_style=False), encoding="utf-8")
+    return cfg_path
+
+
+# ---------------------------------------------------------------------------
 # Shared fixtures
 # ---------------------------------------------------------------------------
 
