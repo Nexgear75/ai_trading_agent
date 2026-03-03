@@ -237,12 +237,10 @@ def _sha256_file(path: Path) -> str:
 
 
 def _parquet_path(config: PipelineConfig) -> Path:
-    """Compute the canonical Parquet filename for standard naming."""
+    """Compute the canonical Parquet filename (§17.4: ``{symbol}_{tf}.parquet``)."""
     symbol = config.dataset.symbols[0]
     timeframe = config.dataset.timeframe
-    start = config.dataset.start
-    end = config.dataset.end
-    return Path(config.dataset.raw_dir) / f"{symbol}_{timeframe}_{start}_{end}.parquet"
+    return Path(config.dataset.raw_dir) / f"{symbol}_{timeframe}.parquet"
 
 
 def _cache_covers_period(
