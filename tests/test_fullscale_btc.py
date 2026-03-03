@@ -65,8 +65,9 @@ class TestFullscaleRunAll:
 
     def test_make_run_all_succeeds(self):
         """AC: make run-all CONFIG=configs/fullscale_btc.yaml exits with 0."""
+        config_rel = FULLSCALE_CONFIG.relative_to(PROJECT_ROOT)
         result = subprocess.run(
-            ["make", "run-all", "CONFIG=configs/fullscale_btc.yaml"],
+            ["make", "run-all", f"CONFIG={config_rel}"],
             cwd=str(PROJECT_ROOT),
             capture_output=True,
             text=True,
@@ -135,7 +136,7 @@ class TestFullscaleRunAll:
         run_dir = _find_latest_run_dir()
         folds_dir = run_dir / "folds"
         assert folds_dir.is_dir(), f"folds/ directory not found in {run_dir}"
-        fold_dirs = sorted(folds_dir.iterdir())
+        fold_dirs = sorted(d for d in folds_dir.iterdir() if d.is_dir())
         assert len(fold_dirs) >= 1, "No fold directories found in folds/"
 
     # ------------------------------------------------------------------
@@ -143,13 +144,10 @@ class TestFullscaleRunAll:
     # ------------------------------------------------------------------
 
     def test_equity_curve_exists(self):
-        """AC: equity_curve_stitched.csv or equity_curve.csv at root."""
+        """AC: equity_curve.csv present at run dir root."""
         run_dir = _find_latest_run_dir()
-        stitched = run_dir / "equity_curve_stitched.csv"
-        fallback = run_dir / "equity_curve.csv"
-        assert stitched.is_file() or fallback.is_file(), (
-            f"Neither equity_curve_stitched.csv nor equity_curve.csv "
-            f"found in {run_dir}"
+        assert (run_dir / "equity_curve.csv").is_file(), (
+            f"equity_curve.csv not found in {run_dir}"
         )
 
     # ------------------------------------------------------------------

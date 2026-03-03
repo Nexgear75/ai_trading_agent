@@ -38,7 +38,7 @@ Créer le fichier de test `tests/test_fullscale_btc.py` avec un test marqué `@p
     4. Vérifie que le run directory le plus récent contient `manifest.json` et `metrics.json`.
     5. Vérifie que `manifest.json` et `metrics.json` sont valides (JSON Schema).
     6. Vérifie qu'au moins 1 fold est complété.
-    7. Vérifie la présence de `equity_curve_stitched.csv`.
+    7. Vérifie la présence de `equity_curve.csv`.
     8. Vérifie la présence de `config_snapshot.yaml`.
     9. Vérifie que chaque fold contient `metrics.json` et `trades.csv`.
 
@@ -48,7 +48,7 @@ Créer le fichier de test `tests/test_fullscale_btc.py` avec un test marqué `@p
 - [x] `tests/test_fullscale_btc.py` existe avec test marqué `@pytest.mark.fullscale`.
 - [x] `pytest` standard (sans `-m fullscale`) n'exécute PAS les tests fullscale.
 - [ ] `pytest -m fullscale tests/test_fullscale_btc.py -v --timeout=600` passe en GREEN avec accès réseau. *(requiert exécution manuelle avec accès réseau réel)*
-- [x] Le run directory contient tous les artefacts attendus : `manifest.json`, `metrics.json`, `equity_curve_stitched.csv`, `config_snapshot.yaml`.
+- [x] Le run directory contient tous les artefacts attendus : `manifest.json`, `metrics.json`, `equity_curve.csv`, `config_snapshot.yaml`.
 - [x] Au moins 1 fold complété avec `metrics.json` et `trades.csv` par fold.
 - [x] Fichier Parquet de données contient ≥ 70 000 lignes.
 - [x] Tests couvrent les scénarios nominaux + erreurs + bords.
