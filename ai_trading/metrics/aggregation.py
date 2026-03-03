@@ -44,6 +44,7 @@ _PREDICTION_METRICS = (
 _AGGREGATED_METRICS = _TRADING_METRICS + _PREDICTION_METRICS
 
 # Keys explicitly excluded from aggregation (I-04).
+# n_samples_* keys are reserved for the orchestrator (WS-12).
 _EXCLUDED_METRICS = frozenset({
     "sharpe_per_trade",
     "n_samples_train",
