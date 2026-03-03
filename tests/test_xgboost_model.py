@@ -57,10 +57,9 @@ _Y_VAL = _RNG.standard_normal((5,)).astype(np.float32)
 
 def _reload_xgboost_module():
     """Reload ai_trading.models.xgboost to trigger @register_model side-effect."""
-    import ai_trading.models.xgboost as xgb_mod
-
-    importlib.reload(xgb_mod)
-    return xgb_mod
+    mod_name = "ai_trading.models.xgboost"
+    xgb_mod = importlib.import_module(mod_name)
+    return importlib.reload(xgb_mod)
 
 
 # ---------------------------------------------------------------------------
@@ -1188,3 +1187,160 @@ class TestXGBoostRegModelLoad:
         content = model_file.read_text()
         parsed = json.loads(content)
         assert isinstance(parsed, dict)
+
+
+# ---------------------------------------------------------------------------
+# Tests — Gate G-XGB-Ready (#068)
+# ---------------------------------------------------------------------------
+
+# Synthetic data for gate tests (deterministic, separate RNG stream)
+_RNG_GATE = np.random.default_rng(68)
+_N_GATE, _L_GATE, _F_GATE = 80, 10, 5
+_X_TRAIN_GATE = _RNG_GATE.standard_normal((_N_GATE, _L_GATE, _F_GATE)).astype(np.float32)
+_Y_TRAIN_GATE = _RNG_GATE.standard_normal((_N_GATE,)).astype(np.float32)
+_X_VAL_GATE = _RNG_GATE.standard_normal((25, _L_GATE, _F_GATE)).astype(np.float32)
+_Y_VAL_GATE = _RNG_GATE.standard_normal((25,)).astype(np.float32)
+_X_TEST_GATE = _RNG_GATE.standard_normal((15, _L_GATE, _F_GATE)).astype(np.float32)
+
+
+class TestGateXGBReady:
+    """#068 — Gate G-XGB-Ready: XGBoost model unit-level validation.
+
+    Validates all 7 gate criteria:
+    1. fit() converges with early stopping
+    2. predict() shape (N,) dtype float32
+    3. save() + load() → bit-exact predictions
+    4. Determinism: two fit()+predict() same seed → identical
+    5. Registry + output_type
+    6. Validation stricte (ValueError, TypeError, RuntimeError)
+    7. Coverage ≥ 90% (verified by pytest --cov-fail-under=90)
+    """
+
+    def _fit_model(self, config, run_dir):
+        """Helper: fit a model with n_estimators=10 for performance."""
+        config.models.xgboost.n_estimators = 10
+        model = _make_xgb_model()
+        result = model.fit(
+            X_train=_X_TRAIN_GATE,
+            y_train=_Y_TRAIN_GATE,
+            X_val=_X_VAL_GATE,
+            y_val=_Y_VAL_GATE,
+            config=config,
+            run_dir=run_dir,
+        )
+        return model, result
+
+    # --- AC1: fit() converges with early stopping ---
+
+    def test_ac1_early_stopping_converges(self, default_config, tmp_path):
+        """#068 AC1 — early stopping: best_iteration + 1 < n_estimators."""
+        model, result = self._fit_model(default_config, tmp_path)
+        n_est = default_config.models.xgboost.n_estimators
+        # XGBoost best_iteration is 0-based; require true early stopping
+        assert result["best_iteration"] + 1 < n_est
+
+    # --- AC2: predict() shape (N,) dtype float32 ---
+
+    def test_ac2_predict_shape_and_dtype(self, default_config, tmp_path):
+        """#068 AC2 — predict() returns shape (N,) dtype float32."""
+        model, _ = self._fit_model(default_config, tmp_path)
+        y_hat = model.predict(X=_X_TEST_GATE)
+        assert y_hat.shape == (_X_TEST_GATE.shape[0],)
+        assert y_hat.dtype == np.float32
+
+    # --- AC3: save() + load() → bit-exact ---
+
+    def test_ac3_save_load_round_trip_bit_exact(self, default_config, tmp_path):
+        """#068 AC3 — fit→predict→save→new instance→load→predict → bit-exact."""
+        model, _ = self._fit_model(default_config, tmp_path)
+        y_before = model.predict(X=_X_TEST_GATE)
+
+        save_dir = tmp_path / "gate_save"
+        model.save(path=save_dir)
+
+        new_model = _make_xgb_model()
+        new_model._feature_names = model._feature_names
+        new_model.load(path=save_dir)
+        y_after = new_model.predict(X=_X_TEST_GATE)
+
+        np.testing.assert_array_equal(y_before, y_after)
+
+    # --- AC4: Determinism — two fit()+predict() same seed → identical ---
+
+    def test_ac4_determinism_two_fits_same_seed(self, default_config, tmp_path):
+        """#068 AC4 — Two full fit()+predict() cycles with same seed → bit-exact."""
+        # First fit+predict
+        cfg1 = copy.deepcopy(default_config)
+        cfg1.models.xgboost.n_estimators = 10
+        model1 = _make_xgb_model()
+        model1.fit(
+            X_train=_X_TRAIN_GATE,
+            y_train=_Y_TRAIN_GATE,
+            X_val=_X_VAL_GATE,
+            y_val=_Y_VAL_GATE,
+            config=cfg1,
+            run_dir=tmp_path / "run1",
+        )
+        y1 = model1.predict(X=_X_TEST_GATE)
+
+        # Second fit+predict (same data, same config/seed)
+        cfg2 = copy.deepcopy(default_config)
+        cfg2.models.xgboost.n_estimators = 10
+        model2 = _make_xgb_model()
+        model2.fit(
+            X_train=_X_TRAIN_GATE,
+            y_train=_Y_TRAIN_GATE,
+            X_val=_X_VAL_GATE,
+            y_val=_Y_VAL_GATE,
+            config=cfg2,
+            run_dir=tmp_path / "run2",
+        )
+        y2 = model2.predict(X=_X_TEST_GATE)
+
+        np.testing.assert_array_equal(y1, y2)
+
+    # --- AC5: Registry + output_type ---
+
+    def test_ac5_registry_entry(self):
+        """#068 AC5 — 'xgboost_reg' in MODEL_REGISTRY with output_type 'regression'."""
+        mod = _reload_xgboost_module()
+        assert "xgboost_reg" in MODEL_REGISTRY
+        cls = MODEL_REGISTRY["xgboost_reg"]
+        assert cls is mod.XGBoostRegModel
+        assert cls.output_type == "regression"
+
+    # --- AC6: Validation stricte ---
+
+    def test_ac6_valueerror_shape(self, default_config, tmp_path):
+        """#068 AC6 — ValueError if X_train is not 3D."""
+        model = _make_xgb_model()
+        x_2d = _X_TRAIN_GATE.reshape(_N_GATE, -1)
+        with pytest.raises(ValueError):
+            model.fit(
+                X_train=x_2d,
+                y_train=_Y_TRAIN_GATE,
+                X_val=_X_VAL_GATE,
+                y_val=_Y_VAL_GATE,
+                config=default_config,
+                run_dir=tmp_path,
+            )
+
+    def test_ac6_typeerror_dtype(self, default_config, tmp_path):
+        """#068 AC6 — TypeError if X_train is float64."""
+        model = _make_xgb_model()
+        x_f64 = _X_TRAIN_GATE.astype(np.float64)
+        with pytest.raises(TypeError):
+            model.fit(
+                X_train=x_f64,
+                y_train=_Y_TRAIN_GATE,
+                X_val=_X_VAL_GATE,
+                y_val=_Y_VAL_GATE,
+                config=default_config,
+                run_dir=tmp_path,
+            )
+
+    def test_ac6_runtimeerror_predict_without_fit(self):
+        """#068 AC6 — RuntimeError if predict() called without fit()."""
+        model = _make_xgb_model()
+        with pytest.raises(RuntimeError):
+            model.predict(X=_X_TEST_GATE)
