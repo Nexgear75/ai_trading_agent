@@ -63,4 +63,5 @@ warn_return_any = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]
 addopts = "-v --tb=short"

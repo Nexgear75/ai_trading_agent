@@ -271,7 +271,7 @@ class TestCompareStrategies:
         df = compare_strategies(metrics_list)
         go_nogo = df[df["comparison_type"] == "go_nogo"]
         best = go_nogo.loc[go_nogo["net_pnl_mean"].idxmax()]
-        assert best["strategy_name"] == "lstm"
+        assert str(best["strategy_name"]) == "lstm"
 
     def test_all_strategies_present(self, run_dirs: dict[str, Path]) -> None:
         """#052 — All loaded strategies appear in the comparison table."""
