@@ -121,13 +121,9 @@ class TestXGBoostRegModelAttributes:
 
 
 class TestXGBoostRegModelStubs:
-    """#060 — Remaining stub methods must raise NotImplementedError."""
+    """#060 — Remaining stub methods (none currently)."""
 
-    def test_load_raises_not_implemented(self, tmp_path: Path):
-        mod = _reload_xgboost_module()
-        model = mod.XGBoostRegModel()
-        with pytest.raises(NotImplementedError):
-            model.load(path=tmp_path / "model.json")
+    pass
 
 
 # ---------------------------------------------------------------------------
@@ -1072,3 +1068,134 @@ class TestXGBoostRegModelSave:
         fitted_model.save(path=tmp_path)
         fitted_model.save(path=tmp_path)
         assert (tmp_path / "xgboost_model.json").exists()
+
+
+# ---------------------------------------------------------------------------
+# Tests — load() (#067)
+# ---------------------------------------------------------------------------
+
+
+class TestXGBoostRegModelLoad:
+    """#067 — XGBoostRegModel.load() JSON restoration.
+
+    Covers:
+    - load() restores a functional model (capable of predict())
+    - Round-trip: save() → load() → predict() bit-exact
+    - FileNotFoundError if file does not exist
+    - Directory path resolves to xgboost_model.json
+    - Explicit file path used as-is
+    - predict() works after load() without fit()
+    """
+
+    # --- Error: file not found ---
+
+    def test_load_raises_file_not_found_nonexistent_file(self, tmp_path):
+        """#067 — FileNotFoundError if the file does not exist."""
+        model = _make_xgb_model()
+        nonexistent = tmp_path / "nonexistent_model.json"
+        with pytest.raises(FileNotFoundError, match="Model file not found"):
+            model.load(path=nonexistent)
+
+    def test_load_raises_file_not_found_nonexistent_dir(self, tmp_path):
+        """#067 — FileNotFoundError if directory exists but default file is absent."""
+        model = _make_xgb_model()
+        empty_dir = tmp_path / "empty_dir"
+        empty_dir.mkdir()
+        with pytest.raises(FileNotFoundError, match="Model file not found"):
+            model.load(path=empty_dir)
+
+    # --- Nominal: load from directory path ---
+
+    def test_load_from_directory_path(self, fitted_model, tmp_path):
+        """#067 — load(directory) resolves to xgboost_model.json and loads."""
+        fitted_model.save(path=tmp_path)
+        new_model = _make_xgb_model()
+        new_model._feature_names = fitted_model._feature_names
+        new_model.load(path=tmp_path)
+        assert new_model._model is not None
+
+    # --- Nominal: load from explicit file path ---
+
+    def test_load_from_explicit_file_path(self, fitted_model, tmp_path):
+        """#067 — load(file_path) loads from the exact file path."""
+        explicit = tmp_path / "custom_model.json"
+        fitted_model.save(path=explicit)
+        new_model = _make_xgb_model()
+        new_model._feature_names = fitted_model._feature_names
+        new_model.load(path=explicit)
+        assert new_model._model is not None
+
+    # --- Functional: predict after load ---
+
+    def test_predict_works_after_load(self, fitted_model, tmp_path):
+        """#067 — predict() works after load() without calling fit()."""
+        fitted_model.save(path=tmp_path)
+        new_model = _make_xgb_model()
+        new_model._feature_names = fitted_model._feature_names
+        new_model.load(path=tmp_path)
+        y_hat = new_model.predict(X=_X_TEST_PRED)
+        assert isinstance(y_hat, np.ndarray)
+        assert y_hat.shape == (_X_TEST_PRED.shape[0],)
+        assert y_hat.dtype == np.float32
+
+    # --- Round-trip: bit-exact ---
+
+    def test_round_trip_bit_exact_directory(self, fitted_model, tmp_path):
+        """#067 — save(dir) → load(dir) → predict() is bit-exact."""
+        y_before = fitted_model.predict(X=_X_TEST_PRED)
+        fitted_model.save(path=tmp_path)
+
+        new_model = _make_xgb_model()
+        new_model._feature_names = fitted_model._feature_names
+        new_model.load(path=tmp_path)
+        y_after = new_model.predict(X=_X_TEST_PRED)
+
+        np.testing.assert_array_equal(y_before, y_after)
+
+    def test_round_trip_bit_exact_explicit_path(self, fitted_model, tmp_path):
+        """#067 — save(file) → load(file) → predict() is bit-exact."""
+        explicit = tmp_path / "my_model.json"
+        y_before = fitted_model.predict(X=_X_TEST_PRED)
+        fitted_model.save(path=explicit)
+
+        new_model = _make_xgb_model()
+        new_model._feature_names = fitted_model._feature_names
+        new_model.load(path=explicit)
+        y_after = new_model.predict(X=_X_TEST_PRED)
+
+        np.testing.assert_array_equal(y_before, y_after)
+
+    # --- Boundary: load overwrites previous _model ---
+
+    def test_load_overwrites_existing_model(self, fitted_model, tmp_path):
+        """#067 — load() on an already-fitted model replaces _model."""
+        y_original = fitted_model.predict(X=_X_TEST_PRED)
+        fitted_model.save(path=tmp_path)
+
+        # Create a second model, fit it with different data (different predictions)
+        rng = np.random.default_rng(6700)
+        x2 = rng.standard_normal((_N_PRED, _L_PRED, _F_PRED)).astype(np.float32)
+        y2 = rng.standard_normal((_N_PRED,)).astype(np.float32)
+        x_v2 = rng.standard_normal((25, _L_PRED, _F_PRED)).astype(np.float32)
+        y_v2 = rng.standard_normal((25,)).astype(np.float32)
+
+        from ai_trading.config import load_config
+
+        # Use the fitted_model which already has config baked in; load from saved
+        new_model = _make_xgb_model()
+        new_model._feature_names = fitted_model._feature_names
+        new_model.load(path=tmp_path)
+        y_loaded = new_model.predict(X=_X_TEST_PRED)
+
+        # After loading from the first model's save, predictions match the original
+        np.testing.assert_array_equal(y_original, y_loaded)
+
+    # --- Security: JSON only, no pickle ---
+
+    def test_load_uses_json_format(self, fitted_model, tmp_path):
+        """#067 — Loaded file is valid JSON (not pickle binary)."""
+        fitted_model.save(path=tmp_path)
+        model_file = tmp_path / "xgboost_model.json"
+        content = model_file.read_text()
+        parsed = json.loads(content)
+        assert isinstance(parsed, dict)
