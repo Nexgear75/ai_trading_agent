@@ -115,8 +115,6 @@ class TestXGBoostRegModelAttributes:
 
 
 # ---------------------------------------------------------------------------
-# Tests — Stub methods raise NotImplementedError
-# ---------------------------------------------------------------------------
 # Tests — Import via package
 # ---------------------------------------------------------------------------
 
@@ -1094,6 +1092,17 @@ class TestXGBoostRegModelLoad:
         with pytest.raises(FileNotFoundError, match="Model file not found"):
             model.load(path=empty_dir)
 
+    def test_load_raises_is_a_directory_error(self, tmp_path):
+        """#067 — IsADirectoryError when resolved path exists but is a directory."""
+        model = _make_xgb_model()
+        # Create a directory at the path _resolve_path would return
+        model_dir = tmp_path / "models"
+        model_dir.mkdir()
+        fake_file = model_dir / "xgboost_model.json"
+        fake_file.mkdir()  # directory instead of file
+        with pytest.raises(IsADirectoryError, match="Expected a model file"):
+            model.load(path=model_dir)
+
     # --- Nominal: load from directory path ---
 
     def test_load_from_directory_path(self, fitted_model, tmp_path):
@@ -1160,14 +1169,14 @@ class TestXGBoostRegModelLoad:
     def test_load_overwrites_existing_model(self, fitted_model, tmp_path):
         """#067 — load() on an already-fitted model replaces _model."""
         y_original = fitted_model.predict(X=_X_TEST_PRED)
+        old_model_obj = fitted_model._model
         fitted_model.save(path=tmp_path)
 
-        # Load from saved: predictions must match the original
-        new_model = _make_xgb_model()
-        new_model._feature_names = fitted_model._feature_names
-        new_model.load(path=tmp_path)
-        y_loaded = new_model.predict(X=_X_TEST_PRED)
+        # Load into the already-fitted instance: should replace _model
+        fitted_model.load(path=tmp_path)
+        y_loaded = fitted_model.predict(X=_X_TEST_PRED)
 
+        assert fitted_model._model is not old_model_obj
         np.testing.assert_array_equal(y_original, y_loaded)
 
     # --- Security: JSON only, no pickle ---

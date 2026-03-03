@@ -78,4 +78,4 @@ Implémenter la méthode `load()` de `XGBoostRegModel` :
 - [x] `ruff check ai_trading/ tests/` passe sans erreur.
 - [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
 - [x] **Commit GREEN** : `[WS-XGB-5] #067 GREEN: load JSON natif XGBoostRegModel`.
-- [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-XGB-5] #067 — Chargement JSON native XGBoost`.
+- [x] **Pull Request ouverte** vers `Max6000i1` : `[WS-XGB-5] #067 — Chargement JSON native XGBoost`.
