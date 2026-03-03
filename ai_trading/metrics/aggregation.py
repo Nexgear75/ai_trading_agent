@@ -34,14 +34,14 @@ _TRADING_METRICS = (
     "exposure_time_frac",
 )
 
-_PREDICTION_METRICS = (
+PREDICTION_METRICS = (
     "mae",
     "rmse",
     "directional_accuracy",
     "spearman_ic",
 )
 
-_AGGREGATED_METRICS = _TRADING_METRICS + _PREDICTION_METRICS
+_AGGREGATED_METRICS = _TRADING_METRICS + PREDICTION_METRICS
 
 # Keys explicitly excluded from aggregation (I-04).
 # n_samples_* keys are reserved for the orchestrator (WS-12).
@@ -100,7 +100,11 @@ def aggregate_fold_metrics(
         else:
             arr = np.array(values, dtype=np.float64)
             result[f"{metric}_mean"] = float(np.mean(arr))
-            result[f"{metric}_std"] = float(np.std(arr, ddof=1))
+            # ddof=1 requires ≥2 values; with 1 fold, std is 0.0 by definition.
+            if len(arr) < 2:
+                result[f"{metric}_std"] = 0.0
+            else:
+                result[f"{metric}_std"] = float(np.std(arr, ddof=1))
 
     return result
 

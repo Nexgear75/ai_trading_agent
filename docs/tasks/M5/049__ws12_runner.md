@@ -1,6 +1,6 @@
 # Tâche — Orchestrateur de run (runner)
 
-Statut : TODO
+Statut : DONE
 Ordre : 049
 Workstream : WS-12
 Milestone : M5
@@ -60,31 +60,31 @@ Implémenter le module `ai_trading/pipeline/runner.py` qui orchestre le pipeline
 - Constante `VALID_STRATEGIES` listant toutes les stratégies valides.
 
 ## Critères d'acceptation
-- [ ] Le module `ai_trading/pipeline/runner.py` existe et est importable.
-- [ ] Run complet avec DummyModel → arborescence correcte, JSON valides, métriques non nulles.
-- [ ] Run complet avec baseline no_trade → bypass θ, net_pnl=0, n_trades=0.
-- [ ] Les warnings §14.4 sont émis si les seuils sont dépassés.
-- [ ] Le bypass θ pour `output_type == "signal"` est loggé au niveau INFO.
-- [ ] `strategy.framework` est dérivé automatiquement et correct pour chaque stratégie MVP.
-- [ ] Le `config_snapshot.yaml` est toujours écrit (inconditionnel).
-- [ ] La validation JSON Schema est exécutée en fin de run.
-- [ ] Les artefacts conditionnels (`preds_*.csv`, `equity_curve.csv`, modèle) respectent les flags `save_*`.
-- [ ] Test de causalité généralisé : modifier les prix OHLCV futurs → signaux passés identiques.
-- [ ] Tests couvrent les scénarios nominaux + erreurs + bords.
-- [ ] Suite de tests verte après implémentation.
-- [ ] `ruff check` passe sans erreur.
+- [x] Le module `ai_trading/pipeline/runner.py` existe et est importable.
+- [x] Run complet avec DummyModel → arborescence correcte, JSON valides, métriques non nulles.
+- [x] Run complet avec baseline no_trade → bypass θ, net_pnl=0, n_trades=0.
+- [x] Les warnings §14.4 sont émis si les seuils sont dépassés.
+- [x] Le bypass θ pour `output_type == "signal"` est loggé au niveau INFO.
+- [x] `strategy.framework` est dérivé automatiquement et correct pour chaque stratégie MVP.
+- [x] Le `config_snapshot.yaml` est toujours écrit (inconditionnel).
+- [x] La validation JSON Schema est exécutée en fin de run.
+- [x] Les artefacts conditionnels (`preds_*.csv`, `equity_curve.csv`, modèle) respectent les flags `save_*`.
+- [x] Test de causalité généralisé : modifier les prix OHLCV futurs → signaux passés identiques.
+- [x] Tests couvrent les scénarios nominaux + erreurs + bords.
+- [x] Suite de tests verte après implémentation.
+- [x] `ruff check` passe sans erreur.
 
 ## Pré-condition de démarrage
 - **Tous les tests existants sont GREEN** avant de commencer.
 - **Créer une branche dédiée** `task/049-runner` depuis `Max6000i1`.
 
 ## Checklist de fin de tâche
-- [ ] Branche `task/049-runner` créée depuis `Max6000i1`.
-- [ ] Tests RED écrits avant implémentation.
-- [ ] **Commit RED** : `[WS-12] #049 RED: tests orchestrateur runner`.
-- [ ] Tests GREEN passants et reproductibles.
-- [ ] Critères d'acceptation tous satisfaits.
-- [ ] `ruff check ai_trading/ tests/` passe sans erreur.
-- [ ] Fichier de tâche mis à jour (statut DONE, critères cochés).
-- [ ] **Commit GREEN** : `[WS-12] #049 GREEN: orchestrateur runner`.
-- [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-12] #049 — Orchestrateur de run (runner)`.
+- [x] Branche `task/049-runner` créée depuis `Max6000i1`.
+- [x] Tests RED écrits avant implémentation.
+- [x] **Commit RED** : `[WS-12] #049 RED: tests orchestrateur runner`.
+- [x] Tests GREEN passants et reproductibles.
+- [x] Critères d'acceptation tous satisfaits.
+- [x] `ruff check ai_trading/ tests/` passe sans erreur.
+- [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
+- [x] **Commit GREEN** : `[WS-12] #049 GREEN: orchestrateur runner`.
+- [x] **Pull Request ouverte** vers `Max6000i1` : `[WS-12] #049 — Orchestrateur de run (runner)`.
