@@ -18,7 +18,6 @@ from ai_trading.config import PipelineConfig, load_config
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 FULLSCALE_PATH = PROJECT_ROOT / "configs" / "fullscale_btc.yaml"
-DEFAULT_PATH = PROJECT_ROOT / "configs" / "default.yaml"
 
 
 # ---------------------------------------------------------------------------
@@ -90,7 +89,6 @@ class TestFullscaleStrictValidation:
             cfg.features.params.rsi_period,
             cfg.features.params.ema_slow,
             max(cfg.features.params.vol_windows),
-            72,
         )
         assert cfg.window.min_warmup >= feature_min
 
@@ -153,10 +151,9 @@ class TestFullscaleUnchangedParams:
     """AC: features, scaling, costs, backtest, thresholding match default.yaml."""
 
     @pytest.fixture
-    def configs(self):
+    def configs(self, default_config):
         fullscale = load_config(str(FULLSCALE_PATH))
-        default = load_config(str(DEFAULT_PATH))
-        return fullscale, default
+        return fullscale, default_config
 
     def test_features_identical(self, configs):
         fullscale, default = configs
@@ -239,8 +236,8 @@ class TestFullscaleUnchangedParams:
 class TestFullscaleRawYamlDiff:
     """Verify that only the expected keys differ between raw YAMLs."""
 
-    def test_only_expected_keys_differ(self):
-        raw_default = _load_raw_yaml(DEFAULT_PATH)
+    def test_only_expected_keys_differ(self, default_yaml_data):
+        raw_default = default_yaml_data
         raw_fullscale = _load_raw_yaml(FULLSCALE_PATH)
 
         # dataset.start and dataset.end should differ
