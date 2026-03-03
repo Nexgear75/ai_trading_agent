@@ -21,14 +21,11 @@ import importlib
 import json
 import logging
 from pathlib import Path
-from unittest.mock import patch
 
 import numpy as np
 import pandas as pd
 import pytest
 import yaml
-
-from tests.conftest import PROJECT_ROOT
 
 # ---------------------------------------------------------------------------
 # Helpers — synthetic OHLCV on disk
