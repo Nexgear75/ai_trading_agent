@@ -17,6 +17,7 @@
 - [Features MVP](#features-mvp-9)
 - [Installation](#installation)
 - [Utilisation](#utilisation)
+- [XGBoost](#xgboost)
 - [Docker](#docker)
 - [Configuration](#configuration)
 - [Walk-Forward Rolling](#walk-forward-rolling)
@@ -185,6 +186,43 @@ python -m ai_trading --config configs/default.yaml \
   --set strategy.strategy_type=baseline \
   --set strategy.name=buy_hold
 ```
+
+### XGBoost
+
+La configuration par défaut lance déjà XGBoost (`strategy.name: xgboost_reg`). Les hyperparamètres sont dans `configs/default.yaml`, section `models.xgboost`.
+
+```bash
+# Run XGBoost avec la config par défaut
+python -m ai_trading --config configs/default.yaml
+
+# Overrider des hyperparamètres depuis la CLI
+python -m ai_trading --config configs/default.yaml \
+  --set models.xgboost.max_depth=6 \
+  --set models.xgboost.n_estimators=1000 \
+  --set models.xgboost.learning_rate=0.01
+
+# Exemple : XGBoost avec régularisation renforcée
+python -m ai_trading --config configs/default.yaml \
+  --set models.xgboost.reg_alpha=0.1 \
+  --set models.xgboost.reg_lambda=5.0 \
+  --set models.xgboost.subsample=0.7
+```
+
+**Hyperparamètres XGBoost** (valeurs par défaut) :
+
+| Paramètre | Défaut | Description |
+|---|---|---|
+| `max_depth` | 5 | Profondeur max des arbres |
+| `n_estimators` | 500 | Nombre de boosting rounds |
+| `learning_rate` | 0.05 | Taux d'apprentissage (shrinkage) |
+| `subsample` | 0.8 | Fraction d'échantillons par arbre |
+| `colsample_bytree` | 0.8 | Fraction de features par arbre |
+| `reg_alpha` | 0.0 | Régularisation L1 |
+| `reg_lambda` | 1.0 | Régularisation L2 |
+
+XGBoost utilise l'adapter flat de `dataset.py` : les séquences `(N, L, F)` sont aplanies en `(N, L×F)` avant entraînement. L'early stopping est contrôlé par `training.early_stopping_patience` (10 rounds sans amélioration par défaut).
+
+Les artefacts incluent le modèle sérialisé (`model.json`) dans chaque fold, permettant la reproductibilité bit-exacte.
 
 ---
 
