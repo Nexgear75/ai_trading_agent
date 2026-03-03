@@ -44,7 +44,7 @@ tests/test_xgboost_integration.py           (185 lignes ajoutées — tests)
 |---|---|---|
 | Statut DONE | ✅ | Fichier tâche ligne 3 : `Statut : DONE` |
 | Critères d'acceptation cochés | ✅ (8/8) | Tous `[x]` dans la section « Critères d'acceptation » |
-| Checklist cochée | ✅ (7/9) | 7 items cochés. 2 items non cochés : « Commit GREEN » et « Pull Request ouverte » — ces items sont post-commit par construction (le fichier est créé dans le GREEN commit lui-même, impossible de les cocher avant). Pattern accepté. |
+| Checklist cochée | ✅ (8/9) | 8 items cochés. 1 item non coché : « Pull Request ouverte » — cet item est post-commit par construction. Pattern accepté. |
 
 Mapping critères → code :
 
