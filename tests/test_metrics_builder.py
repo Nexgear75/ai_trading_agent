@@ -635,6 +635,54 @@ class TestStrictValidation:
                 aggregate_data=_minimal_aggregate_data(),
             )
 
+    def test_missing_prediction_required_key_raises(self):
+        """Missing required prediction sub-key (mae) raises KeyError."""
+        fold = _minimal_fold_data(0)
+        del fold["prediction"]["mae"]
+        with pytest.raises(KeyError, match="mae"):
+            build_metrics(
+                run_id="20260227_120000_xgboost_reg",
+                strategy_info=_minimal_strategy_info(),
+                folds_data=[fold],
+                aggregate_data=_minimal_aggregate_data(),
+            )
+
+    def test_missing_trading_required_key_raises(self):
+        """Missing required trading sub-key (n_trades) raises KeyError."""
+        fold = _minimal_fold_data(0)
+        del fold["trading"]["n_trades"]
+        with pytest.raises(KeyError, match="n_trades"):
+            build_metrics(
+                run_id="20260227_120000_xgboost_reg",
+                strategy_info=_minimal_strategy_info(),
+                folds_data=[fold],
+                aggregate_data=_minimal_aggregate_data(),
+            )
+
+    def test_missing_prediction_directional_accuracy_raises(self):
+        """Missing required prediction key directional_accuracy raises KeyError."""
+        fold = _minimal_fold_data(0)
+        del fold["prediction"]["directional_accuracy"]
+        with pytest.raises(KeyError, match="directional_accuracy"):
+            build_metrics(
+                run_id="20260227_120000_xgboost_reg",
+                strategy_info=_minimal_strategy_info(),
+                folds_data=[fold],
+                aggregate_data=_minimal_aggregate_data(),
+            )
+
+    def test_missing_trading_net_pnl_raises(self):
+        """Missing required trading key net_pnl raises KeyError."""
+        fold = _minimal_fold_data(0)
+        del fold["trading"]["net_pnl"]
+        with pytest.raises(KeyError, match="net_pnl"):
+            build_metrics(
+                run_id="20260227_120000_xgboost_reg",
+                strategy_info=_minimal_strategy_info(),
+                folds_data=[fold],
+                aggregate_data=_minimal_aggregate_data(),
+            )
+
 
 # ===================================================================
 # AC-8: Write functions — file I/O
@@ -697,6 +745,37 @@ class TestWriteFunctions:
             (fold_dir / "metrics_fold.json").read_text(encoding="utf-8")
         )
         assert loaded["fold_id"] == 0
+
+    def test_write_metrics_rejects_nan(self, tmp_path):
+        """write_metrics rejects NaN values with allow_nan=False."""
+        metrics = build_metrics(
+            run_id="20260227_120000_xgboost_reg",
+            strategy_info=_minimal_strategy_info(),
+            folds_data=[_minimal_fold_data(0)],
+            aggregate_data=_minimal_aggregate_data(),
+        )
+        metrics["folds"][0]["prediction"]["mae"] = float("nan")
+        with pytest.raises(ValueError):
+            write_metrics(metrics, tmp_path / "run")
+
+    def test_write_fold_metrics_rejects_nan(self, tmp_path):
+        """write_fold_metrics rejects NaN values with allow_nan=False."""
+        fold = _minimal_fold_data(0)
+        fold["prediction"]["mae"] = float("nan")
+        with pytest.raises(ValueError):
+            write_fold_metrics(fold, tmp_path / "fold")
+
+    def test_write_metrics_rejects_inf(self, tmp_path):
+        """write_metrics rejects inf values with allow_nan=False."""
+        metrics = build_metrics(
+            run_id="20260227_120000_xgboost_reg",
+            strategy_info=_minimal_strategy_info(),
+            folds_data=[_minimal_fold_data(0)],
+            aggregate_data=_minimal_aggregate_data(),
+        )
+        metrics["folds"][0]["trading"]["net_pnl"] = float("inf")
+        with pytest.raises(ValueError):
+            write_metrics(metrics, tmp_path / "run")
 
 
 # ===================================================================

@@ -48,6 +48,12 @@ _TRADING_FLOAT_KEYS = (
 
 _TRADING_INT_KEYS = ("n_trades",)
 
+_REQUIRED_PREDICTION_KEYS = frozenset({"mae", "rmse", "directional_accuracy"})
+
+_REQUIRED_TRADING_KEYS = frozenset(
+    {"net_pnl", "net_return", "max_drawdown", "profit_factor", "n_trades"}
+)
+
 
 # ---------------------------------------------------------------------------
 # Internal helpers
@@ -68,6 +74,9 @@ def _ensure_int(value: int) -> int:
 
 def _normalize_prediction(prediction: dict) -> dict:
     """Normalize prediction metrics to float64."""
+    for key in _REQUIRED_PREDICTION_KEYS:
+        if key not in prediction:
+            raise KeyError(f"Missing required prediction key: '{key}'")
     result: dict = {}
     for key in _PREDICTION_FLOAT_KEYS:
         if key in prediction:
@@ -77,6 +86,9 @@ def _normalize_prediction(prediction: dict) -> dict:
 
 def _normalize_trading(trading: dict) -> dict:
     """Normalize trading metrics: floats for metrics, int for n_trades."""
+    for key in _REQUIRED_TRADING_KEYS:
+        if key not in trading:
+            raise KeyError(f"Missing required trading key: '{key}'")
     result: dict = {}
     for key in _TRADING_FLOAT_KEYS:
         if key in trading:
@@ -226,7 +238,7 @@ def write_metrics(metrics_data: dict, run_dir: Path) -> None:
     run_dir.mkdir(parents=True, exist_ok=True)
     output_path = run_dir / "metrics.json"
     output_path.write_text(
-        json.dumps(metrics_data, indent=2, ensure_ascii=False) + "\n",
+        json.dumps(metrics_data, indent=2, ensure_ascii=False, allow_nan=False) + "\n",
         encoding="utf-8",
     )
 
@@ -244,8 +256,9 @@ def write_fold_metrics(fold_data: dict, fold_dir: Path) -> None:
         Created (with parents) if it does not exist.
     """
     fold_dir.mkdir(parents=True, exist_ok=True)
+    normalized = _normalize_fold(fold_data)
     output_path = fold_dir / "metrics_fold.json"
     output_path.write_text(
-        json.dumps(fold_data, indent=2, ensure_ascii=False) + "\n",
+        json.dumps(normalized, indent=2, ensure_ascii=False, allow_nan=False) + "\n",
         encoding="utf-8",
     )
