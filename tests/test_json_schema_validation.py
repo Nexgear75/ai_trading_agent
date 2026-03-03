@@ -30,7 +30,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 def example_manifest():
     """Load the example manifest from docs/specifications/example_manifest.json."""
     path = PROJECT_ROOT / "docs" / "specifications" / "example_manifest.json"
-    with open(path) as f:
+    with open(path, encoding="utf-8") as f:
         return json.load(f)
 
 
@@ -38,7 +38,7 @@ def example_manifest():
 def example_metrics():
     """Load the example metrics from docs/specifications/example_metrics.json."""
     path = PROJECT_ROOT / "docs" / "specifications" / "example_metrics.json"
-    with open(path) as f:
+    with open(path, encoding="utf-8") as f:
         return json.load(f)
 
 

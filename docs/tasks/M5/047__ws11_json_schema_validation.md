@@ -61,5 +61,5 @@ Les schémas JSON sont chargés depuis `docs/specifications/manifest.schema.json
 - [x] Critères d'acceptation tous satisfaits.
 - [x] `ruff check ai_trading/ tests/` passe sans erreur.
 - [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
-- [ ] **Commit GREEN** : `[WS-11] #047 GREEN: validation schémas JSON`.
+- [x] **Commit GREEN** : `[WS-11] #047 GREEN: validation schémas JSON`.
 - [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-11] #047 — Validation des schémas JSON`.

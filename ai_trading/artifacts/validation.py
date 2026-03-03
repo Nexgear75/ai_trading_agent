@@ -37,7 +37,7 @@ def _load_schema(schema_name: str) -> dict:
         raise FileNotFoundError(
             f"Schema file not found: {schema_path}"
         )
-    with open(schema_path) as f:
+    with open(schema_path, encoding="utf-8") as f:
         return json.load(f)
 
 
