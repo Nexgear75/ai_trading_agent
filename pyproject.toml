@@ -64,4 +64,7 @@ warn_return_any = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
-addopts = "-v --tb=short"
+addopts = "-v --tb=short -m \"not fullscale\""
+markers = [
+    "fullscale: full-scale integration tests requiring network access",
+]
