@@ -269,6 +269,11 @@ class TestSeedEpsilonOutputDir:
         with pytest.raises(ValidationError, match="global_seed"):
             load_config(tmp_yaml(data))
 
+    def test_global_seed_zero_raises(self, default_yaml_data, tmp_yaml):
+        data = _mutate(default_yaml_data, "reproducibility.global_seed", 0)
+        with pytest.raises(ValidationError, match="global_seed"):
+            load_config(tmp_yaml(data))
+
     def test_sharpe_epsilon_zero_raises(self, default_yaml_data, tmp_yaml):
         data = _mutate(default_yaml_data, "metrics.sharpe_epsilon", 0)
         with pytest.raises(ValidationError, match="sharpe_epsilon"):

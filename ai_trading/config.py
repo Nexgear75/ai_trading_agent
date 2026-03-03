@@ -301,7 +301,7 @@ class MetricsConfig(_StrictBase):
 
 
 class ReproducibilityConfig(_StrictBase):
-    global_seed: int = Field(ge=0)
+    global_seed: int = Field(ge=1)
     deterministic_torch: bool
 
 
