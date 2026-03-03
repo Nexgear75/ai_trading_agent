@@ -133,6 +133,7 @@ class XGBoostRegModel(BaseModel):
         return {
             "best_iteration": self._model.best_iteration,
             "best_score": self._model.best_score,
+            "n_features_in": x_tab_train.shape[1],
         }
 
     def predict(
