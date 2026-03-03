@@ -14,6 +14,7 @@ Run explicitly with: ``pytest -m fullscale tests/test_fullscale_btc.py -v --time
 """
 
 import json
+import math
 import subprocess
 from pathlib import Path
 
@@ -204,3 +205,113 @@ class TestFullscaleRunAll:
             assert (fold_dir / "trades.csv").is_file(), (
                 f"trades.csv not found in {fold_dir.name}"
             )
+
+    # ------------------------------------------------------------------
+    # 10. Metrics coherence — Task #057
+    # ------------------------------------------------------------------
+
+    def test_fullscale_metrics_coherence(self):
+        """#057 — Validate numerical coherence of metrics from fullscale run.
+
+        For each fold:
+        - net_pnl is a finite float
+        - max_drawdown ∈ [0, 1]
+        - n_trades >= 0
+        - sharpe is a finite float (if not null)
+        - hit_rate ∈ [0, 1] if n_trades > 0 (if not null)
+
+        Aggregate:
+        - mean and std present for each trading metric
+        - All mean/std values are finite floats
+        """
+        run_dir = _get_run_dir()
+        metrics = _load_json(run_dir / "metrics.json")
+
+        # --- Per-fold validation ---
+        folds = metrics["folds"]
+        assert len(folds) >= 1, "metrics.json must contain at least 1 fold"
+
+        for fold in folds:
+            fold_id = fold["fold_id"]
+            trading = fold["trading"]
+
+            # net_pnl: finite float
+            net_pnl = trading["net_pnl"]
+            assert isinstance(net_pnl, (int, float)), (
+                f"fold {fold_id}: net_pnl is not numeric: {net_pnl!r}"
+            )
+            assert math.isfinite(net_pnl), (
+                f"fold {fold_id}: net_pnl is not finite: {net_pnl}"
+            )
+
+            # max_drawdown ∈ [0, 1]
+            mdd = trading["max_drawdown"]
+            assert isinstance(mdd, (int, float)), (
+                f"fold {fold_id}: max_drawdown is not numeric: {mdd!r}"
+            )
+            assert 0.0 <= mdd <= 1.0, (
+                f"fold {fold_id}: max_drawdown out of [0, 1]: {mdd}"
+            )
+
+            # n_trades >= 0
+            n_trades = trading["n_trades"]
+            assert isinstance(n_trades, int), (
+                f"fold {fold_id}: n_trades is not int: {n_trades!r}"
+            )
+            assert n_trades >= 0, (
+                f"fold {fold_id}: n_trades negative: {n_trades}"
+            )
+
+            # sharpe: finite float if not null
+            sharpe = trading["sharpe"]
+            if sharpe is not None:
+                assert isinstance(sharpe, (int, float)), (
+                    f"fold {fold_id}: sharpe is not numeric: {sharpe!r}"
+                )
+                assert math.isfinite(sharpe), (
+                    f"fold {fold_id}: sharpe is not finite: {sharpe}"
+                )
+
+            # hit_rate ∈ [0, 1] if n_trades > 0 and not null
+            hit_rate = trading["hit_rate"]
+            if hit_rate is not None and n_trades > 0:
+                assert isinstance(hit_rate, (int, float)), (
+                    f"fold {fold_id}: hit_rate is not numeric: {hit_rate!r}"
+                )
+                assert 0.0 <= hit_rate <= 1.0, (
+                    f"fold {fold_id}: hit_rate out of [0, 1]: {hit_rate}"
+                )
+
+        # --- Aggregate validation ---
+        aggregate = metrics["aggregate"]
+        agg_trading = aggregate["trading"]
+
+        assert "mean" in agg_trading, "aggregate.trading missing 'mean'"
+        assert "std" in agg_trading, "aggregate.trading missing 'std'"
+
+        # Every key in mean must also be in std
+        mean_keys = set(agg_trading["mean"].keys())
+        std_keys = set(agg_trading["std"].keys())
+        assert mean_keys == std_keys, (
+            f"aggregate mean/std key mismatch: mean={mean_keys}, std={std_keys}"
+        )
+
+        # All mean values: finite floats
+        for key, val in agg_trading["mean"].items():
+            if val is not None:
+                assert isinstance(val, (int, float)), (
+                    f"aggregate.trading.mean.{key} is not numeric: {val!r}"
+                )
+                assert math.isfinite(val), (
+                    f"aggregate.trading.mean.{key} is not finite: {val}"
+                )
+
+        # All std values: finite floats
+        for key, val in agg_trading["std"].items():
+            if val is not None:
+                assert isinstance(val, (int, float)), (
+                    f"aggregate.trading.std.{key} is not numeric: {val!r}"
+                )
+                assert math.isfinite(val), (
+                    f"aggregate.trading.std.{key} is not finite: {val}"
+                )
