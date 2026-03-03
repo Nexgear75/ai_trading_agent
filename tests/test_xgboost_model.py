@@ -309,6 +309,84 @@ class TestXGBoostRegModelFit:
                 run_dir=tmp_path,
             )
 
+    def test_fit_raises_typeerror_y_train_not_float32(self, default_config, tmp_path):
+        """#062 FIX — TypeError if y_train.dtype is float64."""
+        model = _make_xgb_model()
+        y_f64 = _Y_TRAIN_FIT.astype(np.float64)
+        with pytest.raises(TypeError, match="y_train.*float32"):
+            model.fit(
+                X_train=_X_TRAIN_FIT,
+                y_train=y_f64,
+                X_val=_X_VAL_FIT,
+                y_val=_Y_VAL_FIT,
+                config=default_config,
+                run_dir=tmp_path,
+            )
+
+    def test_fit_raises_typeerror_y_val_not_float32(self, default_config, tmp_path):
+        """#062 FIX — TypeError if y_val.dtype is float64."""
+        model = _make_xgb_model()
+        y_val_f64 = _Y_VAL_FIT.astype(np.float64)
+        with pytest.raises(TypeError, match="y_val.*float32"):
+            model.fit(
+                X_train=_X_TRAIN_FIT,
+                y_train=_Y_TRAIN_FIT,
+                X_val=_X_VAL_FIT,
+                y_val=y_val_f64,
+                config=default_config,
+                run_dir=tmp_path,
+            )
+
+    # --- Boundary: N=0 and N=1 ---
+
+    def test_fit_boundary_n_train_zero(self, default_config, tmp_path):
+        """#062 FIX — fit() with N_train=0 raises ValueError (empty training set)."""
+        model = _make_xgb_model()
+        x_empty = np.empty((0, _L_FIT, _F_FIT), dtype=np.float32)
+        y_empty = np.empty((0,), dtype=np.float32)
+        with pytest.raises(ValueError, match="X_train.*at least 1 sample"):
+            model.fit(
+                X_train=x_empty,
+                y_train=y_empty,
+                X_val=_X_VAL_FIT,
+                y_val=_Y_VAL_FIT,
+                config=default_config,
+                run_dir=tmp_path,
+            )
+
+    def test_fit_boundary_n_val_zero(self, default_config, tmp_path):
+        """#062 FIX — fit() with N_val=0 raises ValueError (empty val set)."""
+        model = _make_xgb_model()
+        x_val_empty = np.empty((0, _L_FIT, _F_FIT), dtype=np.float32)
+        y_val_empty = np.empty((0,), dtype=np.float32)
+        with pytest.raises(ValueError, match="X_val.*at least 1 sample"):
+            model.fit(
+                X_train=_X_TRAIN_FIT,
+                y_train=_Y_TRAIN_FIT,
+                X_val=x_val_empty,
+                y_val=y_val_empty,
+                config=default_config,
+                run_dir=tmp_path,
+            )
+
+    def test_fit_boundary_n_train_one(self, default_config, tmp_path):
+        """#062 FIX — fit() with N_train=1 runs without error."""
+        rng = np.random.default_rng(6201)
+        x1 = rng.standard_normal((1, _L_FIT, _F_FIT)).astype(np.float32)
+        y1 = rng.standard_normal((1,)).astype(np.float32)
+        x_val = rng.standard_normal((1, _L_FIT, _F_FIT)).astype(np.float32)
+        y_val = rng.standard_normal((1,)).astype(np.float32)
+        model = _make_xgb_model()
+        model.fit(
+            X_train=x1,
+            y_train=y1,
+            X_val=x_val,
+            y_val=y_val,
+            config=default_config,
+            run_dir=tmp_path,
+        )
+        assert model._model is not None
+
     # --- Nominal training ---
 
     def test_fit_nominal_no_error(self, default_config, tmp_path):

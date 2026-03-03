@@ -58,6 +58,10 @@ class XGBoostRegModel(BaseModel):
                 f"X_val must be 3D (N, L, F), got {X_val.ndim}D "
                 f"with shape {X_val.shape}."
             )
+        if X_train.shape[0] == 0:
+            raise ValueError("X_train must have at least 1 sample, got 0.")
+        if X_val.shape[0] == 0:
+            raise ValueError("X_val must have at least 1 sample, got 0.")
         if X_train.shape[0] != y_train.shape[0]:
             raise ValueError(
                 f"X_train and y_train sample count mismatch: "
@@ -75,6 +79,14 @@ class XGBoostRegModel(BaseModel):
         if X_val.dtype != np.float32:
             raise TypeError(
                 f"X_val must be float32, got {X_val.dtype}."
+            )
+        if y_train.dtype != np.float32:
+            raise TypeError(
+                f"y_train must be float32, got {y_train.dtype}."
+            )
+        if y_val.dtype != np.float32:
+            raise TypeError(
+                f"y_val must be float32, got {y_val.dtype}."
             )
 
         # --- Flatten 3D → 2D via adapter ---
