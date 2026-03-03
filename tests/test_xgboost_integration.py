@@ -8,12 +8,16 @@ Task #070 — WS-XGB-7: anti-leak tests for the XGBoost pipeline path.
 
 Task #071 — WS-XGB-7: reproducibility tests — metrics determinism,
 trades SHA-256, serialization round-trip.
+
+Task #072 — WS-XGB-7: gate G-XGB-Integration — consolidated validation
+of all 8 gate criteria.
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
+import subprocess
 from pathlib import Path
 from unittest.mock import patch
 
@@ -734,4 +738,208 @@ class TestXGBoostReproducibility:
         np.testing.assert_array_equal(
             y_hat_before, y_hat_after,
             err_msg="Predictions differ after save/load round-trip",
+        )
+
+
+# ---------------------------------------------------------------------------
+# TestGateXGBIntegration
+# ---------------------------------------------------------------------------
+
+
+class TestGateXGBIntegration:
+    """#072 — Gate G-XGB-Integration: consolidated validation of all 8 criteria.
+
+    Runs the pipeline once and checks:
+    1. Run complet sans crash
+    2. manifest.json and metrics.json valid (JSON Schema)
+    3. strategy.name == 'xgboost_reg' and strategy.framework == 'xgboost'
+    4. Prediction metrics non-null (MAE, RMSE, DA)
+    5. Trading metrics present and coherent
+    6. Anti-leak: future price modification → predictions unchanged for t ≤ T
+    7. Reproducibility: two runs same seed → metrics.json identical (atol=1e-7)
+    8. ruff check ai_trading/ tests/ clean
+    """
+
+    @pytest.fixture(autouse=True)
+    def setup(self, tmp_path: Path) -> None:
+        self.tmp = tmp_path
+        self.cfg_dict = _make_xgboost_config_dict(tmp_path)
+        self.cfg_path = write_config(tmp_path, self.cfg_dict)
+
+    def _run(self) -> Path:
+        """Load config and run the pipeline, returning the run directory."""
+        from ai_trading.config import load_config
+        from ai_trading.pipeline.runner import run_pipeline
+
+        config = load_config(str(self.cfg_path))
+        return run_pipeline(config)
+
+    # -- Criterion 1: Run complet sans crash -----------------------------
+
+    def test_gate_criterion_1_run_completes(self):
+        """#072 — Gate criterion 1: full pipeline run completes without crash."""
+        run_dir = self._run()
+        assert isinstance(run_dir, Path)
+        assert run_dir.is_dir()
+        # At least one fold was produced
+        folds_dir = run_dir / "folds"
+        assert folds_dir.is_dir()
+        fold_dirs = sorted(folds_dir.iterdir())
+        assert len(fold_dirs) >= 1
+
+    # -- Criterion 2: manifest.json and metrics.json valid JSON Schema ---
+
+    def test_gate_criterion_2_json_schema_valid(self):
+        """#072 — Gate criterion 2: manifest.json and metrics.json pass schema."""
+        from ai_trading.artifacts.validation import validate_manifest, validate_metrics
+
+        run_dir = self._run()
+
+        manifest_path = run_dir / "manifest.json"
+        assert manifest_path.is_file()
+        manifest = json.loads(manifest_path.read_text())
+        validate_manifest(manifest)
+
+        metrics_path = run_dir / "metrics.json"
+        assert metrics_path.is_file()
+        metrics = json.loads(metrics_path.read_text())
+        validate_metrics(metrics)
+
+    # -- Criterion 3: strategy.name and strategy.framework ---------------
+
+    def test_gate_criterion_3_strategy_fields(self):
+        """#072 — Gate criterion 3: strategy.name == 'xgboost_reg',
+        strategy.framework == 'xgboost' in manifest.
+        """
+        run_dir = self._run()
+        manifest = json.loads((run_dir / "manifest.json").read_text())
+        assert manifest["strategy"]["name"] == "xgboost_reg"
+        assert manifest["strategy"]["framework"] == "xgboost"
+
+    # -- Criterion 4: Prediction metrics non-null ------------------------
+
+    def test_gate_criterion_4_prediction_metrics_non_null(self):
+        """#072 — Gate criterion 4: MAE > 0, RMSE > 0, DA in [0,1]."""
+        run_dir = self._run()
+        metrics = json.loads((run_dir / "metrics.json").read_text())
+        assert len(metrics["folds"]) >= 1
+        for fold in metrics["folds"]:
+            pred = fold["prediction"]
+            assert pred["mae"] > 0, f"MAE must be > 0, got {pred['mae']}"
+            assert pred["rmse"] > 0, f"RMSE must be > 0, got {pred['rmse']}"
+            assert 0.0 <= pred["directional_accuracy"] <= 1.0, (
+                f"DA must be in [0,1], got {pred['directional_accuracy']}"
+            )
+
+    # -- Criterion 5: Trading metrics present and coherent ---------------
+
+    def test_gate_criterion_5_trading_metrics_present(self):
+        """#072 — Gate criterion 5: trading metrics present in each fold."""
+        run_dir = self._run()
+        metrics = json.loads((run_dir / "metrics.json").read_text())
+        for fold in metrics["folds"]:
+            trading = fold["trading"]
+            assert trading["net_pnl"] is not None
+            assert trading["n_trades"] is not None
+            assert trading["max_drawdown"] is not None
+            # Coherence: max_drawdown >= 0 (absolute drawdown convention)
+            assert trading["max_drawdown"] >= 0.0, (
+                f"max_drawdown must be >= 0, got {trading['max_drawdown']}"
+            )
+
+    # -- Criterion 6: Anti-leak (future perturbation) --------------------
+
+    def test_gate_criterion_6_anti_leak(self):
+        """#072 — Gate criterion 6: modifying future OHLCV prices does not
+        change predictions/metrics for t ≤ T (first fold).
+        """
+        from ai_trading.config import load_config
+        from ai_trading.pipeline.runner import run_pipeline
+
+        # Run 1: original
+        config1 = load_config(str(self.cfg_path))
+        run_dir1 = run_pipeline(config1)
+        metrics1 = json.loads((run_dir1 / "metrics.json").read_text())
+
+        # Perturb last 30 bars (well beyond first fold's test window)
+        raw_dir = Path(self.cfg_dict["dataset"]["raw_dir"])
+        pq_path = raw_dir / "BTCUSDT_1h.parquet"
+        df = pd.read_parquet(pq_path)
+        df.loc[df.index[-30:], "close"] = df.loc[df.index[-30:], "close"] * 2.0
+        df.loc[df.index[-30:], "high"] = df.loc[df.index[-30:], "high"] * 2.0
+        df.to_parquet(pq_path, index=False)
+
+        # Run 2: perturbed data, separate output
+        output_dir2 = self.tmp / "runs_gate6"
+        output_dir2.mkdir(parents=True, exist_ok=True)
+        cfg_dict2 = dict(self.cfg_dict)
+        cfg_dict2["artifacts"] = dict(self.cfg_dict["artifacts"])
+        cfg_dict2["artifacts"]["output_dir"] = str(output_dir2)
+        cfg2_dir = self.tmp / "cfg_gate6"
+        cfg2_dir.mkdir(parents=True, exist_ok=True)
+        cfg_path2 = write_config(cfg2_dir, cfg_dict2)
+        config2 = load_config(str(cfg_path2))
+        run_dir2 = run_pipeline(config2)
+        metrics2 = json.loads((run_dir2 / "metrics.json").read_text())
+
+        # First fold metrics must be identical
+        assert len(metrics1["folds"]) >= 1
+        assert len(metrics2["folds"]) >= 1
+        f1 = metrics1["folds"][0]
+        f2 = metrics2["folds"][0]
+        for key in ("mae", "rmse", "directional_accuracy"):
+            assert f1["prediction"][key] == pytest.approx(
+                f2["prediction"][key], abs=1e-12
+            ), f"Gate criterion 6 failed: prediction '{key}' differs"
+        for key in ("n_trades", "net_pnl", "max_drawdown"):
+            assert f1["trading"][key] == pytest.approx(
+                f2["trading"][key], abs=1e-12
+            ), f"Gate criterion 6 failed: trading '{key}' differs"
+
+    # -- Criterion 7: Reproducibility (two runs, atol=1e-7) --------------
+
+    def test_gate_criterion_7_reproducibility(self):
+        """#072 — Gate criterion 7: two runs with same seed produce
+        metrics.json identical field-by-field (atol=1e-7).
+        """
+        from ai_trading.config import load_config
+        from ai_trading.pipeline.runner import run_pipeline
+
+        config1 = load_config(str(self.cfg_path))
+        run_dir1 = run_pipeline(config1)
+        metrics1 = json.loads((run_dir1 / "metrics.json").read_text())
+
+        # Second run — separate output dir
+        output_dir2 = self.tmp / "runs_gate7"
+        output_dir2.mkdir(parents=True, exist_ok=True)
+        cfg_dict2 = dict(self.cfg_dict)
+        cfg_dict2["artifacts"] = dict(self.cfg_dict["artifacts"])
+        cfg_dict2["artifacts"]["output_dir"] = str(output_dir2)
+        cfg2_dir = self.tmp / "cfg_gate7"
+        cfg2_dir.mkdir(parents=True, exist_ok=True)
+        cfg_path2 = write_config(cfg2_dir, cfg_dict2)
+        config2 = load_config(str(cfg_path2))
+        run_dir2 = run_pipeline(config2)
+        metrics2 = json.loads((run_dir2 / "metrics.json").read_text())
+
+        # Remove non-deterministic metadata
+        for m in (metrics1, metrics2):
+            m.pop("run_id", None)
+            m.pop("timestamp", None)
+            m.pop("run_dir", None)
+
+        _deep_compare_metrics(metrics1, metrics2, "gate7.metrics", atol=1e-7)
+
+    # -- Criterion 8: ruff check clean ----------------------------------
+
+    def test_gate_criterion_8_ruff_check_clean(self):
+        """#072 — Gate criterion 8: ruff check ai_trading/ tests/ exits 0."""
+        result = subprocess.run(
+            ["ruff", "check", "ai_trading/", "tests/"],
+            capture_output=True,
+            text=True,
+            cwd=str(Path(__file__).resolve().parent.parent),
+        )
+        assert result.returncode == 0, (
+            f"ruff check failed with:\n{result.stdout}\n{result.stderr}"
         )
