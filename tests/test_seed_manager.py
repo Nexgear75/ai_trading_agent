@@ -185,9 +185,9 @@ class TestPyTorchOptional:
         """When PyTorch is unavailable, an INFO log is emitted."""
         from ai_trading.utils.seed import set_global_seed
 
-        with mock.patch.dict(sys.modules, {"torch": None}):
-            with caplog.at_level(logging.INFO, logger="ai_trading.utils.seed"):
-                set_global_seed(42, deterministic_torch=True)
+        with mock.patch.dict(sys.modules, {"torch": None}), \
+             caplog.at_level(logging.INFO, logger="ai_trading.utils.seed"):
+            set_global_seed(42, deterministic_torch=True)
 
         assert any("torch" in r.message.lower() or "pytorch" in r.message.lower()
                     for r in caplog.records if r.levelno == logging.INFO)
@@ -242,9 +242,9 @@ class TestPyTorchDeterministic:
         )
         mock_torch.cuda = mock.MagicMock()
 
-        with mock.patch.dict(sys.modules, {"torch": mock_torch}):
-            with caplog.at_level(logging.WARNING, logger="ai_trading.utils.seed"):
-                set_global_seed(42, deterministic_torch=True)
+        with mock.patch.dict(sys.modules, {"torch": mock_torch}), \
+             caplog.at_level(logging.WARNING, logger="ai_trading.utils.seed"):
+            set_global_seed(42, deterministic_torch=True)
 
         # Verify warn_only=True was called
         calls = mock_torch.use_deterministic_algorithms.call_args_list

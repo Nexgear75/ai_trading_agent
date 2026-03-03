@@ -1,6 +1,6 @@
 # Tâche — Seed manager
 
-Statut : TODO
+Statut : DONE
 Ordre : 048
 Workstream : WS-12
 Milestone : M5
@@ -35,28 +35,28 @@ Implémenter le module `ai_trading/utils/seed.py` qui :
 - La fonction gère gracieusement l'absence de PyTorch (import optionnel).
 
 ## Critères d'acceptation
-- [ ] Le module `ai_trading/utils/seed.py` existe et est importable.
-- [ ] `set_global_seed(42, False)` fixe les seeds pour `random`, `numpy`, `PYTHONHASHSEED`.
-- [ ] `set_global_seed(42, True)` active en plus `torch.use_deterministic_algorithms(True)` si PyTorch est installé.
-- [ ] Si PyTorch n'est pas installé, la fonction ne plante pas (import optionnel, pas de fallback silencieux — log INFO indiquant que PyTorch n'est pas disponible).
-- [ ] Si `deterministic_torch=True` et que l'activation échoue, le fallback `warn_only=True` est activé et un warning est loggé au niveau WARNING.
-- [ ] Deux appels successifs avec la même seed produisent les mêmes séquences `numpy.random.rand(10)` et `random.random()`.
-- [ ] Erreur explicite si seed non entier ou négatif.
-- [ ] Tests couvrent les scénarios nominaux + erreurs + bords.
-- [ ] Suite de tests verte après implémentation.
-- [ ] `ruff check` passe sans erreur.
+- [x] Le module `ai_trading/utils/seed.py` existe et est importable.
+- [x] `set_global_seed(42, False)` fixe les seeds pour `random`, `numpy`, `PYTHONHASHSEED`.
+- [x] `set_global_seed(42, True)` active en plus `torch.use_deterministic_algorithms(True)` si PyTorch est installé.
+- [x] Si PyTorch n'est pas installé, la fonction ne plante pas (import optionnel, pas de fallback silencieux — log INFO indiquant que PyTorch n'est pas disponible).
+- [x] Si `deterministic_torch=True` et que l'activation échoue, le fallback `warn_only=True` est activé et un warning est loggé au niveau WARNING.
+- [x] Deux appels successifs avec la même seed produisent les mêmes séquences `numpy.random.rand(10)` et `random.random()`.
+- [x] Erreur explicite si seed non entier ou négatif.
+- [x] Tests couvrent les scénarios nominaux + erreurs + bords.
+- [x] Suite de tests verte après implémentation.
+- [x] `ruff check` passe sans erreur.
 
 ## Pré-condition de démarrage
 - **Tous les tests existants sont GREEN** avant de commencer.
 - **Créer une branche dédiée** `task/048-seed-manager` depuis `Max6000i1`.
 
 ## Checklist de fin de tâche
-- [ ] Branche `task/048-seed-manager` créée depuis `Max6000i1`.
-- [ ] Tests RED écrits avant implémentation.
-- [ ] **Commit RED** : `[WS-12] #048 RED: tests seed manager`.
-- [ ] Tests GREEN passants et reproductibles.
-- [ ] Critères d'acceptation tous satisfaits.
-- [ ] `ruff check ai_trading/ tests/` passe sans erreur.
-- [ ] Fichier de tâche mis à jour (statut DONE, critères cochés).
+- [x] Branche `task/048-seed-manager` créée depuis `Max6000i1`.
+- [x] Tests RED écrits avant implémentation.
+- [x] **Commit RED** : `[WS-12] #048 RED: tests seed manager`.
+- [x] Tests GREEN passants et reproductibles.
+- [x] Critères d'acceptation tous satisfaits.
+- [x] `ruff check ai_trading/ tests/` passe sans erreur.
+- [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
 - [ ] **Commit GREEN** : `[WS-12] #048 GREEN: seed manager`.
 - [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-12] #048 — Seed manager`.
