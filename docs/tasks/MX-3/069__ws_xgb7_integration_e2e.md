@@ -80,4 +80,4 @@ Créer `tests/test_xgboost_integration.py` avec un test d'intégration E2E qui e
 - [x] `ruff check ai_trading/ tests/` passe sans erreur.
 - [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
 - [x] **Commit GREEN** : `[WS-XGB-7] #069 GREEN: intégration E2E XGBoost validée`.
-- [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-XGB-7] #069 — Intégration E2E XGBoost`.
+- [x] **Pull Request ouverte** vers `Max6000i1` : `[WS-XGB-7] #069 — Intégration E2E XGBoost` (PR #83).
