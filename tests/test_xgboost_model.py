@@ -637,7 +637,9 @@ class TestXGBoostRegModelEarlyStopping:
             run_dir=tmp_path,
         )
         n_est = default_config.models.xgboost.n_estimators
-        assert model._model.best_iteration < n_est
+        # best_iteration is 0-based, so < n_est - 1 proves early stopping triggered
+        # before the last boosting round (< n_est would always pass).
+        assert model._model.best_iteration < n_est - 1
 
     def test_patience_config_driven_different_value(
         self, default_yaml_data, tmp_yaml, tmp_path
