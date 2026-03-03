@@ -70,4 +70,4 @@ Ajouter la cible `gate-m6` au Makefile. Elle exécute `pytest -m fullscale tests
 - [x] `ruff check ai_trading/ tests/` passe sans erreur.
 - [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
 - [x] **Commit GREEN** : `[WS-13] #058 GREEN: cible Makefile gate-m6`.
-- [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-13] #058 — Cible Makefile gate-m6`.
+- [x] **Pull Request ouverte** vers `Max6000i1` : `[WS-13] #058 — Cible Makefile gate-m6`.
