@@ -130,7 +130,10 @@ class XGBoostRegModel(BaseModel):
             verbose=False,
         )
 
-        return {}
+        return {
+            "best_iteration": self._model.best_iteration,
+            "best_score": self._model.best_score,
+        }
 
     def predict(
         self,
