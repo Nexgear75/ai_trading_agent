@@ -1,6 +1,6 @@
 # Tâche — Dockerfile et CI
 
-Statut : TODO
+Statut : DONE
 Ordre : 051
 Workstream : WS-12
 Milestone : M5
@@ -50,28 +50,28 @@ Dépendances :
 - Nouveau fichier `tests/test_integration.py`.
 
 ## Critères d'acceptation
-- [ ] `docker build -t ai-trading-pipeline .` construit l'image sans erreur.
-- [ ] `docker run --rm ai-trading-pipeline` exécute le pipeline (peut échouer si données absentes — c'est attendu).
-- [ ] Le workflow CI (`.github/workflows/ci.yml`) est syntaxiquement correct.
-- [ ] La fixture `synthetic_ohlcv` génère un DataFrame OHLCV valide (500 bougies, colonnes conformes §4.1).
-- [ ] Le test d'intégration passe avec DummyModel sur données synthétiques → arborescence §15.1, JSON valides.
-- [ ] Le test d'intégration passe avec no_trade → bypass θ, net_pnl=0, n_trades=0.
-- [ ] `make lint` et `make test` fonctionnent dans le CI.
-- [ ] Tests couvrent les scénarios nominaux + erreurs + bords.
-- [ ] Suite de tests verte après implémentation.
-- [ ] `ruff check` passe sans erreur.
+- [x] `docker build -t ai-trading-pipeline .` construit l'image sans erreur.
+- [x] `docker run --rm ai-trading-pipeline` exécute le pipeline (peut échouer si données absentes — c'est attendu).
+- [x] Le workflow CI (`.github/workflows/ci.yml`) est syntaxiquement correct.
+- [x] La fixture `synthetic_ohlcv` génère un DataFrame OHLCV valide (500 bougies, colonnes conformes §4.1).
+- [x] Le test d'intégration passe avec DummyModel sur données synthétiques → arborescence §15.1, JSON valides.
+- [x] Le test d'intégration passe avec no_trade → bypass θ, net_pnl=0, n_trades=0.
+- [x] `make lint` et `make test` fonctionnent dans le CI.
+- [x] Tests couvrent les scénarios nominaux + erreurs + bords.
+- [x] Suite de tests verte après implémentation.
+- [x] `ruff check` passe sans erreur.
 
 ## Pré-condition de démarrage
 - **Tous les tests existants sont GREEN** avant de commencer.
 - **Créer une branche dédiée** `task/051-dockerfile-ci` depuis `Max6000i1`.
 
 ## Checklist de fin de tâche
-- [ ] Branche `task/051-dockerfile-ci` créée depuis `Max6000i1`.
-- [ ] Tests RED écrits avant implémentation.
-- [ ] **Commit RED** : `[WS-12] #051 RED: tests intégration + CI`.
-- [ ] Tests GREEN passants et reproductibles.
-- [ ] Critères d'acceptation tous satisfaits.
-- [ ] `ruff check ai_trading/ tests/` passe sans erreur.
-- [ ] Fichier de tâche mis à jour (statut DONE, critères cochés).
-- [ ] **Commit GREEN** : `[WS-12] #051 GREEN: Dockerfile + CI + test intégration`.
+- [x] Branche `task/051-dockerfile-ci` créée depuis `Max6000i1`.
+- [x] Tests RED écrits avant implémentation.
+- [x] **Commit RED** : `[WS-12] #051 RED: tests intégration + CI`.
+- [x] Tests GREEN passants et reproductibles.
+- [x] Critères d'acceptation tous satisfaits.
+- [x] `ruff check ai_trading/ tests/` passe sans erreur.
+- [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
+- [x] **Commit GREEN** : `[WS-12] #051 GREEN: Dockerfile + CI + test intégration`.
 - [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-12] #051 — Dockerfile et CI`.
