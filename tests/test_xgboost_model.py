@@ -828,7 +828,12 @@ _X_TEST_PRED = _RNG_PRED.standard_normal((15, _L_PRED, _F_PRED)).astype(np.float
 
 @pytest.fixture()
 def fitted_model(default_config, tmp_path):
-    """Return a fitted XGBoostRegModel ready for predict() tests."""
+    """Return a fitted XGBoostRegModel ready for predict() tests.
+
+    Overrides n_estimators to 10 (from 500) for performance: predict tests
+    do not depend on model quality, and this avoids 17+ slow fits.
+    """
+    default_config.models.xgboost.n_estimators = 10
     model = _make_xgb_model()
     model.fit(
         X_train=_X_TRAIN_PRED,
@@ -855,6 +860,14 @@ class TestXGBoostRegModelPredict:
         """#065 — RuntimeError if fit() has not been called."""
         model = _make_xgb_model()
         with pytest.raises(RuntimeError, match="Model not fitted"):
+            model.predict(X=_X_TEST_PRED)
+
+    def test_predict_raises_runtime_error_if_feature_names_none(self):
+        """#065 PR-FIX — RuntimeError if _feature_names is None (e.g. after load)."""
+        model = _make_xgb_model()
+        # Simulate a loaded model with _model set but _feature_names still None
+        model._model = object()  # non-None so the first guard passes
+        with pytest.raises(RuntimeError, match="Feature names are not set"):
             model.predict(X=_X_TEST_PRED)
 
     # --- Validation: shape errors ---

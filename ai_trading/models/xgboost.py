@@ -159,6 +159,11 @@ class XGBoostRegModel(BaseModel):
             raise TypeError(f"X.dtype must be float32, got {X.dtype}.")
         if X.shape[0] == 0:
             return np.empty((0,), dtype=np.float32)
+        if self._feature_names is None:
+            raise RuntimeError(
+                "Feature names are not set. Ensure the model was fitted or properly "
+                "loaded before calling predict()."
+            )
         x_tab, _ = flatten_seq_to_tab(X, self._feature_names)
         y_hat = self._model.predict(x_tab)
         return y_hat.astype(np.float32)
