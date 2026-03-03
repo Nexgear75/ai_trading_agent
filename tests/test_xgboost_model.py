@@ -18,7 +18,6 @@ import pytest
 
 from ai_trading.models.base import MODEL_REGISTRY, BaseModel
 
-
 # ---------------------------------------------------------------------------
 # Registry cleanup fixture
 # ---------------------------------------------------------------------------
@@ -184,8 +183,13 @@ class TestXGBoostRegModelImport:
 
     def test_import_via_models_package(self):
         """Importing ai_trading.models registers xgboost_reg."""
+        import ai_trading.models.xgboost as xgb_mod
+
+        # Reload submodule first so @register_model re-executes
+        importlib.reload(xgb_mod)
+
         import ai_trading.models as models_pkg
 
         importlib.reload(models_pkg)
-        # After reloading the package, xgboost_reg should be registered
+        # After reloading, xgboost_reg should be registered
         assert "xgboost_reg" in MODEL_REGISTRY
