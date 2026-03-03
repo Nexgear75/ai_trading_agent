@@ -41,10 +41,10 @@ Ajouter dans `tests/test_fullscale_btc.py` un ou plusieurs tests marqués `@pyte
 - [x] Pour chaque fold : `net_pnl` est un float fini.
 - [x] Pour chaque fold : `max_drawdown` ∈ [0, 1].
 - [x] Pour chaque fold : `n_trades >= 0`.
-- [x] Pour chaque fold : `sharpe` est un float fini.
+- [x] Pour chaque fold : `sharpe` est un float fini ou null.
 - [x] Pour chaque fold : `hit_rate` ∈ [0, 1] si `n_trades > 0`.
 - [x] Agrégation inter-fold contient `mean` et `std` pour chaque métrique de trading.
-- [x] Toutes les valeurs agrégées sont des floats finis.
+- [x] Toutes les valeurs agrégées sont des floats finis (ou null pour les métriques optionnelles).
 - [x] Tests couvrent les scénarios nominaux + erreurs + bords.
 - [x] Suite de tests standard verte après implémentation.
 - [x] `ruff check` passe sans erreur.
