@@ -1,6 +1,6 @@
 # Tâche — Manifest builder
 
-Statut : TODO
+Statut : DONE
 Ordre : 045
 Workstream : WS-11
 Milestone : M5
@@ -48,28 +48,28 @@ Implémenter le module `ai_trading/artifacts/manifest.py` qui construit le `mani
 - Mapping interne `STRATEGY_FRAMEWORK_MAP` pour dériver `strategy.framework` à partir de `strategy.name`.
 
 ## Critères d'acceptation
-- [ ] Le module `ai_trading/artifacts/manifest.py` existe et est importable.
-- [ ] Le JSON produit est valide contre `manifest.schema.json` (test via `jsonschema.validate()`).
-- [ ] La période `train` de chaque fold exclut la période `val` (bornes disjointes).
-- [ ] Le champ `git_commit` est présent et contient un hash hexadécimal valide ou `"unknown"`.
-- [ ] Le champ `pipeline_version` est présent et correspond à `ai_trading.__version__`.
-- [ ] Si `config.logging.file != null`, le champ `artifacts.files.pipeline_log` est présent dans le manifest.
-- [ ] Le champ `strategy.framework` est correctement dérivé pour chaque stratégie MVP (dummy, no_trade, buy_hold, sma_rule).
-- [ ] Tests couvrent les scénarios nominaux + erreurs + bords (git absent, pipeline_log conditionnel).
-- [ ] Suite de tests verte après implémentation.
-- [ ] `ruff check` passe sans erreur.
+- [x] Le module `ai_trading/artifacts/manifest.py` existe et est importable.
+- [x] Le JSON produit est valide contre `manifest.schema.json` (test via `jsonschema.validate()`).
+- [x] La période `train` de chaque fold exclut la période `val` (bornes disjointes).
+- [x] Le champ `git_commit` est présent et contient un hash hexadécimal valide ou `"unknown"`.
+- [x] Le champ `pipeline_version` est présent et correspond à `ai_trading.__version__`.
+- [x] Si `config.logging.file != null`, le champ `artifacts.files.pipeline_log` est présent dans le manifest.
+- [x] Le champ `strategy.framework` est correctement dérivé pour chaque stratégie MVP (dummy, no_trade, buy_hold, sma_rule).
+- [x] Tests couvrent les scénarios nominaux + erreurs + bords (git absent, pipeline_log conditionnel).
+- [x] Suite de tests verte après implémentation.
+- [x] `ruff check` passe sans erreur.
 
 ## Pré-condition de démarrage
 - **Tous les tests existants sont GREEN** avant de commencer.
 - **Créer une branche dédiée** `task/045-manifest-builder` depuis `Max6000i1`.
 
 ## Checklist de fin de tâche
-- [ ] Branche `task/045-manifest-builder` créée depuis `Max6000i1`.
-- [ ] Tests RED écrits avant implémentation.
-- [ ] **Commit RED** : `[WS-11] #045 RED: tests manifest builder`.
-- [ ] Tests GREEN passants et reproductibles.
-- [ ] Critères d'acceptation tous satisfaits.
-- [ ] `ruff check ai_trading/ tests/` passe sans erreur.
-- [ ] Fichier de tâche mis à jour (statut DONE, critères cochés).
+- [x] Branche `task/045-manifest-builder` créée depuis `Max6000i1`.
+- [x] Tests RED écrits avant implémentation.
+- [x] **Commit RED** : `[WS-11] #045 RED: tests manifest builder`.
+- [x] Tests GREEN passants et reproductibles.
+- [x] Critères d'acceptation tous satisfaits.
+- [x] `ruff check ai_trading/ tests/` passe sans erreur.
+- [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
 - [ ] **Commit GREEN** : `[WS-11] #045 GREEN: manifest builder`.
 - [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-11] #045 — Manifest builder`.

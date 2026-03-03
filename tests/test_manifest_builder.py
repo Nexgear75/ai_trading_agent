@@ -6,14 +6,12 @@ Task #045 — WS-11.
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
-from unittest.mock import patch
 
 import jsonschema
 import pytest
 
-import ai_trading
 from ai_trading.artifacts.manifest import (
     STRATEGY_FRAMEWORK_MAP,
     build_manifest,
@@ -525,7 +523,7 @@ class TestBuildManifestErrors:
     def test_missing_run_id_raises(self):
         """Calling without run_id raises TypeError."""
         with pytest.raises(TypeError):
-            build_manifest(
+            build_manifest(  # type: ignore[call-arg]
                 config_snapshot=_minimal_config_snapshot(),
                 dataset_info=_minimal_dataset_info(),
                 label_info={"horizon_H_bars": 4, "target_type": "log_return_trade"},
