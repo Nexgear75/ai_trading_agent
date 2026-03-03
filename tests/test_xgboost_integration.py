@@ -10,47 +10,17 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 import pytest
-import yaml
+
+from tests.conftest import build_ohlcv_df, write_config, write_parquet
 
 # ---------------------------------------------------------------------------
-# Helpers — synthetic OHLCV on disk
+# Constants
 # ---------------------------------------------------------------------------
 
 _N_BARS = 500
 _SEED = 42
-
-
-def _build_ohlcv_df(n: int = _N_BARS, seed: int = _SEED) -> pd.DataFrame:
-    """Synthetic OHLCV (UTC-aware, hourly, positive prices)."""
-    rng = np.random.default_rng(seed)
-    ts = pd.date_range("2024-01-01", periods=n, freq="1h", tz="UTC")
-    close = 100.0 + np.cumsum(rng.standard_normal(n) * 0.3)
-    close = np.abs(close) + 50.0
-    opens = close + rng.standard_normal(n) * 0.05
-    opens = np.abs(opens) + 50.0
-    high = np.maximum(opens, close) + rng.uniform(0.01, 0.5, n)
-    low = np.minimum(opens, close) - rng.uniform(0.01, 0.5, n)
-    volume = rng.uniform(100, 10000, n)
-    return pd.DataFrame(
-        {
-            "timestamp_utc": ts,
-            "open": opens,
-            "high": high,
-            "low": low,
-            "close": close,
-            "volume": volume,
-        },
-    )
-
-
-def _write_parquet(ohlcv_df: pd.DataFrame, raw_dir: Path, symbol: str) -> None:
-    """Write a parquet file matching the ingestion convention."""
-    raw_dir.mkdir(parents=True, exist_ok=True)
-    path = raw_dir / f"{symbol}_1h.parquet"
-    ohlcv_df.to_parquet(path, index=False)
 
 
 def _make_xgboost_config_dict(tmp_path: Path) -> dict:
@@ -63,8 +33,8 @@ def _make_xgboost_config_dict(tmp_path: Path) -> dict:
     output_dir = tmp_path / "runs"
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    ohlcv = _build_ohlcv_df()
-    _write_parquet(ohlcv, raw_dir, "BTCUSDT")
+    ohlcv = build_ohlcv_df(n=_N_BARS)
+    write_parquet(ohlcv, raw_dir, "BTCUSDT")
 
     start_ts = ohlcv["timestamp_utc"].iloc[0]
     end_ts = ohlcv["timestamp_utc"].iloc[-1] + pd.Timedelta(hours=1)
@@ -217,15 +187,6 @@ def _make_xgboost_config_dict(tmp_path: Path) -> dict:
     }
 
 
-def _write_config(tmp_path: Path, cfg_dict: dict) -> Path:
-    """Write config dict to a YAML file and return its path."""
-    cfg_path = tmp_path / "config.yaml"
-    cfg_path.write_text(
-        yaml.dump(cfg_dict, default_flow_style=False), encoding="utf-8"
-    )
-    return cfg_path
-
-
 # ---------------------------------------------------------------------------
 # TestXGBoostE2E
 # ---------------------------------------------------------------------------
@@ -238,7 +199,7 @@ class TestXGBoostE2E:
     def setup(self, tmp_path):
         self.tmp = tmp_path
         self.cfg_dict = _make_xgboost_config_dict(tmp_path)
-        self.cfg_path = _write_config(tmp_path, self.cfg_dict)
+        self.cfg_path = write_config(tmp_path, self.cfg_dict)
 
     def _run(self) -> Path:
         """Load config and run the pipeline, returning the run directory."""
