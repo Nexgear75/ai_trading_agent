@@ -1,6 +1,6 @@
 # Tâche — Gate M5 (Production Readiness)
 
-Statut : TODO
+Statut : DONE
 Ordre : 054
 Workstream : WS-12
 Milestone : M5
@@ -49,27 +49,27 @@ Implémenter les tests de validation du gate M5 dans `tests/test_gate_m5.py` vé
 - Fonction auxiliaire pour la comparaison de `metrics.json`.
 
 ## Critères d'acceptation
-- [ ] Le fichier `tests/test_gate_m5.py` existe et est exécutable.
-- [ ] Test de reproductibilité : 2 runs avec même seed → `>= 95%` des champs numériques clés dans tolérance `<= 1%`.
-- [ ] Test de conformité : `manifest.json` et `metrics.json` valident contre les schémas JSON.
-- [ ] Test de conformité : l'arborescence §15.1 est complète (tous les fichiers attendus présents).
-- [ ] Test d'exécution : pipeline complet (DummyModel) sans crash.
-- [ ] Test d'exécution : pipeline complet (no_trade baseline) sans crash, bypass θ vérifié.
-- [ ] Les tests fonctionnent sur données synthétiques uniquement.
-- [ ] Suite de tests verte après implémentation.
-- [ ] `ruff check` passe sans erreur.
+- [x] Le fichier `tests/test_gate_m5.py` existe et est exécutable.
+- [x] Test de reproductibilité : 2 runs avec même seed → `>= 95%` des champs numériques clés dans tolérance `<= 1%`.
+- [x] Test de conformité : `manifest.json` et `metrics.json` valident contre les schémas JSON.
+- [x] Test de conformité : l'arborescence §15.1 est complète (tous les fichiers attendus présents).
+- [x] Test d'exécution : pipeline complet (DummyModel) sans crash.
+- [x] Test d'exécution : pipeline complet (no_trade baseline) sans crash, bypass θ vérifié.
+- [x] Les tests fonctionnent sur données synthétiques uniquement.
+- [x] Suite de tests verte après implémentation.
+- [x] `ruff check` passe sans erreur.
 
 ## Pré-condition de démarrage
 - **Tous les tests existants sont GREEN** avant de commencer.
 - **Créer une branche dédiée** `task/054-gate-m5` depuis `Max6000i1`.
 
 ## Checklist de fin de tâche
-- [ ] Branche `task/054-gate-m5` créée depuis `Max6000i1`.
-- [ ] Tests RED écrits avant implémentation.
-- [ ] **Commit RED** : `[WS-12] #054 RED: tests gate M5`.
-- [ ] Tests GREEN passants et reproductibles.
-- [ ] Critères d'acceptation tous satisfaits.
-- [ ] `ruff check ai_trading/ tests/` passe sans erreur.
-- [ ] Fichier de tâche mis à jour (statut DONE, critères cochés).
-- [ ] **Commit GREEN** : `[WS-12] #054 GREEN: gate M5`.
+- [x] Branche `task/054-gate-m5` créée depuis `Max6000i1`.
+- [x] Tests RED écrits avant implémentation.
+- [x] **Commit RED** : `[WS-12] #054 RED: tests gate M5`.
+- [x] Tests GREEN passants et reproductibles.
+- [x] Critères d'acceptation tous satisfaits.
+- [x] `ruff check ai_trading/ tests/` passe sans erreur.
+- [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
+- [x] **Commit GREEN** : `[WS-12] #054 GREEN: gate M5`.
 - [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-12] #054 — Gate M5 (Production Readiness)`.
