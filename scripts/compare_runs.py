@@ -98,6 +98,32 @@ def load_metrics(paths: list[Path]) -> list[dict]:
                 f"File {p}: missing required strategy keys: {sorted(missing_strat)}"
             )
 
+        # Validate nested aggregate structure required by compare_strategies
+        aggregate = data["aggregate"]
+        if not isinstance(aggregate, dict):
+            raise ValueError(
+                f"File {p}: 'aggregate' must be an object, got {type(aggregate).__name__}"
+            )
+        if "trading" not in aggregate:
+            raise ValueError(
+                f"File {p}: 'aggregate' missing required key 'trading'"
+            )
+        trading = aggregate["trading"]
+        if not isinstance(trading, dict):
+            raise ValueError(
+                f"File {p}: 'aggregate.trading' must be an object, "
+                f"got {type(trading).__name__}"
+            )
+        if "mean" not in trading:
+            raise ValueError(
+                f"File {p}: 'aggregate.trading' missing required key 'mean'"
+            )
+        if not isinstance(trading["mean"], dict):
+            raise ValueError(
+                f"File {p}: 'aggregate.trading.mean' must be an object, "
+                f"got {type(trading['mean']).__name__}"
+            )
+
         results.append(data)
 
     return results
@@ -142,12 +168,12 @@ def compare_strategies(metrics_list: list[dict]) -> pd.DataFrame:
             "strategy_name": strategy["name"],
             "strategy_type": strategy["strategy_type"],
             "comparison_type": comp_type,
-            "net_pnl_mean": trading_mean.get("net_pnl"),
-            "net_return_mean": trading_mean.get("net_return"),
-            "max_drawdown_mean": trading_mean.get("max_drawdown"),
-            "sharpe_mean": trading_mean.get("sharpe"),
-            "profit_factor_mean": trading_mean.get("profit_factor"),
-            "n_trades_mean": trading_mean.get("n_trades"),
+            "net_pnl_mean": trading_mean["net_pnl"],
+            "net_return_mean": trading_mean["net_return"],
+            "max_drawdown_mean": trading_mean["max_drawdown"],
+            "sharpe_mean": trading_mean["sharpe"],
+            "profit_factor_mean": trading_mean["profit_factor"],
+            "n_trades_mean": trading_mean["n_trades"],
         }
         rows.append(row)
 
@@ -157,8 +183,9 @@ def compare_strategies(metrics_list: list[dict]) -> pd.DataFrame:
 def check_criterion_14_4(comparison: pd.DataFrame) -> bool:
     """Check §14.4: best model beats at least one baseline.
 
-    The comparison is restricted to ``go_nogo`` strategies only (buy & hold
-    is excluded as it is a contextual baseline per §13.4).
+    Per §14.4, the best model must beat at least one baseline
+    (no-trade **and/or** buy & hold) in P&L net or MDD.
+    Both go_nogo and contextual baselines are included.
 
     A model "beats" a baseline if it has **higher** ``net_pnl_mean`` **or**
     **lower** ``max_drawdown_mean``.
@@ -171,16 +198,17 @@ def check_criterion_14_4(comparison: pd.DataFrame) -> bool:
     Returns
     -------
     bool
-        True if at least one model beats at least one go_nogo baseline.
+        True if at least one model beats at least one baseline.
 
     Raises
     ------
     ValueError
-        If no model or no go_nogo baseline is present in the comparison.
+        If no model or no baseline is present in the comparison.
     """
     go_nogo = comparison[comparison["comparison_type"] == "go_nogo"]
     models = go_nogo[go_nogo["strategy_type"] == "model"]
-    baselines = go_nogo[go_nogo["strategy_type"] == "baseline"]
+    # §14.4 includes ALL baselines (go_nogo + contextual like buy_hold)
+    baselines = comparison[comparison["strategy_type"] == "baseline"]
 
     if len(models) == 0:
         raise ValueError(
@@ -189,7 +217,7 @@ def check_criterion_14_4(comparison: pd.DataFrame) -> bool:
         )
     if len(baselines) == 0:
         raise ValueError(
-            "No baseline strategy found in go_nogo comparison. "
+            "No baseline strategy found in comparison. "
             "Cannot evaluate criterion §14.4."
         )
 

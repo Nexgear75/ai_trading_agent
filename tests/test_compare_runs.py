@@ -230,6 +230,37 @@ class TestLoadMetrics:
         with pytest.raises(ValueError, match="at least one"):
             load_metrics([])
 
+    def test_load_missing_aggregate_trading_mean_raises(self, tmp_path: Path) -> None:
+        """#052 — load_metrics raises ValueError when aggregate.trading.mean is missing."""
+        from scripts.compare_runs import load_metrics
+
+        # Missing 'trading' in aggregate
+        bad = {
+            "run_id": "x",
+            "strategy": {"strategy_type": "model", "name": "lstm"},
+            "aggregate": {},
+        }
+        p = tmp_path / "bad" / "metrics.json"
+        p.parent.mkdir(parents=True)
+        p.write_text(json.dumps(bad), encoding="utf-8")
+        with pytest.raises(ValueError, match="trading"):
+            load_metrics([p])
+
+    def test_load_missing_trading_mean_raises(self, tmp_path: Path) -> None:
+        """#052 — load_metrics raises ValueError when aggregate.trading has no 'mean'."""
+        from scripts.compare_runs import load_metrics
+
+        bad = {
+            "run_id": "x",
+            "strategy": {"strategy_type": "model", "name": "lstm"},
+            "aggregate": {"trading": {}},
+        }
+        p = tmp_path / "bad2" / "metrics.json"
+        p.parent.mkdir(parents=True)
+        p.write_text(json.dumps(bad), encoding="utf-8")
+        with pytest.raises(ValueError, match="mean"):
+            load_metrics([p])
+
 
 # ---------------------------------------------------------------------------
 # Tests — compare_strategies
@@ -439,8 +470,8 @@ class TestCheckCriterion144:
         with pytest.raises(ValueError, match="baseline"):
             check_criterion_14_4(df)
 
-    def test_contextual_buy_hold_excluded_from_criterion(self, tmp_path: Path) -> None:
-        """#052 — buy_hold (contextual) is excluded from §14.4 go_nogo comparison."""
+    def test_buy_hold_included_in_criterion(self, tmp_path: Path) -> None:
+        """#052 — buy_hold (contextual) IS included in §14.4 per spec."""
         from scripts.compare_runs import (
             check_criterion_14_4,
             compare_strategies,
@@ -468,7 +499,41 @@ class TestCheckCriterion144:
         p3 = _write_metrics(tmp_path / "r3" / "metrics.json", m_bh)
         metrics_list = load_metrics([p1, p2, p3])
         df = compare_strategies(metrics_list)
-        # Model beats no_trade in net_pnl → True (buy_hold irrelevant for §14.4)
+        # Model beats no_trade in net_pnl → True
+        # buy_hold is also checked now (model doesn't beat it, but beats no_trade)
+        assert check_criterion_14_4(df) is True
+
+    def test_model_beats_only_buy_hold_returns_true(self, tmp_path: Path) -> None:
+        """#052 — §14.4 passes if model beats buy_hold even when losing to go_nogo baselines."""
+        from scripts.compare_runs import (
+            check_criterion_14_4,
+            compare_strategies,
+            load_metrics,
+        )
+
+        # Model loses to sma_rule (go_nogo) but beats buy_hold (contextual)
+        m_model = _make_metrics(
+            run_id="r1", strategy_type="model", name="lstm",
+            net_pnl_mean=30.0, max_drawdown_mean=0.25,
+            comparison_type="go_nogo",
+        )
+        m_sma = _make_metrics(
+            run_id="r2", strategy_type="baseline", name="sma_rule",
+            net_pnl_mean=50.0, max_drawdown_mean=0.10,
+            comparison_type="go_nogo",
+        )
+        m_bh = _make_metrics(
+            run_id="r3", strategy_type="baseline", name="buy_hold",
+            net_pnl_mean=20.0, max_drawdown_mean=0.30,
+            comparison_type="contextual",
+        )
+        p1 = _write_metrics(tmp_path / "r1" / "metrics.json", m_model)
+        p2 = _write_metrics(tmp_path / "r2" / "metrics.json", m_sma)
+        p3 = _write_metrics(tmp_path / "r3" / "metrics.json", m_bh)
+        metrics_list = load_metrics([p1, p2, p3])
+        df = compare_strategies(metrics_list)
+        # Model (pnl=30) < sma_rule (pnl=50), mdd 0.25 > 0.10 → loses to sma
+        # Model (pnl=30) > buy_hold (pnl=20) → beats buy_hold
         assert check_criterion_14_4(df) is True
 
 
