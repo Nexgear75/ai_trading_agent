@@ -183,8 +183,11 @@ L'orchestrateur interroge la PR via l'outil `github-pull-request_activePullReque
 **Stratégie de polling** :
 - **Délai initial** : attendre 60 secondes après le push avant le premier poll (la review GitHub prend typiquement 30s à 2min).
 - **Intervalle** : 30 secondes entre chaque tentative.
-- **Timeout** : 15 minutes maximum. Si aucun commentaire de review n'apparaît après 15 minutes, **abandonner le polling** et informer l'utilisateur.
+- **Durée minimale de polling** : **15 minutes complètes** (900 secondes). Il est **INTERDIT** d'abandonner le polling avant que 15 minutes se soient écoulées depuis le premier poll. Compter les itérations : avec un intervalle de 30s, cela correspond à **au moins 28 itérations** après le délai initial de 60s.
+- **Timeout** : après 15 minutes de polling sans review, **abandonner le polling**, informer l'utilisateur, et **NE PAS merger la PR**. La PR reste ouverte pour que l'utilisateur décide de la suite (attente manuelle, merge manuel, ou relance).
 - **Détection** : la review est considérée comme arrivée quand le champ `comments` de `activePullRequest` contient au moins un commentaire dont l'auteur est `copilot-pull-request-reviewer`.
+
+> **⚠️ RÈGLE STRICTE** : abandonner le polling avant 15 minutes ou merger sans review sont des violations du workflow. Le merge automatique (Étape 5) n'est autorisé que si la review a été reçue et traitée (Étapes 2-4), OU si tous les commentaires sont IGNORÉS avec justification.
 
 ### Étape 2 — Extraction et triage (orchestrateur)
 
@@ -195,7 +198,8 @@ Une fois les commentaires récupérés :
    - **BLOQUANT** : le commentaire signale un bug, une régression potentielle, une violation de convention, ou une faille.
    - **MINEUR** : le commentaire concerne le style, la documentation, ou une suggestion d'amélioration.
    - **IGNORÉ** : le commentaire est un faux positif, non pertinent, ou contredit les conventions du repo (ex : le reviewer suggère un pattern interdit par AGENTS.md). Documenter la raison.
-3. **Si 0 items actionnables** (tout IGNORÉ ou aucun commentaire) : passer directement à l'Étape 5 (merge).
+3. **Si 0 items actionnables** (tout IGNORÉ) : passer directement à l'Étape 5 (merge).
+4. **Si aucun commentaire de review** (timeout 15 min atteint) : **NE PAS passer à l'Étape 5**. Informer l'utilisateur et **STOPPER**. La PR reste ouverte.
 
 ### Étape 3 — Corrections (agent PR-Review-Fixer)
 
@@ -233,6 +237,8 @@ Après les corrections :
 2. Passer à l'Étape 5.
 
 ### Étape 5 — Merge automatique (orchestrateur)
+
+> **Pré-condition** : cette étape n'est accessible que si la review GitHub a été reçue et traitée (Étapes 2-4), y compris le cas où tous les commentaires sont IGNORÉS. Si le polling a expiré sans review (timeout 15 min), cette étape est **INTERDITE** — la PR reste ouverte.
 
 Vérifier l'état de mergeabilité de la PR via `gh pr view --json mergeable` :
 
