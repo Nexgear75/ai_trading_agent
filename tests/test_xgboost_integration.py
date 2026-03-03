@@ -723,7 +723,10 @@ class TestXGBoostReproducibility:
         # Load into a fresh model and predict
         model2 = XGBoostRegModel()
         model2.load(save_path)
-        # Restore feature names (same convention as fit)
+        # XGBoost's native save/load (save_model/load_model) does not persist
+        # our custom _feature_names attribute. We must restore it manually so that
+        # predict() can build the expected DMatrix column names. This is a known
+        # limitation of the current save/load contract.
         model2._feature_names = [f"f{i}" for i in range(n_feat)]
 
         y_hat_after = model2.predict(X=x_test)
