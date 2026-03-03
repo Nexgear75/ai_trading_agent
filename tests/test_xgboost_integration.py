@@ -18,6 +18,7 @@ from __future__ import annotations
 import hashlib
 import json
 import subprocess
+import sys
 from pathlib import Path
 from unittest.mock import patch
 
@@ -749,7 +750,8 @@ class TestXGBoostReproducibility:
 class TestGateXGBIntegration:
     """#072 — Gate G-XGB-Integration: consolidated validation of all 8 criteria.
 
-    Runs the pipeline once and checks:
+    Each criterion test runs the pipeline independently via ``_run()`` for full
+    isolation (criteria 6 and 7 require two runs each).  Criteria checked:
     1. Run complet sans crash
     2. manifest.json and metrics.json valid (JSON Schema)
     3. strategy.name == 'xgboost_reg' and strategy.framework == 'xgboost'
@@ -935,10 +937,11 @@ class TestGateXGBIntegration:
     def test_gate_criterion_8_ruff_check_clean(self):
         """#072 — Gate criterion 8: ruff check ai_trading/ tests/ exits 0."""
         result = subprocess.run(
-            ["ruff", "check", "ai_trading/", "tests/"],
+            [sys.executable, "-m", "ruff", "check", "ai_trading/", "tests/"],
             capture_output=True,
             text=True,
             cwd=str(Path(__file__).resolve().parent.parent),
+            timeout=60,
         )
         assert result.returncode == 0, (
             f"ruff check failed with:\n{result.stdout}\n{result.stderr}"
