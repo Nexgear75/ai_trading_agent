@@ -26,6 +26,14 @@ def default_config_path():
 
 
 @pytest.fixture
+def default_config(default_config_path):
+    """Load the default pipeline config via shared fixture path."""
+    from ai_trading.config import load_config
+
+    return load_config(str(default_config_path))
+
+
+@pytest.fixture
 def default_yaml_data(default_config_path):
     """Load the raw dict from configs/default.yaml for reuse."""
     with open(default_config_path, encoding="utf-8") as f:

@@ -10,7 +10,6 @@ import numpy as np
 import pytest
 
 from ai_trading.calibration.threshold import apply_threshold, compute_quantile_thresholds
-from ai_trading.config import load_config
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -21,11 +20,6 @@ def y_hat_val() -> np.ndarray:
     """Deterministic predictions for validation (100 values, 0..99)."""
     return np.arange(100, dtype=np.float64)
 
-
-@pytest.fixture()
-def default_config(default_config_path):
-    """Load default pipeline config via shared fixture path."""
-    return load_config(str(default_config_path))
 
 
 # ---------------------------------------------------------------------------
