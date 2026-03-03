@@ -1,6 +1,6 @@
 # Tâche — Early stopping XGBoost
 
-Statut : TODO
+Statut : DONE
 Ordre : 063
 Workstream : WS-XGB-3
 Milestone : MX-2
@@ -44,14 +44,14 @@ Activer et valider l'early stopping dans `fit()` :
 
 ## Critères d'acceptation
 
-- [ ] `early_stopping_rounds` piloté par `config.training.early_stopping_patience`
-- [ ] `self._model.best_iteration` est un entier ≥ 0 après `fit()`
-- [ ] `self._model.best_score` est un float fini après `fit()`
-- [ ] `best_iteration < n_estimators` sur données synthétiques (arrêt anticipé effectif)
-- [ ] La patience n'est pas hardcodée, elle est lue depuis la config
-- [ ] Tests couvrent les scénarios nominaux + bords
-- [ ] Suite de tests verte après implémentation
-- [ ] `ruff check` passe sans erreur
+- [x] `early_stopping_rounds` piloté par `config.training.early_stopping_patience`
+- [x] `self._model.best_iteration` est un entier ≥ 0 après `fit()`
+- [x] `self._model.best_score` est un float fini après `fit()`
+- [x] `best_iteration < n_estimators` sur données synthétiques (arrêt anticipé effectif)
+- [x] La patience n'est pas hardcodée, elle est lue depuis la config
+- [x] Tests couvrent les scénarios nominaux + bords
+- [x] Suite de tests verte après implémentation
+- [x] `ruff check` passe sans erreur
 
 ## Pré-condition de démarrage
 
@@ -60,12 +60,12 @@ Activer et valider l'early stopping dans `fit()` :
 
 ## Checklist de fin de tâche
 
-- [ ] Branche `task/063-xgb-early-stopping` créée depuis `Max6000i1`.
-- [ ] Tests RED écrits avant implémentation.
-- [ ] **Commit RED** : `[WS-XGB-3] #063 RED: tests early stopping XGBoostRegModel` (fichiers de tests uniquement).
-- [ ] Tests GREEN passants et reproductibles.
-- [ ] Critères d'acceptation tous satisfaits.
-- [ ] `ruff check ai_trading/ tests/` passe sans erreur.
-- [ ] Fichier de tâche mis à jour (statut DONE, critères cochés).
-- [ ] **Commit GREEN** : `[WS-XGB-3] #063 GREEN: early stopping XGBoostRegModel`.
-- [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-XGB-3] #063 — Early stopping XGBoost`.
+- [x] Branche `task/063-xgb-early-stopping` créée depuis `Max6000i1`.
+- [x] Tests RED écrits avant implémentation.
+- [x] **Commit RED** : `[WS-XGB-3] #063 RED: tests early stopping XGBoostRegModel` (fichiers de tests uniquement).
+- [x] Tests GREEN passants et reproductibles.
+- [x] Critères d'acceptation tous satisfaits.
+- [x] `ruff check ai_trading/ tests/` passe sans erreur.
+- [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
+- [x] **Commit GREEN** : `[WS-XGB-3] #063 GREEN: early stopping XGBoostRegModel`.
+- [x] **Pull Request ouverte** vers `Max6000i1` : `[WS-XGB-3] #063 — Early stopping XGBoost`.

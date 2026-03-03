@@ -1,4 +1,4 @@
-"""Tests for XGBoostRegModel — Task #060 (WS-XGB-2), Task #062 (WS-XGB-3).
+"""Tests for XGBoostRegModel — Task #060 (WS-XGB-2), #062 (WS-XGB-3), #063 (WS-XGB-3).
 
 Covers:
 - Registration in MODEL_REGISTRY under "xgboost_reg"
@@ -7,11 +7,14 @@ Covers:
 - Stub methods (predict, save, load) raise NotImplementedError
 - Import via ai_trading.models works without error
 - #062: fit() validation, config-driven hyperparams, imposed params, nominal training
+- #063: early stopping behavior: best_iteration, best_score, config-driven patience
 """
 
 from __future__ import annotations
 
+import copy
 import importlib
+import math
 from pathlib import Path
 
 import numpy as np
@@ -555,3 +558,157 @@ class TestXGBoostRegModelFit:
             model._model.early_stopping_rounds
             == default_config.training.early_stopping_patience
         )
+
+
+# ---------------------------------------------------------------------------
+# Larger synthetic data for early stopping tests (#063)
+# ---------------------------------------------------------------------------
+
+_RNG_ES = np.random.default_rng(63)
+_N_ES = 200
+_N_VAL_ES = 60
+_L_ES, _F_ES = 10, 5
+_X_TRAIN_ES = _RNG_ES.standard_normal((_N_ES, _L_ES, _F_ES)).astype(np.float32)
+_Y_TRAIN_ES = _RNG_ES.standard_normal((_N_ES,)).astype(np.float32)
+_X_VAL_ES = _RNG_ES.standard_normal((_N_VAL_ES, _L_ES, _F_ES)).astype(np.float32)
+_Y_VAL_ES = _RNG_ES.standard_normal((_N_VAL_ES,)).astype(np.float32)
+
+
+# ---------------------------------------------------------------------------
+# Tests — Early stopping behavior (#063)
+# ---------------------------------------------------------------------------
+
+
+class TestXGBoostRegModelEarlyStopping:
+    """#063 — Early stopping behavior: best_iteration, best_score, config-driven patience."""
+
+    def test_best_iteration_is_nonneg_int(self, default_config, tmp_path):
+        """#063 — After fit(), self._model.best_iteration is an integer >= 0."""
+        model = _make_xgb_model()
+        model.fit(
+            X_train=_X_TRAIN_ES,
+            y_train=_Y_TRAIN_ES,
+            X_val=_X_VAL_ES,
+            y_val=_Y_VAL_ES,
+            config=default_config,
+            run_dir=tmp_path,
+        )
+        bi = model._model.best_iteration
+        assert isinstance(bi, int)
+        assert bi >= 0
+
+    def test_best_score_is_finite_float(self, default_config, tmp_path):
+        """#063 — After fit(), self._model.best_score is a finite float."""
+        model = _make_xgb_model()
+        model.fit(
+            X_train=_X_TRAIN_ES,
+            y_train=_Y_TRAIN_ES,
+            X_val=_X_VAL_ES,
+            y_val=_Y_VAL_ES,
+            config=default_config,
+            run_dir=tmp_path,
+        )
+        bs = model._model.best_score
+        assert isinstance(bs, float)
+        assert math.isfinite(bs)
+
+    def test_best_score_positive_rmse(self, default_config, tmp_path):
+        """#063 — best_score (RMSE on eval_set) is > 0 for non-trivial data."""
+        model = _make_xgb_model()
+        model.fit(
+            X_train=_X_TRAIN_ES,
+            y_train=_Y_TRAIN_ES,
+            X_val=_X_VAL_ES,
+            y_val=_Y_VAL_ES,
+            config=default_config,
+            run_dir=tmp_path,
+        )
+        assert model._model.best_score > 0.0
+
+    def test_early_stopping_triggers_on_synthetic_data(self, default_config, tmp_path):
+        """#063 — best_iteration < n_estimators: early stopping actually triggers."""
+        model = _make_xgb_model()
+        model.fit(
+            X_train=_X_TRAIN_ES,
+            y_train=_Y_TRAIN_ES,
+            X_val=_X_VAL_ES,
+            y_val=_Y_VAL_ES,
+            config=default_config,
+            run_dir=tmp_path,
+        )
+        n_est = default_config.models.xgboost.n_estimators
+        # best_iteration is 0-based, so < n_est - 1 proves early stopping triggered
+        # before the last boosting round (< n_est would always pass).
+        assert model._model.best_iteration < n_est - 1
+
+    def test_patience_config_driven_different_value(
+        self, default_yaml_data, tmp_yaml, tmp_path
+    ):
+        """#063 — Changing early_stopping_patience in config changes model behaviour."""
+        from ai_trading.config import load_config
+
+        data = copy.deepcopy(default_yaml_data)
+        data["training"]["early_stopping_patience"] = 5
+        cfg_path = tmp_yaml(data)
+        cfg = load_config(cfg_path)
+
+        model = _make_xgb_model()
+        model.fit(
+            X_train=_X_TRAIN_ES,
+            y_train=_Y_TRAIN_ES,
+            X_val=_X_VAL_ES,
+            y_val=_Y_VAL_ES,
+            config=cfg,
+            run_dir=tmp_path,
+        )
+        assert model._model.early_stopping_rounds == 5
+
+    def test_patience_config_driven_high_value(
+        self, default_yaml_data, tmp_yaml, tmp_path
+    ):
+        """#063 — With patience=50, early_stopping_rounds picks up the value."""
+        from ai_trading.config import load_config
+
+        data = copy.deepcopy(default_yaml_data)
+        data["training"]["early_stopping_patience"] = 50
+        cfg_path = tmp_yaml(data)
+        cfg = load_config(cfg_path)
+
+        model = _make_xgb_model()
+        model.fit(
+            X_train=_X_TRAIN_ES,
+            y_train=_Y_TRAIN_ES,
+            X_val=_X_VAL_ES,
+            y_val=_Y_VAL_ES,
+            config=cfg,
+            run_dir=tmp_path,
+        )
+        assert model._model.early_stopping_rounds == 50
+
+    def test_fit_returns_best_iteration_in_result(self, default_config, tmp_path):
+        """#063 — fit() returns best_iteration in result dict."""
+        model = _make_xgb_model()
+        result = model.fit(
+            X_train=_X_TRAIN_ES,
+            y_train=_Y_TRAIN_ES,
+            X_val=_X_VAL_ES,
+            y_val=_Y_VAL_ES,
+            config=default_config,
+            run_dir=tmp_path,
+        )
+        assert "best_iteration" in result
+        assert result["best_iteration"] == model._model.best_iteration
+
+    def test_fit_returns_best_score_in_result(self, default_config, tmp_path):
+        """#063 — fit() returns best_score in result dict."""
+        model = _make_xgb_model()
+        result = model.fit(
+            X_train=_X_TRAIN_ES,
+            y_train=_Y_TRAIN_ES,
+            X_val=_X_VAL_ES,
+            y_val=_Y_VAL_ES,
+            config=default_config,
+            run_dir=tmp_path,
+        )
+        assert "best_score" in result
+        assert result["best_score"] == model._model.best_score
