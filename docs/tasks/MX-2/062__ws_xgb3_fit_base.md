@@ -87,4 +87,4 @@ Implémenter la méthode `fit()` de `XGBoostRegModel` avec :
 - [x] `ruff check ai_trading/ tests/` passe sans erreur.
 - [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
 - [x] **Commit GREEN** : `[WS-XGB-3] #062 GREEN: implémentation fit base XGBoostRegModel`.
-- [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-XGB-3] #062 — Instanciation régresseur et fit de base`.
+- [x] **Pull Request ouverte** vers `Max6000i1` : `[WS-XGB-3] #062 — Instanciation régresseur et fit de base`.
