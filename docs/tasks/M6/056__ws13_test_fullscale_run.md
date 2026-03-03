@@ -22,7 +22,7 @@ Dépendances :
 Créer le fichier de test `tests/test_fullscale_btc.py` avec un test marqué `@pytest.mark.fullscale` qui exécute le pipeline complet sur données réelles et valide la production de tous les artefacts attendus.
 
 ## Règles attendues
-- Accès réseau réel obligatoire : aucune fixture `tmp_path`, aucun mock de données. Les chemins réels de `configs/fullscale_btc.yaml` sont utilisés.
+- **Politique fixtures M6 stricte** : ce test valide le pipeline en conditions réelles. **Aucune** fixture de données OHLCV (`tmp_path`, `sample_ohlcv`, etc.), **aucun** mock réseau, **aucune** fixture conftest de données synthétiques. Seuls les chemins réels (`configs/fullscale_btc.yaml`, `data/raw/`, `runs/`) sont utilisés. Accès réseau réel obligatoire (téléchargement Binance).
 - Le marker `fullscale` doit être enregistré dans `pyproject.toml` et exclu des runs par défaut (`addopts` modifié pour ajouter `-m "not fullscale"`).
 - Timeout de 600 secondes pour le test (le téléchargement initial peut être long).
 - Le test ne doit jamais être exécuté dans la CI standard (uniquement sur demande explicite via `pytest -m fullscale`).
