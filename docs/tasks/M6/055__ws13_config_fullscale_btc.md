@@ -1,6 +1,6 @@
 # Tâche — Configuration full-scale BTCUSDT
 
-Statut : TODO
+Statut : DONE
 Ordre : 055
 Workstream : WS-13
 Milestone : M6
@@ -41,27 +41,27 @@ Créer le fichier `configs/fullscale_btc.yaml` — configuration dédiée au tes
 - Écrire un test vérifiant que le config loader parse `configs/fullscale_btc.yaml` sans erreur.
 
 ## Critères d'acceptation
-- [ ] `configs/fullscale_btc.yaml` existe et est versionné.
-- [ ] Le config loader parse le fichier sans erreur (`PipelineConfig.from_yaml("configs/fullscale_btc.yaml")`).
-- [ ] La validation stricte (WS-1.3) passe sans erreur sur ce fichier.
-- [ ] `dataset.start == "2017-08-17"` et `dataset.end == "2026-01-01"`.
-- [ ] `strategy.name == "dummy"`.
-- [ ] Les paramètres features, scaling, coûts, backtest et thresholding sont identiques à `default.yaml`.
-- [ ] Tests couvrent les scénarios nominaux + erreurs + bords.
-- [ ] Suite de tests verte après implémentation.
-- [ ] `ruff check` passe sans erreur.
+- [x] `configs/fullscale_btc.yaml` existe et est versionné.
+- [x] Le config loader parse le fichier sans erreur (`PipelineConfig.from_yaml("configs/fullscale_btc.yaml")`).
+- [x] La validation stricte (WS-1.3) passe sans erreur sur ce fichier.
+- [x] `dataset.start == "2017-08-17"` et `dataset.end == "2026-01-01"`.
+- [x] `strategy.name == "dummy"`.
+- [x] Les paramètres features, scaling, coûts, backtest et thresholding sont identiques à `default.yaml`.
+- [x] Tests couvrent les scénarios nominaux + erreurs + bords.
+- [x] Suite de tests verte après implémentation.
+- [x] `ruff check` passe sans erreur.
 
 ## Pré-condition de démarrage
 - **Tous les tests existants sont GREEN** avant de commencer.
 - **Créer une branche dédiée** `task/055-config-fullscale-btc` depuis `Max6000i1`.
 
 ## Checklist de fin de tâche
-- [ ] Branche `task/055-config-fullscale-btc` créée depuis `Max6000i1`.
-- [ ] Tests RED écrits avant implémentation.
-- [ ] **Commit RED** : `[WS-13] #055 RED: tests config fullscale_btc.yaml`.
-- [ ] Tests GREEN passants et reproductibles.
-- [ ] Critères d'acceptation tous satisfaits.
-- [ ] `ruff check ai_trading/ tests/` passe sans erreur.
-- [ ] Fichier de tâche mis à jour (statut DONE, critères cochés).
-- [ ] **Commit GREEN** : `[WS-13] #055 GREEN: config fullscale_btc.yaml`.
+- [x] Branche `task/055-config-fullscale-btc` créée depuis `Max6000i1`.
+- [x] Tests RED écrits avant implémentation.
+- [x] **Commit RED** : `[WS-13] #055 RED: tests config fullscale_btc.yaml`.
+- [x] Tests GREEN passants et reproductibles.
+- [x] Critères d'acceptation tous satisfaits.
+- [x] `ruff check ai_trading/ tests/` passe sans erreur.
+- [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
+- [x] **Commit GREEN** : `[WS-13] #055 GREEN: config fullscale_btc.yaml`.
 - [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-13] #055 — Configuration full-scale BTCUSDT`.

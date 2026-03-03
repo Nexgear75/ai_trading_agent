@@ -1,0 +1,224 @@
+# ============================================================================
+# AI Trading Pipeline — Configuration full-scale BTCUSDT
+# Base     : configs/default.yaml (tous paramètres identiques sauf ajustements)
+# Référence : docs/specifications/Specification_Pipeline_Commun_AI_Trading_v1.0.md
+# Tâche    : #055 — WS-13
+# ============================================================================
+
+# --- Logging -----------------------------------------------------------------
+logging:
+  level: INFO                     # DEBUG | INFO | WARNING | ERROR
+  format: text                    # text | json
+  file: "pipeline.log"            # "pipeline.log" par défaut, null = stdout only
+
+# --- Dataset -----------------------------------------------------------------
+dataset:
+  exchange: binance
+  symbols:
+    - BTCUSDT                     # MVP : un seul symbole par run
+  timeframe: "1h"                 # Intervalle entre bougies (Δ)
+  start: "2017-08-17"             # Date début BTC sur Binance (UTC, incluse)
+  end: "2026-01-01"               # Date fin (UTC, exclue)
+  timezone: UTC
+  raw_dir: data/raw               # Répertoire des fichiers bruts
+  ingestion:
+    page_limit: 1000              # Max candles per ccxt API request
+    max_retries: 3                # Nombre de tentatives avant échec
+    base_backoff_s: 1.0           # Backoff initial (secondes), doublé à chaque retry
+
+# --- QA (contrôles qualité) --------------------------------------------------
+qa:
+  zero_volume_min_streak: 2       # Nombre min de bougies consécutives à volume nul
+                                  # pour signaler un volume nul prolongé (§4.2)
+
+# --- Label (cible y_t) ------------------------------------------------------
+label:
+  horizon_H_bars: 4               # Horizon de prédiction (bougies)
+  target_type: log_return_trade   # log_return_trade | log_return_close_to_close
+
+# --- Window (entrée modèle) -------------------------------------------------
+window:
+  L: 128                          # Longueur fenêtre d'entrée (pas de temps)
+  min_warmup: 200                 # Bougies ignorées en début de série
+
+# --- Features ----------------------------------------------------------------
+features:
+  feature_version: mvp_v1
+  feature_list:
+    - logret_1
+    - logret_2
+    - logret_4
+    - vol_24
+    - vol_72
+    - logvol
+    - dlogvol
+    - rsi_14
+    - ema_ratio_12_26
+  # Paramètres des features individuelles
+  # NOTE : Ces paramètres correspondent aux constantes définies dans l'Annexe E.1
+  # de la spec (formules §6.3–§6.5). Ils sont exposés ici en config pour éviter
+  # tout hardcoding et garantir l'explicitation des choix (cf. convention du plan).
+  params:
+    rsi_period: 14
+    rsi_epsilon: 1.0e-12
+    ema_fast: 12
+    ema_slow: 26
+    vol_windows:
+      - 24
+      - 72
+    logvol_epsilon: 1.0e-8
+    volatility_ddof: 0            # Population std (ddof=0)
+
+# --- Splits (walk-forward) --------------------------------------------------
+splits:
+  scheme: walk_forward_rolling
+  train_days: 180
+  test_days: 30
+  step_days: 30                   # Glissement entre folds
+  val_frac_in_train: 0.2          # Fraction temporelle finale du train → validation
+  embargo_bars: 4                 # = H par défaut. Gap entre train/val et test.
+  min_samples_train: 100          # Minimum de samples train pour qu'un fold soit valide
+  min_samples_test: 1             # Minimum de samples test pour qu'un fold soit valide
+
+# --- Scaling / normalisation -------------------------------------------------
+scaling:
+  method: standard                # standard | robust (rolling_zscore : non implémenté dans le MVP)
+  epsilon: 1.0e-12
+  # Options pour 'robust' (si activé) :
+  robust_quantile_low: 0.005
+  robust_quantile_high: 0.995
+  # Options pour 'rolling_zscore' (non MVP) :
+  rolling_window: 720             # Fenêtre passée pour z-score causal
+
+# --- Strategy ----------------------------------------------------------------
+# Remplacer ce bloc par la stratégie à évaluer.
+strategy:
+  strategy_type: model            # model | baseline
+  name: dummy                    # Validation pipeline sans modèle ML/DL
+
+# --- Thresholding (calibration θ) -------------------------------------------
+thresholding:
+  method: quantile_grid           # quantile_grid | fixed_value | none
+  q_grid:
+    - 0.5
+    - 0.6
+    - 0.7
+    - 0.8
+    - 0.9
+    - 0.95
+  objective: max_net_pnl_with_mdd_cap
+  mdd_cap: 0.25                  # Max drawdown toléré
+  min_trades: 20                  # Nombre min de trades pour valider un θ
+
+# --- Costs (backtest) -------------------------------------------------------
+costs:
+  cost_model: per_side_multiplicative
+  fee_rate_per_side: 0.0005       # 0.05% (taker Binance)
+  slippage_rate_per_side: 0.00025 # 0.025%
+
+# --- Backtest ----------------------------------------------------------------
+# NOTE : Les valeurs ci-dessous sont imposées par la spec (§12.1, E.2.3).
+# La validation de config (WS-1.3) lève une erreur si elles sont modifiées.
+backtest:
+  mode: one_at_a_time             # IMPOSÉ MVP — un seul trade actif à la fois
+  direction: long_only            # IMPOSÉ MVP — pas de short
+  initial_equity: 1.0             # Normalisé
+  position_fraction: 1.0          # All-in (w=1), pas de levier
+
+# --- Baselines ---------------------------------------------------------------
+baselines:
+  sma:
+    fast: 20
+    slow: 50
+
+# --- Training (modèles ML/DL) -----------------------------------------------
+# NOTE : loss, optimizer ci-dessous sont des extensions implementation-defined
+# non couvertes par l'Annexe E.1 de la spec (qui fixe uniquement les defaults).
+# Valeurs additionnelles autorisées : loss = mae | huber ; optimizer = sgd | adamw.
+training:
+  loss: mse                       # mse | mae | huber  (extension impl-defined)
+  optimizer: adam                  # adam | sgd | adamw  (extension impl-defined)
+  learning_rate: 1.0e-3           # DL uniquement (CNN1D, GRU, LSTM, PatchTST). Ignoré par XGBoost et RL PPO qui ont leur propre LR ci-dessous.
+  batch_size: 64
+  max_epochs: 100
+  early_stopping_patience: 10     # Epochs sans amélioration (DL) ou boosting rounds
+                                    # sans amélioration (XGBoost). NOTE : 10 epochs DL ≠
+                                    # 10 rounds XGBoost en coût computationnel ; la valeur
+                                    # par défaut est un compromis raisonnable pour les deux.
+
+# --- Hyperparamètres par modèle ----------------------------------------------
+# NOTE : Certains hyperparamètres ci-dessous (subsample, colsample_bytree,
+# reg_alpha, reg_lambda, value_loss_coeff) sont des extensions implementation-
+# defined non listées dans l'Annexe E.1 de la spec. Ils sont documentés ici
+# pour expliciter les choix d'implémentation (cf. spec Annexe E.2, « tout
+# choix implementation-defined est explicite dans la config YAML »).
+models:
+  xgboost:
+    max_depth: 5
+    n_estimators: 500
+    learning_rate: 0.05           # XGBoost-specific LR (pas le training.learning_rate)
+    subsample: 0.8
+    colsample_bytree: 0.8
+    reg_alpha: 0.0
+    reg_lambda: 1.0
+
+  cnn1d:
+    n_conv_layers: 2
+    filters: 64
+    kernel_size: 3
+    dropout: 0.2
+    pool: global_avg              # global_avg | global_max
+
+  gru:
+    hidden_size: 64
+    num_layers: 1
+    bidirectional: false
+    dropout: 0.2
+
+  lstm:
+    hidden_size: 64
+    num_layers: 1
+    bidirectional: false
+    dropout: 0.2
+
+  patchtst:
+    patch_size: 16
+    stride: 8
+    d_model: 64
+    n_heads: 4
+    n_layers: 2
+    ff_dim: 128
+    dropout: 0.2
+
+  rl_ppo:
+    hidden_sizes:
+      - 64
+      - 64
+    clip_epsilon: 0.2             # PPO clipping
+    gamma: 0.99                   # Discount factor
+    gae_lambda: 0.95              # GAE lambda
+    n_epochs_ppo: 4               # PPO inner epochs per rollout
+    max_episodes: 200             # Max training episodes (rollouts)
+    rollout_steps: 512            # Pas de décision par rollout (≠ bougies : en mode skip, un Go saute H+1 bougies)
+    value_loss_coeff: 0.5
+    entropy_coeff: 0.01           # Exploration encouragement
+    learning_rate: 3.0e-4         # PPO-specific LR
+    deterministic_eval: true      # argmax at test time
+
+# --- Metrics -----------------------------------------------------------------
+metrics:
+  sharpe_annualized: false        # Non annualisé dans le MVP
+  sharpe_epsilon: 1.0e-12
+
+# --- Reproducibility ---------------------------------------------------------
+reproducibility:
+  global_seed: 42                 # Seed globale (numpy, random, torch, XGBoost random_state)
+  deterministic_torch: true       # torch.use_deterministic_algorithms(True)
+
+# --- Artifacts ---------------------------------------------------------------
+artifacts:
+  output_dir: runs                # Répertoire racine des runs (chaîne non vide)
+  save_model: true                # Sauvegarder les artefacts modèle par fold
+  save_equity_curve: true         # Générer equity_curve.csv par fold + stitché
+  save_predictions: true          # Générer preds_val.csv et preds_test.csv par fold
+  save_trades: true               # Générer trades.csv par fold (§12.6)
