@@ -1,6 +1,6 @@
 # Tâche — Instanciation du régresseur XGBoost et fit de base
 
-Statut : TODO
+Statut : DONE
 Ordre : 062
 Workstream : WS-XGB-3
 Milestone : MX-2
@@ -57,20 +57,20 @@ Implémenter la méthode `fit()` de `XGBoostRegModel` avec :
 
 ## Critères d'acceptation
 
-- [ ] `fit()` s'exécute sans erreur sur données synthétiques (N=100, L=10, F=5)
-- [ ] `self._model` est un `XGBRegressor` entraîné après `fit()`
-- [ ] `ValueError` si `X_train.ndim != 3`
-- [ ] `ValueError` si `X_val.ndim != 3`
-- [ ] `ValueError` si `X_train.shape[0] != y_train.shape[0]`
-- [ ] `ValueError` si `X_val.shape[0] != y_val.shape[0]`
-- [ ] `TypeError` si `X_train.dtype != float32`
-- [ ] `TypeError` si `X_val.dtype != float32`
-- [ ] Les 7 hyperparamètres sont lus depuis `config.models.xgboost`, aucun hardcodé
-- [ ] `random_state` est fixé à `config.reproducibility.global_seed`
-- [ ] Paramètres imposés : `objective="reg:squarederror"`, `tree_method="hist"`, `booster="gbtree"`, `verbosity=0`
-- [ ] Tests couvrent les scénarios nominaux + erreurs + bords
-- [ ] Suite de tests verte après implémentation
-- [ ] `ruff check` passe sans erreur
+- [x] `fit()` s'exécute sans erreur sur données synthétiques (N=100, L=10, F=5)
+- [x] `self._model` est un `XGBRegressor` entraîné après `fit()`
+- [x] `ValueError` si `X_train.ndim != 3`
+- [x] `ValueError` si `X_val.ndim != 3`
+- [x] `ValueError` si `X_train.shape[0] != y_train.shape[0]`
+- [x] `ValueError` si `X_val.shape[0] != y_val.shape[0]`
+- [x] `TypeError` si `X_train.dtype != float32`
+- [x] `TypeError` si `X_val.dtype != float32`
+- [x] Les 7 hyperparamètres sont lus depuis `config.models.xgboost`, aucun hardcodé
+- [x] `random_state` est fixé à `config.reproducibility.global_seed`
+- [x] Paramètres imposés : `objective="reg:squarederror"`, `tree_method="hist"`, `booster="gbtree"`, `verbosity=0`
+- [x] Tests couvrent les scénarios nominaux + erreurs + bords
+- [x] Suite de tests verte après implémentation
+- [x] `ruff check` passe sans erreur
 
 ## Pré-condition de démarrage
 
@@ -79,12 +79,12 @@ Implémenter la méthode `fit()` de `XGBoostRegModel` avec :
 
 ## Checklist de fin de tâche
 
-- [ ] Branche `task/062-xgb-fit-base` créée depuis `Max6000i1`.
-- [ ] Tests RED écrits avant implémentation.
-- [ ] **Commit RED** : `[WS-XGB-3] #062 RED: tests fit base XGBoostRegModel` (fichiers de tests uniquement).
-- [ ] Tests GREEN passants et reproductibles.
-- [ ] Critères d'acceptation tous satisfaits.
-- [ ] `ruff check ai_trading/ tests/` passe sans erreur.
-- [ ] Fichier de tâche mis à jour (statut DONE, critères cochés).
-- [ ] **Commit GREEN** : `[WS-XGB-3] #062 GREEN: implémentation fit base XGBoostRegModel`.
+- [x] Branche `task/062-xgb-fit-base` créée depuis `Max6000i1`.
+- [x] Tests RED écrits avant implémentation.
+- [x] **Commit RED** : `[WS-XGB-3] #062 RED: tests fit base XGBoostRegModel` (fichiers de tests uniquement).
+- [x] Tests GREEN passants et reproductibles.
+- [x] Critères d'acceptation tous satisfaits.
+- [x] `ruff check ai_trading/ tests/` passe sans erreur.
+- [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
+- [x] **Commit GREEN** : `[WS-XGB-3] #062 GREEN: implémentation fit base XGBoostRegModel`.
 - [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-XGB-3] #062 — Instanciation régresseur et fit de base`.
