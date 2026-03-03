@@ -79,5 +79,4 @@ Créer le fichier `ai_trading/models/xgboost.py` avec la classe `XGBoostRegModel
 - [x] Critères d'acceptation tous satisfaits.
 - [x] `ruff check ai_trading/ tests/` passe sans erreur.
 - [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
-- [ ] **Commit GREEN** : `[WS-XGB-2] #060 GREEN: classe XGBoostRegModel et enregistrement registre`.
 - [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-XGB-2] #060 — Classe XGBoostRegModel et enregistrement registre`.
