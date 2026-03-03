@@ -25,7 +25,7 @@ class DummyModel(BaseModel):
 
     output_type = "regression"
 
-    def __init__(self, seed: int = 42) -> None:
+    def __init__(self, seed: int) -> None:
         self._seed = seed
 
     def fit(

@@ -386,5 +386,5 @@ class TestDummyModelRegressionCalibration:
         """DummyModel declares output_type='regression'."""
         from ai_trading.models.dummy import DummyModel
 
-        model = DummyModel()
+        model = DummyModel(seed=42)
         assert model.__class__.__dict__["output_type"] == "regression"
