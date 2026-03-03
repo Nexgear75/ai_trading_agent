@@ -163,7 +163,7 @@ def main() -> None:
     overrides = _build_overrides(args)
     config = load_config(
         yaml_path=args.config,
-        overrides=overrides or None,
+        overrides=overrides,
     )
 
     command = args.command
