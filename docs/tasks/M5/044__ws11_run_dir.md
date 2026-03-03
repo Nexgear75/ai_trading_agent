@@ -78,5 +78,5 @@ Le `run_id` suit la convention `YYYYMMDD_HHMMSS_<strategy>`.
 - [x] Critères d'acceptation tous satisfaits.
 - [x] `ruff check ai_trading/ tests/` passe sans erreur.
 - [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
-- [ ] **Commit GREEN** : `[WS-11] #044 GREEN: arborescence run_dir`.
+- [x] **Commit GREEN** : `[WS-11] #044 GREEN: arborescence run_dir`.
 - [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-11] #044 — Arborescence du run (run_dir)`.

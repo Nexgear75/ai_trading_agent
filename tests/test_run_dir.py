@@ -15,16 +15,6 @@ import yaml
 from ai_trading.config import load_config
 
 # ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-def _load_default_config():
-    """Load the default pipeline config for use in tests."""
-    root = Path(__file__).resolve().parent.parent
-    return load_config(str(root / "configs" / "default.yaml"))
-
-
-# ---------------------------------------------------------------------------
 # generate_run_id
 # ---------------------------------------------------------------------------
 
@@ -78,11 +68,11 @@ class TestGenerateRunId:
 class TestSaveConfigSnapshot:
     """Tests for save_config_snapshot function."""
 
-    def test_writes_yaml_file(self, tmp_path):
+    def test_writes_yaml_file(self, tmp_path, default_config):
         """#044 — config_snapshot.yaml is written in run_dir."""
         from ai_trading.artifacts.run_dir import save_config_snapshot
 
-        config = _load_default_config()
+        config = default_config
         run_dir = tmp_path / "test_run"
         run_dir.mkdir()
 
@@ -91,11 +81,11 @@ class TestSaveConfigSnapshot:
         snapshot_path = run_dir / "config_snapshot.yaml"
         assert snapshot_path.exists()
 
-    def test_content_is_valid_yaml(self, tmp_path):
+    def test_content_is_valid_yaml(self, tmp_path, default_config):
         """#044 — config_snapshot.yaml contains valid, loadable YAML."""
         from ai_trading.artifacts.run_dir import save_config_snapshot
 
-        config = _load_default_config()
+        config = default_config
         run_dir = tmp_path / "test_run"
         run_dir.mkdir()
 
@@ -111,11 +101,11 @@ class TestSaveConfigSnapshot:
         assert "features" in data
         assert "artifacts" in data
 
-    def test_snapshot_preserves_config_values(self, tmp_path):
+    def test_snapshot_preserves_config_values(self, tmp_path, default_config):
         """#044 — snapshot reflects the fully-resolved config."""
         from ai_trading.artifacts.run_dir import save_config_snapshot
 
-        config = _load_default_config()
+        config = default_config
         run_dir = tmp_path / "test_run"
         run_dir.mkdir()
 
@@ -128,13 +118,13 @@ class TestSaveConfigSnapshot:
         assert data["artifacts"]["output_dir"] == config.artifacts.output_dir
         assert data["label"]["horizon_H_bars"] == config.label.horizon_H_bars
 
-    def test_run_dir_not_existing_raises(self, tmp_path):
+    def test_run_dir_not_existing_raises(self, tmp_path, default_config):
         """#044 — save_config_snapshot raises if run_dir doesn't exist."""
         import pytest
 
         from ai_trading.artifacts.run_dir import save_config_snapshot
 
-        config = _load_default_config()
+        config = default_config
         missing_dir = tmp_path / "nonexistent"
 
         with pytest.raises(FileNotFoundError):
