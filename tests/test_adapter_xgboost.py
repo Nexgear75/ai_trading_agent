@@ -1,6 +1,7 @@
 """Tests for XGBoost tabular adapter — flatten_seq_to_tab.
 
 Task #017 — WS-4: flatten 3D tensor (N, L, F) to 2D (N, L*F) for XGBoost.
+Task #059 — WS-XGB-1: audit de couverture vs spec XGBoost §3.
 """
 
 from __future__ import annotations
@@ -52,6 +53,28 @@ class TestNominalShape:
         x_tab, _ = flatten_seq_to_tab(x_seq, ["a", "b"])
         assert x_tab.shape == (1, 8)
 
+    def test_shape_edge_l1(self):
+        """#059 — L=1 (single timestep) → shape (N, F)."""
+        x_seq = _make_x_seq(7, 1, 4)
+        x_tab, col_names = flatten_seq_to_tab(x_seq, ["a", "b", "c", "d"])
+        assert x_tab.shape == (7, 4)
+        assert len(col_names) == 4
+
+    def test_shape_edge_f1(self):
+        """#059 — F=1 (single feature) → shape (N, L)."""
+        x_seq = _make_x_seq(6, 5, 1)
+        x_tab, col_names = flatten_seq_to_tab(x_seq, ["only"])
+        assert x_tab.shape == (6, 5)
+        assert len(col_names) == 5
+
+    def test_shape_large_n(self):
+        """#059 — N=10000: shape correctness only (no value check)."""
+        rng = np.random.default_rng(99)
+        x_seq = rng.standard_normal((10_000, 8, 5)).astype(np.float32)
+        x_tab, col_names = flatten_seq_to_tab(x_seq, [f"f{i}" for i in range(5)])
+        assert x_tab.shape == (10_000, 40)
+        assert len(col_names) == 40
+
 
 # ---------------------------------------------------------------------------
 # Test: nominal — column naming convention
@@ -88,6 +111,18 @@ class TestColumnNaming:
         feature_names = [f"f{i}" for i in range(7)]
         x_tab, col_names = flatten_seq_to_tab(x_seq, feature_names)
         assert len(col_names) == x_tab.shape[1]
+
+    def test_column_names_l1(self):
+        """#059 — L=1: all columns at lag 0."""
+        x_seq = _make_x_seq(3, 1, 3)
+        _, col_names = flatten_seq_to_tab(x_seq, ["a", "b", "c"])
+        assert col_names == ["a_0", "b_0", "c_0"]
+
+    def test_column_names_f1(self):
+        """#059 — F=1: single feature across all lags."""
+        x_seq = _make_x_seq(3, 4, 1)
+        _, col_names = flatten_seq_to_tab(x_seq, ["only"])
+        assert col_names == ["only_0", "only_1", "only_2", "only_3"]
 
 
 # ---------------------------------------------------------------------------
@@ -142,6 +177,12 @@ class TestDtype:
         x_tab, _ = flatten_seq_to_tab(x_seq, ["a", "b"])
         assert x_tab.dtype == np.float64
 
+    def test_dtype_int32_preserved(self):
+        """#059 — Input int32 → output int32 (dtype passthrough)."""
+        x_seq = np.ones((3, 2, 2), dtype=np.int32)
+        x_tab, _ = flatten_seq_to_tab(x_seq, ["a", "b"])
+        assert x_tab.dtype == np.int32
+
 
 # ---------------------------------------------------------------------------
 # Test: error — non-3D input
@@ -168,6 +209,12 @@ class TestErrorNon3D:
         x_4d = np.ones((2, 3, 4, 5), dtype=np.float32)
         with pytest.raises(ValueError, match="3D"):
             flatten_seq_to_tab(x_4d, ["a", "b", "c", "d"])
+
+    def test_0d_raises(self):
+        """#059 — Scalar (0D) array should raise ValueError."""
+        x_0d = np.float32(42.0)
+        with pytest.raises(ValueError, match="3D"):
+            flatten_seq_to_tab(x_0d, [])
 
 
 # ---------------------------------------------------------------------------
