@@ -71,5 +71,5 @@ Implémenter le module `ai_trading/artifacts/manifest.py` qui construit le `mani
 - [x] Critères d'acceptation tous satisfaits.
 - [x] `ruff check ai_trading/ tests/` passe sans erreur.
 - [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
-- [ ] **Commit GREEN** : `[WS-11] #045 GREEN: manifest builder`.
+- [x] **Commit GREEN** : `[WS-11] #045 GREEN: manifest builder`.
 - [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-11] #045 — Manifest builder`.
