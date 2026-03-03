@@ -4,11 +4,11 @@ Branche : `task/068-gate-xgb-ready`
 Tâche : `docs/tasks/MX-2/068__gate_xgb_ready.md`
 Date : 2026-03-03
 
-## Verdict global : ⚠️ REQUEST CHANGES
+## Verdict global : ✅ APPROVE (post-fix)
 
 ## Résumé
 
-La branche ajoute 8 tests de gate dans `TestGateXGBReady` couvrant les 7 critères fonctionnels du gate G-XGB-Ready. Les tests passent (1756 passed), ruff est clean. Deux points nécessitent correction : (1) le critère de couverture AC7 est marqué `[x]` avec "100% atteint" alors que la commande d'automatisation du plan échoue (58.43% combiné), et (2) le test AC5 utilise une registration manuelle au lieu de `_reload_xgboost_module()`.
+La branche ajoute 8 tests de gate dans `TestGateXGBReady` couvrant les 7 critères fonctionnels du gate G-XGB-Ready. Les tests passent (1756 passed), ruff est clean. Trois items mineurs corrigés post-revue : (1) commande de couverture élargie à la suite complète, (2) AC5 utilise `_reload_xgboost_module()` via `importlib.import_module`, (3) AC1 assertion corrigée en `best_iteration + 1 < n_estimators`.
 
 ---
 

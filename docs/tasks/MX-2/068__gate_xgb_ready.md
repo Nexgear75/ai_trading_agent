@@ -46,7 +46,7 @@ Valider les 7 critères du gate G-XGB-Ready :
 
 ## Critères d'acceptation
 
-- [x] `fit()` converge avec early stopping (`best_iteration < n_estimators`) sur données synthétiques
+- [x] `fit()` converge avec early stopping (`best_iteration + 1 < n_estimators`, 0-based) sur données synthétiques
 - [x] `predict()` retourne shape $(N,)$ dtype `float32`
 - [x] `save()` + `load()` → prédictions identiques (bit-exact)
 - [x] Déterminisme : deux `fit()` + `predict()` même seed → sorties identiques

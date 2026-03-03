@@ -57,15 +57,9 @@ _Y_VAL = _RNG.standard_normal((5,)).astype(np.float32)
 
 def _reload_xgboost_module():
     """Reload ai_trading.models.xgboost to trigger @register_model side-effect."""
-    import sys
-
     mod_name = "ai_trading.models.xgboost"
-    if mod_name not in sys.modules:
-        import ai_trading.models.xgboost  # noqa: F811
-        sys.modules[mod_name] = ai_trading.models.xgboost
-    xgb_mod = sys.modules[mod_name]
-    importlib.reload(xgb_mod)
-    return xgb_mod
+    xgb_mod = importlib.import_module(mod_name)
+    return importlib.reload(xgb_mod)
 
 
 # ---------------------------------------------------------------------------
@@ -1239,10 +1233,11 @@ class TestGateXGBReady:
     # --- AC1: fit() converges with early stopping ---
 
     def test_ac1_early_stopping_converges(self, default_config, tmp_path):
-        """#068 AC1 — best_iteration < n_estimators on synthetic data."""
+        """#068 AC1 — early stopping: best_iteration + 1 < n_estimators."""
         model, result = self._fit_model(default_config, tmp_path)
         n_est = default_config.models.xgboost.n_estimators
-        assert result["best_iteration"] < n_est
+        # XGBoost best_iteration is 0-based; require true early stopping
+        assert result["best_iteration"] + 1 < n_est
 
     # --- AC2: predict() shape (N,) dtype float32 ---
 
