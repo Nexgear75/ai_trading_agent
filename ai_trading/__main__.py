@@ -18,7 +18,7 @@ from pathlib import Path
 
 from ai_trading.config import PipelineConfig, load_config
 from ai_trading.data.ingestion import fetch_ohlcv
-from ai_trading.data.qa import run_qa_checks
+from ai_trading.data.qa import QAReport, run_qa_checks
 from ai_trading.pipeline.runner import run_pipeline
 from ai_trading.utils.logging import setup_logging
 
@@ -30,31 +30,24 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 
-def build_parser() -> argparse.ArgumentParser:
-    """Build the CLI argument parser with subcommands."""
-    parser = argparse.ArgumentParser(
-        prog="ai_trading",
-        description="AI Trading Pipeline — CLI entry point.",
-    )
-
-    # -- Common arguments (added to each subcommand via parent) --
-    common = argparse.ArgumentParser(add_help=False)
-    common.add_argument(
+def _add_common_arguments(parser: argparse.ArgumentParser) -> None:
+    """Add common CLI arguments to *parser*."""
+    parser.add_argument(
         "--config",
         default="configs/default.yaml",
         help="Path to the YAML configuration file (default: configs/default.yaml).",
     )
-    common.add_argument(
+    parser.add_argument(
         "--strategy",
         default=None,
         help="Shortcut for --set strategy.name=<value>.",
     )
-    common.add_argument(
+    parser.add_argument(
         "--output-dir",
         default=None,
         help="Shortcut for --set artifacts.output_dir=<value>.",
     )
-    common.add_argument(
+    parser.add_argument(
         "--set",
         action="append",
         default=None,
@@ -63,8 +56,23 @@ def build_parser() -> argparse.ArgumentParser:
         help="Override a config key (dot-notation). Repeatable.",
     )
 
+
+def build_parser() -> argparse.ArgumentParser:
+    """Build the CLI argument parser with subcommands."""
+    parser = argparse.ArgumentParser(
+        prog="ai_trading",
+        description="AI Trading Pipeline — CLI entry point.",
+    )
+
+    # Common arguments on the main parser so they work without a subcommand.
+    _add_common_arguments(parser)
+
+    # Parent parser for subcommands (same arguments).
+    common = argparse.ArgumentParser(add_help=False)
+    _add_common_arguments(common)
+
     subparsers = parser.add_subparsers(dest="command")
-    subparsers.default = "run"
+    parser.set_defaults(command="run")
 
     subparsers.add_parser(
         "run",
@@ -107,7 +115,7 @@ def _build_overrides(args: argparse.Namespace) -> list[str]:
 # ---------------------------------------------------------------------------
 
 
-def _run_qa_command(config: PipelineConfig) -> None:
+def _run_qa_command(config: PipelineConfig) -> QAReport:
     """Run QA checks on the raw OHLCV data for the first configured symbol."""
     import pandas as pd
 
@@ -155,7 +163,7 @@ def main() -> None:
     overrides = _build_overrides(args)
     config = load_config(
         yaml_path=args.config,
-        overrides=overrides if overrides else None,
+        overrides=overrides or None,
     )
 
     command = args.command

@@ -101,6 +101,34 @@ class TestSubcommands:
         args = parser.parse_args([])
         assert args.command == "run"
 
+    def test_default_subcommand_has_config(self):
+        """No subcommand still populates --config with default value."""
+        parser = build_parser()
+        args = parser.parse_args([])
+        assert args.config == "configs/default.yaml"
+
+    def test_default_subcommand_accepts_config(self):
+        """--config works without explicit subcommand."""
+        parser = build_parser()
+        args = parser.parse_args(["--config", "custom.yaml"])
+        assert args.command == "run"
+        assert args.config == "custom.yaml"
+
+    def test_default_subcommand_accepts_all_common_args(self):
+        """All common args (--config, --strategy, --output-dir, --set) work without subcommand."""
+        parser = build_parser()
+        args = parser.parse_args([
+            "--config", "custom.yaml",
+            "--strategy", "dummy",
+            "--output-dir", "/tmp/out",
+            "--set", "logging.level=DEBUG",
+        ])
+        assert args.command == "run"
+        assert args.config == "custom.yaml"
+        assert args.strategy == "dummy"
+        assert args.output_dir == "/tmp/out"
+        assert args.set == ["logging.level=DEBUG"]
+
 
 # ---------------------------------------------------------------------------
 # Overrides merging (_build_overrides)
@@ -171,6 +199,25 @@ class TestBuildOverrides:
 
 class TestMainRun:
     """Tests for main() with the 'run' subcommand."""
+
+    @patch("ai_trading.__main__.run_pipeline")
+    @patch("ai_trading.__main__.load_config")
+    @patch("ai_trading.__main__.setup_logging")
+    def test_run_no_subcommand_calls_pipeline(
+        self, mock_logging, mock_load, mock_run, tmp_path,
+    ):
+        """main() without explicit subcommand defaults to 'run' and calls run_pipeline."""
+        cfg_path = tmp_path / "config.yaml"
+        cfg_path.touch()
+        mock_config = MagicMock()
+        mock_load.return_value = mock_config
+        mock_run.return_value = tmp_path / "runs" / "test_run"
+
+        with patch("sys.argv", ["ai_trading", "--config", str(cfg_path)]):
+            main()
+
+        mock_load.assert_called_once()
+        mock_run.assert_called_once_with(mock_config)
 
     @patch("ai_trading.__main__.run_pipeline")
     @patch("ai_trading.__main__.load_config")
@@ -266,6 +313,71 @@ class TestMainQA:
 
         mock_load.assert_called_once()
         mock_qa.assert_called_once_with(mock_config)
+
+
+# ---------------------------------------------------------------------------
+# _run_qa_command unit tests
+# ---------------------------------------------------------------------------
+
+
+class TestRunQACommand:
+    """Unit tests for _run_qa_command internal logic."""
+
+    def test_nominal_runs_qa_checks(self, tmp_path):
+        """_run_qa_command reads parquet, calls run_qa_checks, returns QAReport."""
+        import pandas as pd
+
+        from ai_trading.__main__ import _run_qa_command
+
+        # Create a minimal OHLCV parquet file.
+        raw_dir = tmp_path / "raw"
+        raw_dir.mkdir()
+        df = pd.DataFrame({
+            "timestamp": pd.date_range("2024-01-01", periods=100, freq="1h"),
+            "open": 100.0,
+            "high": 101.0,
+            "low": 99.0,
+            "close": 100.5,
+            "volume": 10.0,
+        })
+        parquet_path = raw_dir / "BTCUSDT_1h.parquet"
+        df.to_parquet(parquet_path)
+
+        # Build a mock config pointing to the temp directory.
+        config = MagicMock()
+        config.dataset.symbols = ["BTCUSDT"]
+        config.dataset.timeframe = "1h"
+        config.dataset.raw_dir = str(raw_dir)
+        config.qa.zero_volume_min_streak = 5
+
+        with patch("ai_trading.__main__.run_qa_checks") as mock_qa:
+            mock_report = MagicMock()
+            mock_report.passed = True
+            mock_qa.return_value = mock_report
+
+            report = _run_qa_command(config)
+
+        mock_qa.assert_called_once()
+        call_kw = mock_qa.call_args[1]
+        assert call_kw["timeframe"] == "1h"
+        assert call_kw["zero_volume_min_streak"] == 5
+        assert len(call_kw["df"]) == 100
+        assert report.passed is True
+
+    def test_missing_parquet_raises(self, tmp_path):
+        """_run_qa_command raises FileNotFoundError when parquet file is absent."""
+        from ai_trading.__main__ import _run_qa_command
+
+        raw_dir = tmp_path / "raw"
+        raw_dir.mkdir()
+
+        config = MagicMock()
+        config.dataset.symbols = ["BTCUSDT"]
+        config.dataset.timeframe = "1h"
+        config.dataset.raw_dir = str(raw_dir)
+
+        with pytest.raises(FileNotFoundError, match="BTCUSDT_1h.parquet"):
+            _run_qa_command(config)
 
 
 # ---------------------------------------------------------------------------

@@ -66,5 +66,5 @@ Implémenter le CLI dans `ai_trading/__main__.py` avec :
 - [x] Critères d'acceptation tous satisfaits.
 - [x] `ruff check ai_trading/ tests/` passe sans erreur.
 - [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
-- [ ] **Commit GREEN** : `[WS-12] #050 GREEN: CLI entry point`.
-- [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-12] #050 — CLI entry point`.
+- [x] **Commit GREEN** : `[WS-12] #050 GREEN: CLI entry point`.
+- [x] **Pull Request ouverte** vers `Max6000i1` : `[WS-12] #050 — CLI entry point`.
