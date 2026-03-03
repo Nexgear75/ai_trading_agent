@@ -68,4 +68,4 @@ Créer le fichier de test `tests/test_fullscale_btc.py` avec un test marqué `@p
 - [x] `ruff check ai_trading/ tests/` passe sans erreur.
 - [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
 - [x] **Commit GREEN** : `[WS-13] #056 GREEN: test fullscale make run-all BTCUSDT`.
-- [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-13] #056 — Test full-scale make run-all BTCUSDT`.
+- [x] **Pull Request ouverte** vers `Max6000i1` : `[WS-13] #056 — Test full-scale make run-all BTCUSDT`.
