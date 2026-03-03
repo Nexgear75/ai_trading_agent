@@ -6,14 +6,13 @@ Task #044 — WS-11: Arborescence du run (run_dir).
 from __future__ import annotations
 
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from unittest.mock import patch
 
 import yaml
 
 from ai_trading.config import load_config
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -45,14 +44,14 @@ class TestGenerateRunId:
         """#044 — run_id is generated from UTC time, not local."""
         from ai_trading.artifacts.run_dir import generate_run_id
 
-        fake_utc = datetime(2026, 3, 1, 14, 30, 45, tzinfo=timezone.utc)
+        fake_utc = datetime(2026, 3, 1, 14, 30, 45, tzinfo=UTC)
         with patch("ai_trading.artifacts.run_dir.datetime") as mock_dt:
             mock_dt.now.return_value = fake_utc
-            mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)
+            mock_dt.UTC = UTC
             run_id = generate_run_id("lstm_reg")
 
         assert run_id == "20260301_143045_lstm_reg"
-        mock_dt.now.assert_called_once_with(timezone.utc)
+        mock_dt.now.assert_called_once_with(UTC)
 
     def test_different_strategy_names(self):
         """#044 — run_id contains the strategy name."""
@@ -63,9 +62,9 @@ class TestGenerateRunId:
 
     def test_empty_strategy_raises(self):
         """#044 — empty strategy name is rejected."""
-        from ai_trading.artifacts.run_dir import generate_run_id
-
         import pytest
+
+        from ai_trading.artifacts.run_dir import generate_run_id
 
         with pytest.raises(ValueError, match="strategy_name"):
             generate_run_id("")
