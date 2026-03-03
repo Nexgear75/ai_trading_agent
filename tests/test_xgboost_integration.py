@@ -5,10 +5,14 @@ strategy.name='xgboost_reg' completes without crash on synthetic OHLCV
 data and produces valid artefacts (manifest, metrics, model files, trades).
 
 Task #070 — WS-XGB-7: anti-leak tests for the XGBoost pipeline path.
+
+Task #071 — WS-XGB-7: reproducibility tests — metrics determinism,
+trades SHA-256, serialization round-trip.
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 from unittest.mock import patch
@@ -538,3 +542,193 @@ class TestXGBoostAntiLeak:
         )
         assert x_tab.shape == (n, seq_len * n_feat)
         assert len(col_names) == seq_len * n_feat
+
+
+# ---------------------------------------------------------------------------
+# Helpers for deep comparison
+# ---------------------------------------------------------------------------
+
+
+def _deep_compare_metrics(obj1: object, obj2: object, path: str, atol: float) -> None:
+    """Recursively compare two JSON-like objects, asserting float equality."""
+    if isinstance(obj1, dict) and isinstance(obj2, dict):
+        assert set(obj1.keys()) == set(obj2.keys()), (
+            f"Key mismatch at {path}: {set(obj1.keys())} vs {set(obj2.keys())}"
+        )
+        for key in obj1:
+            _deep_compare_metrics(obj1[key], obj2[key], f"{path}.{key}", atol)
+    elif isinstance(obj1, list) and isinstance(obj2, list):
+        assert len(obj1) == len(obj2), (
+            f"List length mismatch at {path}: {len(obj1)} vs {len(obj2)}"
+        )
+        for i, (a, b) in enumerate(zip(obj1, obj2, strict=True)):
+            _deep_compare_metrics(a, b, f"{path}[{i}]", atol)
+    elif isinstance(obj1, (int, float)) and isinstance(obj2, (int, float)):
+        assert abs(float(obj1) - float(obj2)) <= atol, (
+            f"Float mismatch at {path}: {obj1} vs {obj2} (atol={atol})"
+        )
+    else:
+        assert obj1 == obj2, f"Value mismatch at {path}: {obj1!r} vs {obj2!r}"
+
+
+def _sha256_file(path: Path) -> str:
+    """Return the SHA-256 hex digest of a file."""
+    h = hashlib.sha256()
+    h.update(path.read_bytes())
+    return h.hexdigest()
+
+
+# ---------------------------------------------------------------------------
+# TestXGBoostReproducibility
+# ---------------------------------------------------------------------------
+
+
+class TestXGBoostReproducibility:
+    """#071 — Reproducibility tests for the XGBoost pipeline.
+
+    Validates that two independent runs with the same seed produce
+    strictly identical metrics.json and trades.csv, and that model
+    serialization round-trip preserves predictions.
+    """
+
+    @pytest.fixture(autouse=True)
+    def setup(self, tmp_path: Path) -> None:
+        self.tmp = tmp_path
+        self.cfg_dict = _make_xgboost_config_dict(tmp_path)
+        self.cfg_path = write_config(tmp_path, self.cfg_dict)
+
+    def _run_pipeline(self, cfg_path: Path) -> Path:
+        """Load config and run the pipeline, returning the run directory."""
+        from ai_trading.config import load_config
+        from ai_trading.pipeline.runner import run_pipeline
+
+        config = load_config(str(cfg_path))
+        return run_pipeline(config)
+
+    def _run_two(self) -> tuple[Path, Path]:
+        """Execute two independent pipeline runs with the same config/seed."""
+        # Run 1
+        run_dir1 = self._run_pipeline(self.cfg_path)
+
+        # Run 2 — same config, fresh output dir
+        output_dir2 = self.tmp / "runs2"
+        output_dir2.mkdir(parents=True, exist_ok=True)
+        cfg_dict2 = dict(self.cfg_dict)
+        cfg_dict2["artifacts"] = dict(self.cfg_dict["artifacts"])
+        cfg_dict2["artifacts"]["output_dir"] = str(output_dir2)
+        cfg2_dir = self.tmp / "cfg2"
+        cfg2_dir.mkdir(parents=True, exist_ok=True)
+        cfg_path2 = write_config(cfg2_dir, cfg_dict2)
+        run_dir2 = self._run_pipeline(cfg_path2)
+
+        return run_dir1, run_dir2
+
+    # -- Test 1: Metrics determinism (full metrics.json, atol=1e-7) ------
+
+    def test_metrics_json_identical_across_two_runs(self) -> None:
+        """#071 — Two runs with same seed produce metrics.json identical
+        field-by-field (atol=1e-7 for floats).
+        """
+        run_dir1, run_dir2 = self._run_two()
+
+        metrics1 = json.loads((run_dir1 / "metrics.json").read_text())
+        metrics2 = json.loads((run_dir2 / "metrics.json").read_text())
+
+        # Remove non-deterministic metadata (run_id, timestamps, paths)
+        for m in (metrics1, metrics2):
+            m.pop("run_id", None)
+            m.pop("timestamp", None)
+            m.pop("run_dir", None)
+
+        _deep_compare_metrics(metrics1, metrics2, "metrics", atol=1e-7)
+
+    # -- Test 2: Trades SHA-256 -----------------------------------------
+
+    def test_trades_csv_sha256_identical_across_two_runs(self) -> None:
+        """#071 — Two runs with same seed produce trades.csv files that are
+        byte-identical (SHA-256 comparison) in each fold.
+        """
+        run_dir1, run_dir2 = self._run_two()
+
+        folds1 = sorted((run_dir1 / "folds").iterdir())
+        folds2 = sorted((run_dir2 / "folds").iterdir())
+        assert len(folds1) == len(folds2)
+        assert len(folds1) >= 1
+
+        for fd1, fd2 in zip(folds1, folds2, strict=True):
+            trades1 = fd1 / "trades.csv"
+            trades2 = fd2 / "trades.csv"
+            assert trades1.is_file(), f"trades.csv missing in {fd1.name}"
+            assert trades2.is_file(), f"trades.csv missing in {fd2.name}"
+
+            hash1 = _sha256_file(trades1)
+            hash2 = _sha256_file(trades2)
+            assert hash1 == hash2, (
+                f"trades.csv SHA-256 mismatch in {fd1.name}: "
+                f"{hash1} vs {hash2}"
+            )
+
+    # -- Test 3: Serialization round-trip --------------------------------
+
+    def test_serialization_roundtrip_predictions(self) -> None:
+        """#071 — save() + load() + predict() produces identical predictions
+        as before save (serialization round-trip at model level).
+        """
+        from ai_trading.models.xgboost import XGBoostRegModel
+
+        rng = np.random.default_rng(_SEED)
+
+        # Build synthetic 3D data (N, L, F) — matches pipeline conventions
+        n_train, n_val, n_test = 80, 20, 30
+        seq_len, n_feat = 24, 9
+        x_train = rng.standard_normal(
+            (n_train, seq_len, n_feat)
+        ).astype(np.float32)
+        y_train = rng.standard_normal(n_train).astype(np.float32)
+        x_val = rng.standard_normal(
+            (n_val, seq_len, n_feat)
+        ).astype(np.float32)
+        y_val = rng.standard_normal(n_val).astype(np.float32)
+        x_test = rng.standard_normal(
+            (n_test, seq_len, n_feat)
+        ).astype(np.float32)
+
+        # Create a minimal config for XGBoost fit
+        from ai_trading.config import load_config
+
+        rt_cfg_dir = self.tmp / "rt_cfg"
+        rt_cfg_dir.mkdir(parents=True, exist_ok=True)
+        cfg_path = write_config(rt_cfg_dir, self.cfg_dict)
+        config = load_config(str(cfg_path))
+
+        # Fit model
+        model = XGBoostRegModel()
+        model.fit(
+            X_train=x_train,
+            y_train=y_train,
+            X_val=x_val,
+            y_val=y_val,
+            config=config,
+            run_dir=self.tmp / "rt_model",
+        )
+
+        # Predict before save
+        y_hat_before = model.predict(X=x_test)
+
+        # Save
+        save_path = self.tmp / "rt_model" / "saved_model"
+        model.save(save_path)
+        assert save_path.is_file()
+
+        # Load into a fresh model and predict
+        model2 = XGBoostRegModel()
+        model2.load(save_path)
+        # Restore feature names (same convention as fit)
+        model2._feature_names = [f"f{i}" for i in range(n_feat)]
+
+        y_hat_after = model2.predict(X=x_test)
+
+        np.testing.assert_array_equal(
+            y_hat_before, y_hat_after,
+            err_msg="Predictions differ after save/load round-trip",
+        )
