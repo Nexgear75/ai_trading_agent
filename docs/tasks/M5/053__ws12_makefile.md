@@ -1,6 +1,6 @@
 # Tâche — Makefile (pilotage du pipeline)
 
-Statut : TODO
+Statut : DONE
 Ordre : 053
 Workstream : WS-12
 Milestone : M5
@@ -65,33 +65,33 @@ GM1 → G-Features → G-Split → GM2 → G-Doc → GM3 → G-Backtest → GM4 
 - Convention de commentaires `##` pour l'aide inline.
 
 ## Critères d'acceptation
-- [ ] `make help` affiche la liste des cibles disponibles.
-- [ ] `make install` installe les dépendances de `requirements.txt`.
-- [ ] `make test` lance `pytest tests/ -v`.
-- [ ] `make lint` lance `ruff check ai_trading/ tests/`.
-- [ ] `make run CONFIG=configs/default.yaml` lance le pipeline.
-- [ ] `make fetch-data` déclenche l'ingestion.
-- [ ] `make run-all` enchaîne fetch → qa → run.
-- [ ] `make docker-build` et `make docker-run` fonctionnent.
-- [ ] Les variables `CONFIG`, `MODEL`, `SEED` sont surchargeables.
-- [ ] `make gate-m1` à `make gate-m5` exécutent les vérifications et génèrent les rapports JSON.
-- [ ] `make gate-features`, `make gate-split`, `make gate-backtest`, `make gate-doc` fonctionnent.
-- [ ] Les dépendances inter-gates sont respectées (`gate-features` échoue si `gate-m1` n'est pas GO, etc.).
-- [ ] Tests couvrent les scénarios nominaux (vérification syntaxique du Makefile, cibles help).
-- [ ] Suite de tests verte après implémentation.
-- [ ] `ruff check` passe sans erreur.
+- [x] `make help` affiche la liste des cibles disponibles.
+- [x] `make install` installe les dépendances de `requirements.txt`.
+- [x] `make test` lance `pytest tests/ -v`.
+- [x] `make lint` lance `ruff check ai_trading/ tests/`.
+- [x] `make run CONFIG=configs/default.yaml` lance le pipeline.
+- [x] `make fetch-data` déclenche l'ingestion.
+- [x] `make run-all` enchaîne fetch → qa → run.
+- [x] `make docker-build` et `make docker-run` fonctionnent.
+- [x] Les variables `CONFIG`, `MODEL`, `SEED` sont surchargeables.
+- [x] `make gate-m1` à `make gate-m5` exécutent les vérifications et génèrent les rapports JSON.
+- [x] `make gate-features`, `make gate-split`, `make gate-backtest`, `make gate-doc` fonctionnent.
+- [x] Les dépendances inter-gates sont respectées (`gate-features` échoue si `gate-m1` n'est pas GO, etc.).
+- [x] Tests couvrent les scénarios nominaux (vérification syntaxique du Makefile, cibles help).
+- [x] Suite de tests verte après implémentation.
+- [x] `ruff check` passe sans erreur.
 
 ## Pré-condition de démarrage
 - **Tous les tests existants sont GREEN** avant de commencer.
 - **Créer une branche dédiée** `task/053-makefile` depuis `Max6000i1`.
 
 ## Checklist de fin de tâche
-- [ ] Branche `task/053-makefile` créée depuis `Max6000i1`.
-- [ ] Tests RED écrits avant implémentation.
-- [ ] **Commit RED** : `[WS-12] #053 RED: tests Makefile`.
-- [ ] Tests GREEN passants et reproductibles.
-- [ ] Critères d'acceptation tous satisfaits.
-- [ ] `ruff check ai_trading/ tests/` passe sans erreur.
-- [ ] Fichier de tâche mis à jour (statut DONE, critères cochés).
-- [ ] **Commit GREEN** : `[WS-12] #053 GREEN: Makefile`.
-- [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-12] #053 — Makefile (pilotage du pipeline)`.
+- [x] Branche `task/053-makefile` créée depuis `Max6000i1`.
+- [x] Tests RED écrits avant implémentation.
+- [x] **Commit RED** : `[WS-12] #053 RED: tests Makefile`.
+- [x] Tests GREEN passants et reproductibles.
+- [x] Critères d'acceptation tous satisfaits.
+- [x] `ruff check ai_trading/ tests/` passe sans erreur.
+- [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
+- [x] **Commit GREEN** : `[WS-12] #053 GREEN: Makefile`.
+- [x] **Pull Request ouverte** vers `Max6000i1` : `[WS-12] #053 — Makefile (pilotage du pipeline)`.
