@@ -960,3 +960,12 @@ class TestXGBoostRegModelPredict:
         y_hat = fitted_model.predict(X=x_single)
         assert y_hat.shape == (1,)
         assert y_hat.dtype == np.float32
+
+    # --- Boundary: N=0 ---
+
+    def test_predict_boundary_n_zero(self, fitted_model):
+        """#065 — predict() with empty array (0, L, F) returns empty (0,) float32."""
+        x_empty = np.empty((0, _L_PRED, _F_PRED), dtype=np.float32)
+        y_hat = fitted_model.predict(X=x_empty)
+        assert y_hat.shape == (0,)
+        assert y_hat.dtype == np.float32

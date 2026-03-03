@@ -26,6 +26,7 @@ class XGBoostRegModel(BaseModel):
 
     def __init__(self) -> None:
         self._model = None
+        self._feature_names: list[str] | None = None
 
     def fit(
         self,
@@ -156,6 +157,8 @@ class XGBoostRegModel(BaseModel):
             raise ValueError(f"X must be 3D (N, L, F), got {X.ndim}D.")
         if X.dtype != np.float32:
             raise TypeError(f"X.dtype must be float32, got {X.dtype}.")
+        if X.shape[0] == 0:
+            return np.empty((0,), dtype=np.float32)
         x_tab, _ = flatten_seq_to_tab(X, self._feature_names)
         y_hat = self._model.predict(x_tab)
         return y_hat.astype(np.float32)
