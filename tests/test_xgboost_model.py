@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import copy
 import importlib
+import json
 import math
 from pathlib import Path
 
@@ -121,12 +122,6 @@ class TestXGBoostRegModelAttributes:
 
 class TestXGBoostRegModelStubs:
     """#060 — Remaining stub methods must raise NotImplementedError."""
-
-    def test_save_raises_not_implemented(self, tmp_path: Path):
-        mod = _reload_xgboost_module()
-        model = mod.XGBoostRegModel()
-        with pytest.raises(NotImplementedError):
-            model.save(path=tmp_path / "model.json")
 
     def test_load_raises_not_implemented(self, tmp_path: Path):
         mod = _reload_xgboost_module()
@@ -982,3 +977,98 @@ class TestXGBoostRegModelPredict:
         y_hat = fitted_model.predict(X=x_empty)
         assert y_hat.shape == (0,)
         assert y_hat.dtype == np.float32
+
+
+# ---------------------------------------------------------------------------
+# Tests — save() (#066)
+# ---------------------------------------------------------------------------
+
+
+class TestXGBoostRegModelSave:
+    """#066 — XGBoostRegModel.save() JSON persistence.
+
+    Covers:
+    - RuntimeError if model not fitted
+    - Directory path resolves to xgboost_model.json
+    - File path used as-is
+    - Output file is valid JSON
+    - Parent directories created automatically
+    - _resolve_path static method behavior
+    """
+
+    # --- Error: not fitted ---
+
+    def test_save_raises_runtime_error_if_not_fitted(self, tmp_path):
+        """#066 — RuntimeError if save() called before fit()."""
+        model = _make_xgb_model()
+        with pytest.raises(RuntimeError, match="Model not fitted"):
+            model.save(path=tmp_path / "model.json")
+
+    # --- Nominal: directory path ---
+
+    def test_save_creates_file_in_directory(self, fitted_model, tmp_path):
+        """#066 — save(directory) creates xgboost_model.json inside it."""
+        fitted_model.save(path=tmp_path)
+        expected = tmp_path / "xgboost_model.json"
+        assert expected.exists()
+        assert expected.is_file()
+
+    def test_save_file_is_valid_json_directory(self, fitted_model, tmp_path):
+        """#066 — File created by save(directory) is parseable JSON."""
+        fitted_model.save(path=tmp_path)
+        content = (tmp_path / "xgboost_model.json").read_text()
+        parsed = json.loads(content)
+        assert isinstance(parsed, dict)
+
+    # --- Nominal: explicit file path ---
+
+    def test_save_uses_explicit_file_path(self, fitted_model, tmp_path):
+        """#066 — save(file_path) uses the exact path, not appending default filename."""
+        explicit = tmp_path / "my_model.json"
+        fitted_model.save(path=explicit)
+        assert explicit.exists()
+        assert explicit.is_file()
+        # Default filename should NOT be created
+        assert not (tmp_path / "xgboost_model.json").exists()
+
+    def test_save_explicit_path_is_valid_json(self, fitted_model, tmp_path):
+        """#066 — File at explicit path is parseable JSON."""
+        explicit = tmp_path / "custom_name.json"
+        fitted_model.save(path=explicit)
+        content = explicit.read_text()
+        parsed = json.loads(content)
+        assert isinstance(parsed, dict)
+
+    # --- Parent directory creation ---
+
+    def test_save_creates_parent_directories(self, fitted_model, tmp_path):
+        """#066 — save() creates parent directories if they don't exist."""
+        nested = tmp_path / "a" / "b" / "c" / "model.json"
+        assert not nested.parent.exists()
+        fitted_model.save(path=nested)
+        assert nested.exists()
+
+    # --- _resolve_path static method ---
+
+    def test_resolve_path_directory_appends_filename(self, tmp_path):
+        """#066 — _resolve_path(directory) appends xgboost_model.json."""
+        from ai_trading.models.xgboost import XGBoostRegModel
+
+        resolved = XGBoostRegModel._resolve_path(tmp_path)
+        assert resolved == tmp_path / "xgboost_model.json"
+
+    def test_resolve_path_file_returns_as_is(self, tmp_path):
+        """#066 — _resolve_path(file_path) returns the path unchanged."""
+        from ai_trading.models.xgboost import XGBoostRegModel
+
+        file_path = tmp_path / "my_model.json"
+        resolved = XGBoostRegModel._resolve_path(file_path)
+        assert resolved == file_path
+
+    # --- Boundary: save twice overwrites ---
+
+    def test_save_twice_overwrites(self, fitted_model, tmp_path):
+        """#066 — Calling save() twice to the same path overwrites without error."""
+        fitted_model.save(path=tmp_path)
+        fitted_model.save(path=tmp_path)
+        assert (tmp_path / "xgboost_model.json").exists()

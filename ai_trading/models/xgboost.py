@@ -17,6 +17,8 @@ import xgboost as xgb
 from ai_trading.data.dataset import flatten_seq_to_tab
 from ai_trading.models.base import BaseModel, register_model
 
+_MODEL_FILENAME = "xgboost_model.json"
+
 
 @register_model("xgboost_reg")
 class XGBoostRegModel(BaseModel):
@@ -168,9 +170,28 @@ class XGBoostRegModel(BaseModel):
         y_hat = self._model.predict(x_tab)
         return y_hat.astype(np.float32)
 
+    @staticmethod
+    def _resolve_path(path: Path) -> Path:
+        """Resolve *path* to a concrete file path.
+
+        If *path* is an existing directory, append the default model filename.
+        Otherwise treat *path* as a file path.
+        """
+        path = Path(path)
+        if path.is_dir():
+            return path / _MODEL_FILENAME
+        return path
+
     def save(self, path: Path) -> None:
-        """Not implemented yet — stub for WS-XGB-5."""
-        raise NotImplementedError("XGBoostRegModel.save() is not implemented yet.")
+        """Persist the trained XGBoost model to JSON format.
+
+        Task #066 (WS-XGB-5).
+        """
+        if self._model is None:
+            raise RuntimeError("Model not fitted. Call fit() before save().")
+        resolved = self._resolve_path(path)
+        resolved.parent.mkdir(parents=True, exist_ok=True)
+        self._model.save_model(str(resolved))
 
     def load(self, path: Path) -> None:
         """Not implemented yet — stub for WS-XGB-5."""
