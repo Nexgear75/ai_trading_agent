@@ -290,3 +290,48 @@ def clean_registry_with_reload(*modules):
         FEATURE_REGISTRY.update(saved)
 
     return _fixture
+
+
+# ---------------------------------------------------------------------------
+# Synthetic OHLCV fixture — geometric Brownian motion (task #051)
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def synthetic_ohlcv() -> pd.DataFrame:
+    """Generate a synthetic OHLCV dataset using geometric Brownian motion.
+
+    #051 — 500 candles, no network dependency, columns conforming to §4.1:
+    open, high, low, close, volume + timestamp_utc (UTC-aware).
+    """
+    n = 500
+    seed = 42
+    rng = np.random.default_rng(seed)
+    timestamps = pd.date_range("2024-01-01", periods=n, freq="1h", tz="UTC")
+
+    # Geometric Brownian motion: S(t+1) = S(t) * exp((mu - sigma^2/2)*dt + sigma*sqrt(dt)*Z)
+    s0 = 100.0
+    mu = 0.0001  # drift per step
+    sigma = 0.01  # volatility per step
+    dt = 1.0
+    z = rng.standard_normal(n - 1)
+    log_returns = (mu - 0.5 * sigma**2) * dt + sigma * np.sqrt(dt) * z
+    log_prices = np.concatenate([[np.log(s0)], np.log(s0) + np.cumsum(log_returns)])
+    close = np.exp(log_prices)
+
+    # Generate open/high/low around close
+    open_ = close * (1.0 + rng.uniform(-0.002, 0.002, n))
+    high = np.maximum(open_, close) * (1.0 + rng.uniform(0.0005, 0.005, n))
+    low = np.minimum(open_, close) * (1.0 - rng.uniform(0.0005, 0.005, n))
+    volume = rng.uniform(100.0, 10000.0, n)
+
+    return pd.DataFrame(
+        {
+            "timestamp_utc": timestamps,
+            "open": open_,
+            "high": high,
+            "low": low,
+            "close": close,
+            "volume": volume,
+        },
+    )

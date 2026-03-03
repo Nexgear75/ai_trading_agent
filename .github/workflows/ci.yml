@@ -1,0 +1,39 @@
+# ============================================================================
+# AI Trading Pipeline — CI workflow
+# Runs lint + tests on push/PR to main and Max6000i1.
+# Task #051 — WS-12.
+# ============================================================================
+
+name: CI
+
+on:
+  push:
+    branches: [main, Max6000i1]
+  pull_request:
+    branches: [main, Max6000i1]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+          pip install -e .
+
+      - name: Lint
+        run: ruff check ai_trading/ tests/
+
+      - name: Test
+        run: pytest tests/ -v

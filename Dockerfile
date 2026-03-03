@@ -24,4 +24,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Point d'entrée par défaut
-CMD ["python", "-m", "ai_trading", "--config", "configs/default.yaml"]
+CMD ["python", "-m", "ai_trading", "run"]
