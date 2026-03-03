@@ -1,4 +1,4 @@
-"""Tests for XGBoostRegModel — Task #060 (WS-XGB-2), #062 (WS-XGB-3), #063 (WS-XGB-3).
+"""Tests for XGBoostRegModel — Task #060 (WS-XGB-2), #062-#064 (WS-XGB-3).
 
 Covers:
 - Registration in MODEL_REGISTRY under "xgboost_reg"
@@ -8,6 +8,7 @@ Covers:
 - Import via ai_trading.models works without error
 - #062: fit() validation, config-driven hyperparams, imposed params, nominal training
 - #063: early stopping behavior: best_iteration, best_score, config-driven patience
+- #064: fit() artifacts: n_features_in, all 3 required keys, correct types
 """
 
 from __future__ import annotations
@@ -712,3 +713,114 @@ class TestXGBoostRegModelEarlyStopping:
         )
         assert "best_score" in result
         assert result["best_score"] == model._model.best_score
+
+
+# ---------------------------------------------------------------------------
+# Tests — fit() artifacts (#064)
+# ---------------------------------------------------------------------------
+
+
+class TestXGBoostRegModelFitArtifacts:
+    """#064 — fit() returns dict with all 3 required keys and correct types."""
+
+    def test_fit_result_contains_n_features_in(self, default_config, tmp_path):
+        """#064 — fit() result dict contains 'n_features_in' key."""
+        model = _make_xgb_model()
+        result = model.fit(
+            X_train=_X_TRAIN_ES,
+            y_train=_Y_TRAIN_ES,
+            X_val=_X_VAL_ES,
+            y_val=_Y_VAL_ES,
+            config=default_config,
+            run_dir=tmp_path,
+        )
+        assert "n_features_in" in result
+
+    def test_fit_n_features_in_is_int(self, default_config, tmp_path):
+        """#064 — n_features_in value is a Python int."""
+        model = _make_xgb_model()
+        result = model.fit(
+            X_train=_X_TRAIN_ES,
+            y_train=_Y_TRAIN_ES,
+            X_val=_X_VAL_ES,
+            y_val=_Y_VAL_ES,
+            config=default_config,
+            run_dir=tmp_path,
+        )
+        assert isinstance(result["n_features_in"], int)
+
+    def test_fit_n_features_in_equals_l_times_f(self, default_config, tmp_path):
+        """#064 — n_features_in == L * F (10 * 5 = 50 for test data)."""
+        model = _make_xgb_model()
+        result = model.fit(
+            X_train=_X_TRAIN_ES,
+            y_train=_Y_TRAIN_ES,
+            X_val=_X_VAL_ES,
+            y_val=_Y_VAL_ES,
+            config=default_config,
+            run_dir=tmp_path,
+        )
+        expected = _L_ES * _F_ES  # 10 * 5 = 50
+        assert result["n_features_in"] == expected
+
+    def test_fit_result_has_all_three_required_keys(self, default_config, tmp_path):
+        """#064 — fit() result contains exactly the 3 required keys."""
+        model = _make_xgb_model()
+        result = model.fit(
+            X_train=_X_TRAIN_ES,
+            y_train=_Y_TRAIN_ES,
+            X_val=_X_VAL_ES,
+            y_val=_Y_VAL_ES,
+            config=default_config,
+            run_dir=tmp_path,
+        )
+        required_keys = {"best_iteration", "best_score", "n_features_in"}
+        assert required_keys.issubset(result.keys())
+
+    def test_fit_best_iteration_type_in_result(self, default_config, tmp_path):
+        """#064 — best_iteration in result dict is int >= 0."""
+        model = _make_xgb_model()
+        result = model.fit(
+            X_train=_X_TRAIN_ES,
+            y_train=_Y_TRAIN_ES,
+            X_val=_X_VAL_ES,
+            y_val=_Y_VAL_ES,
+            config=default_config,
+            run_dir=tmp_path,
+        )
+        assert isinstance(result["best_iteration"], int)
+        assert result["best_iteration"] >= 0
+
+    def test_fit_best_score_type_in_result(self, default_config, tmp_path):
+        """#064 — best_score in result dict is a finite float."""
+        model = _make_xgb_model()
+        result = model.fit(
+            X_train=_X_TRAIN_ES,
+            y_train=_Y_TRAIN_ES,
+            X_val=_X_VAL_ES,
+            y_val=_Y_VAL_ES,
+            config=default_config,
+            run_dir=tmp_path,
+        )
+        assert isinstance(result["best_score"], float)
+        assert math.isfinite(result["best_score"])
+
+    def test_fit_n_features_in_with_different_dimensions(self, default_config, tmp_path):
+        """#064 — n_features_in adapts to different L and F values (L=5, F=3 → 15)."""
+        rng = np.random.default_rng(6400)
+        l, f = 5, 3
+        x_train = rng.standard_normal((50, l, f)).astype(np.float32)
+        y_train = rng.standard_normal((50,)).astype(np.float32)
+        x_val = rng.standard_normal((20, l, f)).astype(np.float32)
+        y_val = rng.standard_normal((20,)).astype(np.float32)
+
+        model = _make_xgb_model()
+        result = model.fit(
+            X_train=x_train,
+            y_train=y_train,
+            X_val=x_val,
+            y_val=y_val,
+            config=default_config,
+            run_dir=tmp_path,
+        )
+        assert result["n_features_in"] == l * f  # 5 * 3 = 15
