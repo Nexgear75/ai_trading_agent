@@ -182,14 +182,25 @@ class TestXGBoostRegModelImport:
     """#060 — Module import via ai_trading.models works."""
 
     def test_import_via_models_package(self):
-        """Importing ai_trading.models registers xgboost_reg."""
-        import ai_trading.models.xgboost as xgb_mod
+        """Importing ai_trading.models from clean slate registers xgboost_reg."""
+        import sys
 
-        # Reload submodule first so @register_model re-executes
-        importlib.reload(xgb_mod)
+        # Remove the package and submodules (but keep .base so MODEL_REGISTRY
+        # is the same dict object referenced by the test module).
+        keys_to_remove = [
+            k for k in sys.modules
+            if k == "ai_trading.models" or (
+                k.startswith("ai_trading.models.") and k != "ai_trading.models.base"
+            )
+        ]
+        saved_modules = {k: sys.modules.pop(k) for k in keys_to_remove}
+        try:
+            # MODEL_REGISTRY is already cleared by the autouse fixture.
+            # Fresh import of ai_trading.models should trigger xgboost
+            # registration via `from . import xgboost` in __init__.py.
+            import ai_trading.models  # noqa: F811, F401
 
-        import ai_trading.models as models_pkg
-
-        importlib.reload(models_pkg)
-        # After reloading, xgboost_reg should be registered
-        assert "xgboost_reg" in MODEL_REGISTRY
+            assert "xgboost_reg" in MODEL_REGISTRY
+        finally:
+            # Restore modules so other tests are not affected
+            sys.modules.update(saved_modules)
