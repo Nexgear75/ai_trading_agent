@@ -17,7 +17,6 @@ import copy
 import importlib
 import json
 import math
-from pathlib import Path
 
 import numpy as np
 import pytest
@@ -1172,22 +1171,12 @@ class TestXGBoostRegModelLoad:
         y_original = fitted_model.predict(X=_X_TEST_PRED)
         fitted_model.save(path=tmp_path)
 
-        # Create a second model, fit it with different data (different predictions)
-        rng = np.random.default_rng(6700)
-        x2 = rng.standard_normal((_N_PRED, _L_PRED, _F_PRED)).astype(np.float32)
-        y2 = rng.standard_normal((_N_PRED,)).astype(np.float32)
-        x_v2 = rng.standard_normal((25, _L_PRED, _F_PRED)).astype(np.float32)
-        y_v2 = rng.standard_normal((25,)).astype(np.float32)
-
-        from ai_trading.config import load_config
-
-        # Use the fitted_model which already has config baked in; load from saved
+        # Load from saved: predictions must match the original
         new_model = _make_xgb_model()
         new_model._feature_names = fitted_model._feature_names
         new_model.load(path=tmp_path)
         y_loaded = new_model.predict(X=_X_TEST_PRED)
 
-        # After loading from the first model's save, predictions match the original
         np.testing.assert_array_equal(y_original, y_loaded)
 
     # --- Security: JSON only, no pickle ---
