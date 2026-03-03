@@ -89,7 +89,7 @@ class StandardScaler:
         flat = x_train.reshape(n * seq_len, f)
 
         mean = flat.mean(axis=0).astype(np.float64)
-        std = flat.std(axis=0).astype(np.float64)
+        std = flat.std(axis=0, ddof=0).astype(np.float64)
         self.mean_ = mean
         self.std_ = std
 
