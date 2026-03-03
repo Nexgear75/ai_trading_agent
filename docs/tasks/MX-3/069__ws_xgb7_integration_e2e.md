@@ -59,7 +59,7 @@ Créer `tests/test_xgboost_integration.py` avec un test d'intégration E2E qui e
 - [x] `metrics.json` valide JSON Schema, métriques de prédiction non nulles.
 - [x] Métriques de trading présentes et cohérentes.
 - [x] Au moins 1 fold complété.
-- [x] Fichier modèle XGBoost présent dans `model_artifacts/` de chaque fold (sauvé via `trainer.save(run_dir / "model")`).
+- [x] Fichier modèle XGBoost (`model_artifacts/model`) présent dans chaque fold (sauvé via `trainer.save(run_dir / "model")`).
 - [x] Config de test avec `n_estimators: 10`, `max_depth: 3` pour performance CI.
 - [x] Seed fixée, test déterministe.
 - [x] Suite de tests verte après implémentation.

@@ -286,9 +286,9 @@ class TestXGBoostE2E:
         fold_dirs = sorted(folds_dir.iterdir())
         assert len(fold_dirs) >= 1
 
-    # -- AC: xgboost_model.json present in each fold --------------------
+    # -- AC: xgboost model file present in each fold --------------------
 
-    def test_xgboost_model_json_in_each_fold(self):
+    def test_xgboost_model_file_in_each_fold(self):
         """#069 — XGBoost model file present in model_artifacts of each fold.
 
         The trainer saves to ``model_artifacts/model``. The XGBoost _resolve_path
