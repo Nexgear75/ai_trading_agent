@@ -763,8 +763,8 @@ class TestXGBoostRegModelFitArtifacts:
         expected = _L_ES * _F_ES  # 10 * 5 = 50
         assert result["n_features_in"] == expected
 
-    def test_fit_result_has_all_three_required_keys(self, default_config, tmp_path):
-        """#064 — fit() result contains exactly the 3 required keys."""
+    def test_fit_result_has_at_least_three_required_keys(self, default_config, tmp_path):
+        """#064 — fit() result contains at least the 3 required keys."""
         model = _make_xgb_model()
         result = model.fit(
             X_train=_X_TRAIN_ES,
