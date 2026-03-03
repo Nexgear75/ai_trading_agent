@@ -13,7 +13,6 @@ import pytest
 
 from ai_trading.__main__ import build_parser, main
 
-
 # ---------------------------------------------------------------------------
 # Parser construction
 # ---------------------------------------------------------------------------
@@ -280,9 +279,11 @@ class TestErrorHandling:
     def test_missing_config_file_raises(self, tmp_path):
         """main() raises FileNotFoundError when config file does not exist."""
         nonexistent = str(tmp_path / "nonexistent.yaml")
-        with patch("sys.argv", ["ai_trading", "run", "--config", nonexistent]):
-            with pytest.raises(FileNotFoundError, match="nonexistent.yaml"):
-                main()
+        with (
+            patch("sys.argv", ["ai_trading", "run", "--config", nonexistent]),
+            pytest.raises(FileNotFoundError, match="nonexistent.yaml"),
+        ):
+            main()
 
     @patch("ai_trading.__main__.load_config")
     @patch("ai_trading.__main__.setup_logging")
@@ -292,12 +293,14 @@ class TestErrorHandling:
         cfg_path.touch()
         mock_load.side_effect = KeyError("Override key 'bogus' not found")
 
-        with patch(
-            "sys.argv",
-            ["ai_trading", "run", "--config", str(cfg_path), "--set", "bogus=42"],
+        with (
+            patch(
+                "sys.argv",
+                ["ai_trading", "run", "--config", str(cfg_path), "--set", "bogus=42"],
+            ),
+            pytest.raises(KeyError, match="bogus"),
         ):
-            with pytest.raises(KeyError, match="bogus"):
-                main()
+            main()
 
 
 # ---------------------------------------------------------------------------

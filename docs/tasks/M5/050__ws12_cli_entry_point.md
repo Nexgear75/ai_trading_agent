@@ -1,6 +1,6 @@
 # Tâche — CLI entry point
 
-Statut : TODO
+Statut : DONE
 Ordre : 050
 Workstream : WS-12
 Milestone : M5
@@ -42,29 +42,29 @@ Implémenter le CLI dans `ai_trading/__main__.py` avec :
 - Intégration avec `setup_logging()` (phase 1) au démarrage.
 
 ## Critères d'acceptation
-- [ ] `python -m ai_trading --help` affiche l'aide générale avec les sous-commandes.
-- [ ] `python -m ai_trading run --config configs/default.yaml` lance le pipeline complet (via l'orchestrateur).
-- [ ] `python -m ai_trading fetch --config configs/default.yaml` lance l'ingestion uniquement.
-- [ ] `python -m ai_trading qa --config configs/default.yaml` lance le QA uniquement.
-- [ ] `--set strategy.name=dummy` surcharge correctement la config.
-- [ ] `--strategy dummy` est un raccourci pour `--set strategy.name=dummy`.
-- [ ] Erreur explicite si `--config` pointe vers un fichier inexistant.
-- [ ] Le logging phase 1 est configuré au démarrage (INFO par défaut).
-- [ ] Tests couvrent les scénarios nominaux + erreurs + bords (fichier absent, sous-commande invalide).
-- [ ] Suite de tests verte après implémentation.
-- [ ] `ruff check` passe sans erreur.
+- [x] `python -m ai_trading --help` affiche l'aide générale avec les sous-commandes.
+- [x] `python -m ai_trading run --config configs/default.yaml` lance le pipeline complet (via l'orchestrateur).
+- [x] `python -m ai_trading fetch --config configs/default.yaml` lance l'ingestion uniquement.
+- [x] `python -m ai_trading qa --config configs/default.yaml` lance le QA uniquement.
+- [x] `--set strategy.name=dummy` surcharge correctement la config.
+- [x] `--strategy dummy` est un raccourci pour `--set strategy.name=dummy`.
+- [x] Erreur explicite si `--config` pointe vers un fichier inexistant.
+- [x] Le logging phase 1 est configuré au démarrage (INFO par défaut).
+- [x] Tests couvrent les scénarios nominaux + erreurs + bords (fichier absent, sous-commande invalide).
+- [x] Suite de tests verte après implémentation.
+- [x] `ruff check` passe sans erreur.
 
 ## Pré-condition de démarrage
 - **Tous les tests existants sont GREEN** avant de commencer.
 - **Créer une branche dédiée** `task/050-cli-entry-point` depuis `Max6000i1`.
 
 ## Checklist de fin de tâche
-- [ ] Branche `task/050-cli-entry-point` créée depuis `Max6000i1`.
-- [ ] Tests RED écrits avant implémentation.
-- [ ] **Commit RED** : `[WS-12] #050 RED: tests CLI entry point`.
-- [ ] Tests GREEN passants et reproductibles.
-- [ ] Critères d'acceptation tous satisfaits.
-- [ ] `ruff check ai_trading/ tests/` passe sans erreur.
-- [ ] Fichier de tâche mis à jour (statut DONE, critères cochés).
+- [x] Branche `task/050-cli-entry-point` créée depuis `Max6000i1`.
+- [x] Tests RED écrits avant implémentation.
+- [x] **Commit RED** : `[WS-12] #050 RED: tests CLI entry point`.
+- [x] Tests GREEN passants et reproductibles.
+- [x] Critères d'acceptation tous satisfaits.
+- [x] `ruff check ai_trading/ tests/` passe sans erreur.
+- [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
 - [ ] **Commit GREEN** : `[WS-12] #050 GREEN: CLI entry point`.
 - [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-12] #050 — CLI entry point`.
