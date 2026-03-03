@@ -25,6 +25,7 @@ Créer le fichier `configs/fullscale_btc.yaml` — configuration dédiée au tes
 - Config-driven : le fichier doit être un YAML autonome parsable par le config loader existant (WS-1.2).
 - Strict code : la validation stricte (WS-1.3) doit passer sans erreur sur ce fichier.
 - Le fichier est une réplique de `configs/default.yaml` avec uniquement les paramètres ajustés pour un run réaliste complet.
+- **Politique fixtures M6** : cette tâche est un livrable statique (fichier config versionné). Ses tests de validation ne nécessitent ni données OHLCV ni réseau. L'usage de fixtures conftest standards (`default_config`, `default_yaml_data`) pour comparer les configs et de `tmp_path` pour tester les cas d'erreur (configs corrompues) est autorisé. La règle « pas de fixture » de M6 s'applique aux tests d'exécution du pipeline (tâche 056), pas à la validation de config.
 
 ## Évolutions proposées
 - Créer `configs/fullscale_btc.yaml` avec les paramètres suivants modifiés par rapport à `default.yaml` :
