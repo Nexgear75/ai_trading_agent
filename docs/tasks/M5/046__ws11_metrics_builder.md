@@ -1,6 +1,6 @@
 # Tâche — Metrics builder
 
-Statut : TODO
+Statut : DONE
 Ordre : 046
 Workstream : WS-11
 Milestone : M5
@@ -38,27 +38,27 @@ Implémenter le module `ai_trading/artifacts/metrics_builder.py` qui :
 - Fonction `write_fold_metrics(fold_data, fold_dir)` pour écrire `metrics_fold.json` par fold.
 
 ## Critères d'acceptation
-- [ ] Le module `ai_trading/artifacts/metrics_builder.py` existe et est importable.
-- [ ] Le JSON global `metrics.json` est valide contre `metrics.schema.json` (test via `jsonschema.validate()`).
-- [ ] Chaque `folds/fold_XX/metrics_fold.json` est généré et cohérent avec l'entrée correspondante dans `metrics.json`.
-- [ ] Les champs `n_samples_train`, `n_samples_val`, `n_samples_test` sont présents par fold.
-- [ ] Les métriques sont en float64.
-- [ ] Test d'intégration : construction complète avec données synthétiques → JSON valide.
-- [ ] Tests couvrent les scénarios nominaux + erreurs + bords (0 trades, 1 fold, multi-folds).
-- [ ] Suite de tests verte après implémentation.
-- [ ] `ruff check` passe sans erreur.
+- [x] Le module `ai_trading/artifacts/metrics_builder.py` existe et est importable.
+- [x] Le JSON global `metrics.json` est valide contre `metrics.schema.json` (test via `jsonschema.validate()`).
+- [x] Chaque `folds/fold_XX/metrics_fold.json` est généré et cohérent avec l'entrée correspondante dans `metrics.json`.
+- [x] Les champs `n_samples_train`, `n_samples_val`, `n_samples_test` sont présents par fold.
+- [x] Les métriques sont en float64.
+- [x] Test d'intégration : construction complète avec données synthétiques → JSON valide.
+- [x] Tests couvrent les scénarios nominaux + erreurs + bords (0 trades, 1 fold, multi-folds).
+- [x] Suite de tests verte après implémentation.
+- [x] `ruff check` passe sans erreur.
 
 ## Pré-condition de démarrage
 - **Tous les tests existants sont GREEN** avant de commencer.
 - **Créer une branche dédiée** `task/046-metrics-builder` depuis `Max6000i1`.
 
 ## Checklist de fin de tâche
-- [ ] Branche `task/046-metrics-builder` créée depuis `Max6000i1`.
-- [ ] Tests RED écrits avant implémentation.
-- [ ] **Commit RED** : `[WS-11] #046 RED: tests metrics builder`.
-- [ ] Tests GREEN passants et reproductibles.
-- [ ] Critères d'acceptation tous satisfaits.
-- [ ] `ruff check ai_trading/ tests/` passe sans erreur.
-- [ ] Fichier de tâche mis à jour (statut DONE, critères cochés).
-- [ ] **Commit GREEN** : `[WS-11] #046 GREEN: metrics builder`.
-- [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-11] #046 — Metrics builder`.
+- [x] Branche `task/046-metrics-builder` créée depuis `Max6000i1`.
+- [x] Tests RED écrits avant implémentation.
+- [x] **Commit RED** : `[WS-11] #046 RED: tests metrics builder`.
+- [x] Tests GREEN passants et reproductibles.
+- [x] Critères d'acceptation tous satisfaits.
+- [x] `ruff check ai_trading/ tests/` passe sans erreur.
+- [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
+- [x] **Commit GREEN** : `[WS-11] #046 GREEN: metrics builder`.
+- [x] **Pull Request ouverte** vers `Max6000i1` : `[WS-11] #046 — Metrics builder`.
