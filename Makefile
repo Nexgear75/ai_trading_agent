@@ -77,10 +77,10 @@ help: ## Display this help message
 
 # ============================================================================
 # Gate milestone targets
-# GM1 → G-Features → G-Split → GM2 → G-Doc → GM3 → G-Backtest → GM4 → GM5
+# GM1 → G-Features → G-Split → GM2 → G-Doc → GM3 → G-Backtest → GM4 → GM5 → GM6
 # ============================================================================
 
-.PHONY: gate-m1 gate-m2 gate-m3 gate-m4 gate-m5
+.PHONY: gate-m1 gate-m2 gate-m3 gate-m4 gate-m5 gate-m6
 .PHONY: gate-features gate-split gate-backtest gate-doc gate-perf
 
 gate-m1: ## Gate M1 — Foundations verification
@@ -160,6 +160,12 @@ gate-m5: gate-m4 ## Gate M5 — Production Readiness verification (requires M4)
 		-v --tb=short
 	@echo '{"gate": "M5", "status": "GO"}' > reports/gate_report_M5.json
 	@echo "Gate M5: GO"
+
+gate-m6: gate-m5 ## Gate M6 — Full-scale network validation (requires M5)
+	@mkdir -p reports
+	pytest -m fullscale tests/test_fullscale_btc.py -v --timeout=600
+	@echo '{"gate": "M6", "status": "GO"}' > reports/gate_report_M6.json
+	@echo "Gate M6: GO"
 
 gate-perf: ## Gate Perf — Performance benchmarks (post-MVP, non-blocking)
 	@mkdir -p reports

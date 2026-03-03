@@ -1,6 +1,6 @@
 # Tâche — Cible Makefile `gate-m6`
 
-Statut : TODO
+Statut : DONE
 Ordre : 058
 Workstream : WS-13
 Milestone : M6
@@ -46,28 +46,28 @@ Ajouter la cible `gate-m6` au Makefile. Elle exécute `pytest -m fullscale tests
 - Écrire un test dans `tests/test_makefile.py` vérifiant que la cible `gate-m6` existe dans le Makefile.
 
 ## Critères d'acceptation
-- [ ] Cible `gate-m6` ajoutée au Makefile avec dépendance sur `gate-m5`.
-- [ ] `gate-m6` déclarée `.PHONY`.
-- [ ] `gate-m6` exécute `pytest -m fullscale tests/test_fullscale_btc.py -v --timeout=600`.
-- [ ] `gate-m6` génère `reports/gate_report_M6.json`.
-- [ ] Le commentaire de la chaîne de gates inclut GM6.
-- [ ] `make gate-m6` fonctionne quand les prérequis sont satisfaits (accès réseau, gate-m5 GO).
-- [ ] Test dans `tests/test_makefile.py` vérifiant la présence de la cible `gate-m6`.
-- [ ] Tests couvrent les scénarios nominaux + erreurs + bords.
-- [ ] Suite de tests standard verte après implémentation.
-- [ ] `ruff check` passe sans erreur.
+- [x] Cible `gate-m6` ajoutée au Makefile avec dépendance sur `gate-m5`.
+- [x] `gate-m6` déclarée `.PHONY`.
+- [x] `gate-m6` exécute `pytest -m fullscale tests/test_fullscale_btc.py -v --timeout=600`.
+- [x] `gate-m6` génère `reports/gate_report_M6.json`.
+- [x] Le commentaire de la chaîne de gates inclut GM6.
+- [x] `make gate-m6` fonctionne quand les prérequis sont satisfaits (accès réseau, gate-m5 GO).
+- [x] Test dans `tests/test_makefile.py` vérifiant la présence de la cible `gate-m6`.
+- [x] Tests couvrent les scénarios nominaux + erreurs + bords.
+- [x] Suite de tests standard verte après implémentation.
+- [x] `ruff check` passe sans erreur.
 
 ## Pré-condition de démarrage
 - **Tous les tests existants sont GREEN** avant de commencer.
 - **Créer une branche dédiée** `task/058-makefile-gate-m6` depuis `Max6000i1`.
 
 ## Checklist de fin de tâche
-- [ ] Branche `task/058-makefile-gate-m6` créée depuis `Max6000i1`.
-- [ ] Tests RED écrits avant implémentation.
-- [ ] **Commit RED** : `[WS-13] #058 RED: tests cible Makefile gate-m6`.
-- [ ] Tests GREEN passants et reproductibles.
-- [ ] Critères d'acceptation tous satisfaits.
-- [ ] `ruff check ai_trading/ tests/` passe sans erreur.
-- [ ] Fichier de tâche mis à jour (statut DONE, critères cochés).
-- [ ] **Commit GREEN** : `[WS-13] #058 GREEN: cible Makefile gate-m6`.
-- [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-13] #058 — Cible Makefile gate-m6`.
+- [x] Branche `task/058-makefile-gate-m6` créée depuis `Max6000i1`.
+- [x] Tests RED écrits avant implémentation.
+- [x] **Commit RED** : `[WS-13] #058 RED: tests cible Makefile gate-m6`.
+- [x] Tests GREEN passants et reproductibles.
+- [x] Critères d'acceptation tous satisfaits.
+- [x] `ruff check ai_trading/ tests/` passe sans erreur.
+- [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
+- [x] **Commit GREEN** : `[WS-13] #058 GREEN: cible Makefile gate-m6`.
+- [x] **Pull Request ouverte** vers `Max6000i1` : `[WS-13] #058 — Cible Makefile gate-m6`.

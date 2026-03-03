@@ -97,7 +97,7 @@ class TestHelpTarget:
         result = _run_make("help", dry_run=False)
         output = result.stdout
         for target in [
-            "gate-m1", "gate-m2", "gate-m3", "gate-m4", "gate-m5",
+            "gate-m1", "gate-m2", "gate-m3", "gate-m4", "gate-m5", "gate-m6",
             "gate-features", "gate-split", "gate-backtest", "gate-doc",
             "gate-perf",
         ]:
@@ -247,7 +247,7 @@ class TestVariableOverrides:
 class TestGateTargetsDryRun:
     """Verify gate targets produce correct commands."""
 
-    @pytest.mark.parametrize("n", [1, 2, 3, 4, 5])
+    @pytest.mark.parametrize("n", [1, 2, 3, 4, 5, 6])
     def test_gate_milestone_targets(self, n: int) -> None:
         """#053 — make gate-m<N> runs without syntax error."""
         result = _run_make(f"gate-m{n}")
@@ -255,7 +255,7 @@ class TestGateTargetsDryRun:
             f"gate-m{n} failed: {result.stderr}"
         )
 
-    @pytest.mark.parametrize("n", [1, 2, 3, 4, 5])
+    @pytest.mark.parametrize("n", [1, 2, 3, 4, 5, 6])
     def test_gate_milestone_creates_reports_dir(self, n: int) -> None:
         """#053 — gate-m<N> dry-run mentions reports directory."""
         result = _run_make(f"gate-m{n}")
@@ -377,6 +377,15 @@ class TestGateDependencies:
                 return
         pytest.fail("gate-m5 target not found in Makefile")
 
+    def test_gate_m6_depends_on_gate_m5(self, makefile_content: str) -> None:
+        """#058 — gate-m6 depends on gate-m5."""
+        lines = makefile_content.splitlines()
+        for line in lines:
+            if line.startswith("gate-m6") and ":" in line:
+                assert "gate-m5" in line, "gate-m6 should depend on gate-m5"
+                return
+        pytest.fail("gate-m6 target not found in Makefile")
+
 
 class TestHelpComments:
     """Verify that ## comments exist for discoverable targets."""
@@ -399,7 +408,7 @@ class TestHelpComments:
     def test_gate_targets_have_help_comments(self, makefile_content: str) -> None:
         """#053 — Gate targets have ## help comments."""
         gate_targets = [
-            "gate-m1", "gate-m2", "gate-m3", "gate-m4", "gate-m5",
+            "gate-m1", "gate-m2", "gate-m3", "gate-m4", "gate-m5", "gate-m6",
             "gate-features", "gate-split", "gate-backtest", "gate-doc",
             "gate-perf",
         ]
@@ -410,3 +419,39 @@ class TestHelpComments:
                     found = True
                     break
             assert found, f"Gate target '{target}' missing ## help comment"
+
+class TestGateM6:
+    """Verify gate-m6 target specifics. #058"""
+
+    def test_gate_m6_runs_fullscale_pytest(self) -> None:
+        """#058 — gate-m6 runs pytest -m fullscale with timeout."""
+        result = _run_make("gate-m6")
+        assert result.returncode == 0
+        assert "-m fullscale" in result.stdout
+        assert "test_fullscale_btc" in result.stdout
+        assert "-v" in result.stdout
+        assert "--timeout=600" in result.stdout
+
+    def test_gate_m6_creates_report(self) -> None:
+        """#058 — gate-m6 creates gate_report_M6.json."""
+        result = _run_make("gate-m6")
+        assert result.returncode == 0
+        assert "gate_report_M6" in result.stdout
+
+    def test_gate_m6_chain_comment_includes_gm6(self, makefile_content: str) -> None:
+        """#058 — Gate chain comment includes GM6."""
+        found = False
+        for line in makefile_content.splitlines():
+            if "GM6" in line and line.strip().startswith("#"):
+                found = True
+                break
+        assert found, "Gate chain comment should include GM6"
+
+    def test_gate_m6_is_phony(self, makefile_content: str) -> None:
+        """#058 — gate-m6 is declared .PHONY."""
+        found = False
+        for line in makefile_content.splitlines():
+            if line.startswith(".PHONY") and "gate-m6" in line:
+                found = True
+                break
+        assert found, "gate-m6 should be declared .PHONY"
