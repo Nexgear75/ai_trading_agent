@@ -182,10 +182,11 @@ class TestUtilityTargetsDryRun:
         assert "pytest tests/ -v" in result.stdout
 
     def test_lint_target(self) -> None:
-        """#053 — make lint runs ruff check."""
+        """#053 — make lint runs ruff check and mypy."""
         result = _run_make("lint")
         assert result.returncode == 0
         assert "ruff check ai_trading/ tests/" in result.stdout
+        assert "mypy ai_trading/" in result.stdout
 
     def test_docker_build_target(self) -> None:
         """#053 — make docker-build runs docker build."""

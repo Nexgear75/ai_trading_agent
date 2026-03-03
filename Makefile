@@ -53,8 +53,9 @@ run-all: fetch-data qa run ## Run fetch-data → qa → run in sequence
 test: ## Run test suite with pytest
 	pytest tests/ -v
 
-lint: ## Run ruff linter on source and tests
+lint: ## Run ruff linter and mypy type checker on source and tests
 	ruff check ai_trading/ tests/
+	mypy ai_trading/
 
 docker-build: ## Build Docker image
 	docker build -t ai-trading-pipeline .
@@ -84,8 +85,9 @@ help: ## Display this help message
 
 gate-m1: ## Gate M1 — Foundations verification
 	@mkdir -p reports
-	pytest tests/test_config.py tests/test_ingestion.py tests/test_qa.py -v \
-		--tb=short
+	pytest tests/test_config.py tests/test_config_validation.py tests/test_ingestion.py \
+		tests/test_qa.py tests/test_missing.py \
+		-v --tb=short --cov=ai_trading/config.py --cov=ai_trading/data --cov-fail-under=95
 	@echo '{"gate": "M1", "status": "GO"}' > reports/gate_report_M1.json
 	@echo "Gate M1: GO"
 
@@ -96,7 +98,7 @@ gate-features: gate-m1 ## Gate Features — Feature engineering verification (re
 		tests/test_ema_ratio.py tests/test_volume_features.py \
 		tests/test_warmup_validation.py \
 		-v --tb=short --cov=ai_trading/features --cov-fail-under=90
-	@echo '{"gate": "G-Features", "status": "GO"}' > reports/gate_report_G-Features.json
+	@echo '{"gate": "G_Features", "status": "GO"}' > reports/gate_report_G_Features.json
 	@echo "Gate Features: GO"
 
 gate-split: gate-features ## Gate Split — Dataset/splitter verification (requires G-Features)
@@ -104,7 +106,7 @@ gate-split: gate-features ## Gate Split — Dataset/splitter verification (requi
 	pytest tests/test_sample_builder.py tests/test_splitter.py \
 		tests/test_label_target.py tests/test_adapter_xgboost.py \
 		-v --tb=short --cov=ai_trading/data --cov-fail-under=90
-	@echo '{"gate": "G-Split", "status": "GO"}' > reports/gate_report_G-Split.json
+	@echo '{"gate": "G_Split", "status": "GO"}' > reports/gate_report_G_Split.json
 	@echo "Gate Split: GO"
 
 gate-m2: gate-split ## Gate M2 — Feature & Data Pipeline verification (requires G-Split)
@@ -119,8 +121,8 @@ gate-doc: gate-m2 ## Gate Doc — Training/calibration verification (requires M2
 	pytest tests/test_base_model.py tests/test_dummy_model.py \
 		tests/test_fold_trainer.py tests/test_quantile_grid.py \
 		tests/test_theta_optimization.py tests/test_theta_bypass.py \
-		-v --tb=short --cov=ai_trading/training --cov-fail-under=90
-	@echo '{"gate": "G-Doc", "status": "GO"}' > reports/gate_report_G-Doc.json
+		-v --tb=short --cov=ai_trading/training --cov=ai_trading/calibration --cov-fail-under=90
+	@echo '{"gate": "G_Doc", "status": "GO"}' > reports/gate_report_G_Doc.json
 	@echo "Gate Doc: GO"
 
 gate-m3: gate-doc ## Gate M3 — Training Framework verification (requires G-Doc)
@@ -138,7 +140,7 @@ gate-backtest: gate-m3 ## Gate Backtest — Backtest engine verification (requir
 		tests/test_equity_curve.py tests/test_trade_journal.py \
 		tests/test_trading_metrics.py \
 		-v --tb=short --cov=ai_trading/backtest --cov-fail-under=90
-	@echo '{"gate": "G-Backtest", "status": "GO"}' > reports/gate_report_G-Backtest.json
+	@echo '{"gate": "G_Backtest", "status": "GO"}' > reports/gate_report_G_Backtest.json
 	@echo "Gate Backtest: GO"
 
 gate-m4: gate-backtest ## Gate M4 — Evaluation Engine verification (requires G-Backtest)
@@ -162,5 +164,5 @@ gate-m5: gate-m4 ## Gate M5 — Production Readiness verification (requires M4)
 gate-perf: ## Gate Perf — Performance benchmarks (post-MVP, non-blocking)
 	@mkdir -p reports
 	@echo "Performance benchmarks: post-MVP — skipped"
-	@echo '{"gate": "G-Perf", "status": "SKIPPED", "note": "post-MVP"}' > reports/gate_report_G-Perf.json
+	@echo '{"gate": "G_Perf", "status": "SKIPPED", "note": "post-MVP"}' > reports/gate_report_G_Perf.json
 	@echo "Gate Perf: SKIPPED (post-MVP)"

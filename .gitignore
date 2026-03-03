@@ -16,6 +16,7 @@ build/
 # === Artefacts de run (générés par le pipeline) ===
 runs/
 output/
+reports/
 
 # === Données brutes (volumineuses) ===
 data/raw/
