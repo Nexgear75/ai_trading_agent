@@ -58,5 +58,5 @@ Implémenter le module `ai_trading/utils/seed.py` qui :
 - [x] Critères d'acceptation tous satisfaits.
 - [x] `ruff check ai_trading/ tests/` passe sans erreur.
 - [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
-- [ ] **Commit GREEN** : `[WS-12] #048 GREEN: seed manager`.
-- [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-12] #048 — Seed manager`.
+- [x] **Commit GREEN** : `[WS-12] #048 GREEN: seed manager`.
+- [x] **Pull Request ouverte** vers `Max6000i1` : `[WS-12] #048 — Seed manager`.
