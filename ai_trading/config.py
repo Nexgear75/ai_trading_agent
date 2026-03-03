@@ -310,6 +310,7 @@ class ArtifactsConfig(_StrictBase):
     save_model: bool
     save_equity_curve: bool
     save_predictions: bool
+    save_trades: bool
 
 
 # ---------------------------------------------------------------------------

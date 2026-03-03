@@ -36,6 +36,7 @@ from ai_trading.artifacts.run_dir import create_run_dir
 from ai_trading.artifacts.validation import validate_manifest, validate_metrics
 from ai_trading.backtest.costs import apply_cost_model
 from ai_trading.backtest.engine import build_equity_curve, execute_trades
+from ai_trading.backtest.journal import export_trade_journal
 from ai_trading.calibration.threshold import apply_threshold, calibrate_threshold
 from ai_trading.config import VALID_STRATEGIES, PipelineConfig
 from ai_trading.data.dataset import build_samples
@@ -414,6 +415,14 @@ def run_pipeline(config: PipelineConfig) -> Path:
             slippage_rate_per_side=config.costs.slippage_rate_per_side,
         )
 
+        # Enrich trades with y_true / y_hat (required by §12.6 trade journal)
+        y_true_map = dict(zip(ts_test, y_test, strict=True))
+        y_hat_map = dict(zip(ts_test, y_hat_test, strict=True))
+        for trade in enriched_trades:
+            sig_t = trade["signal_time"]
+            trade["y_true"] = float(y_true_map[sig_t])
+            trade["y_hat"] = float(y_hat_map[sig_t])
+
         # Build equity curve
         equity_df = build_equity_curve(
             trades=enriched_trades,
@@ -430,6 +439,14 @@ def run_pipeline(config: PipelineConfig) -> Path:
         if config.artifacts.save_equity_curve:
             equity_df.to_csv(fold_dir / "equity_curve.csv", index=False)
             fold_equities.append(equity_df)
+
+        if config.artifacts.save_trades:
+            export_trade_journal(
+                trades=enriched_trades,
+                path=fold_dir / "trades.csv",
+                fee_rate_per_side=config.costs.fee_rate_per_side,
+                slippage_rate_per_side=config.costs.slippage_rate_per_side,
+            )
 
         # Model already saved by trainer if save_model would be used.
         # The trainer always calls model.save(); the flag controls whether
@@ -589,6 +606,8 @@ def run_pipeline(config: PipelineConfig) -> Path:
             fold_files["preds_test_csv"] = str(fold_dir / "preds_test.csv")
         if config.artifacts.save_equity_curve:
             fold_files["equity_curve_csv"] = str(fold_dir / "equity_curve.csv")
+        if config.artifacts.save_trades:
+            fold_files["trades_csv"] = str(fold_dir / "trades.csv")
         if config.artifacts.save_model:
             fold_files["model_artifacts_dir"] = str(
                 fold_dir / "model_artifacts"

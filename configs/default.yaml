@@ -16,7 +16,7 @@ dataset:
   symbols:
     - BTCUSDT                     # MVP : un seul symbole par run
   timeframe: "1h"                 # Intervalle entre bougies (Δ)
-  start: "2024-01-01"             # Date début (UTC, incluse)
+  start: "2017-01-01"             # Date début (UTC, incluse)
   end: "2026-01-01"               # Date fin (UTC, exclue)
   timezone: UTC
   raw_dir: data/raw               # Répertoire des fichiers bruts
@@ -220,3 +220,4 @@ artifacts:
   save_model: true                # Sauvegarder les artefacts modèle par fold
   save_equity_curve: true         # Générer equity_curve.csv par fold + stitché
   save_predictions: true          # Générer preds_val.csv et preds_test.csv par fold
+  save_trades: true               # Générer trades.csv par fold (§12.6)

@@ -73,6 +73,7 @@ def _make_config_dict(
     save_predictions: bool = True,
     save_equity_curve: bool = True,
     save_model: bool = True,
+    save_trades: bool = True,
     n_bars: int = _N_BARS,
 ) -> dict:
     """Build a raw config dict adapted for fast integration testing.
@@ -234,6 +235,7 @@ def _make_config_dict(
             "save_model": save_model,
             "save_equity_curve": save_equity_curve,
             "save_predictions": save_predictions,
+            "save_trades": save_trades,
         },
     }
 
@@ -419,6 +421,19 @@ class TestFullRunDummy:
         )
         assert found_model
 
+    def test_trades_csv_saved_when_flag_true(self):
+        """W-1: trades.csv exported per fold when save_trades=True."""
+        from ai_trading.config import load_config
+        from ai_trading.pipeline.runner import run_pipeline
+
+        config = load_config(str(self.cfg_path))
+        run_dir = run_pipeline(config)
+        fold_dirs = sorted((run_dir / "folds").iterdir())
+        found_trades = any(
+            (fd / "trades.csv").is_file() for fd in fold_dirs
+        )
+        assert found_trades
+
 
 # ---------------------------------------------------------------------------
 # 4. Full pipeline no_trade run
@@ -543,6 +558,7 @@ class TestConditionalArtifactsFalse:
             save_predictions=False,
             save_equity_curve=False,
             save_model=False,
+            save_trades=False,
         )
         self.cfg_path = _write_config(tmp_path, self.cfg_dict)
 
@@ -568,6 +584,17 @@ class TestConditionalArtifactsFalse:
             assert not (fd / "equity_curve.csv").is_file()
         # No stitched equity curve either
         assert not (run_dir / "equity_curve.csv").is_file()
+
+    def test_no_trades_csv_when_flag_false(self):
+        """W-1: trades.csv NOT exported when save_trades=False."""
+        from ai_trading.config import load_config
+        from ai_trading.pipeline.runner import run_pipeline
+
+        config = load_config(str(self.cfg_path))
+        run_dir = run_pipeline(config)
+        fold_dirs = sorted((run_dir / "folds").iterdir())
+        for fd in fold_dirs:
+            assert not (fd / "trades.csv").is_file()
 
     def test_unconditional_artifacts_always_present(self):
         """manifest.json, metrics.json, config_snapshot.yaml always written."""

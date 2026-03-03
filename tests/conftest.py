@@ -515,6 +515,7 @@ def make_integration_config(
             "save_model": True,
             "save_equity_curve": True,
             "save_predictions": True,
+            "save_trades": True,
         },
     }
 
