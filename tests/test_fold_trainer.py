@@ -9,6 +9,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import numpy as np
+import pandas as pd
 import pytest
 
 from ai_trading.config import load_config
@@ -533,12 +534,13 @@ class TestFoldTrainerPredict:
             np.testing.assert_allclose(test_call_X, expected_X_test, rtol=1e-5)
 
     def test_predict_passes_context(self, config, make_fold_data, tmp_path):
-        """#028 — model.predict() receives meta_val/ohlcv for val, ohlcv for test."""
+        """#028 — model.predict() receives meta_val/ohlcv for val, meta_test/ohlcv for test."""
         X_train, y_train, X_val, y_val, X_test = make_fold_data()
         model = DummyModel(seed=7)
         trainer = FoldTrainer(config=config)
 
         meta_val = {"decision_time": "2024-01-01"}
+        meta_test = {"decision_time": "2024-06-01"}
         ohlcv = "ohlcv_placeholder"
 
         with patch.object(model, "predict", wraps=model.predict) as mock_predict:
@@ -551,6 +553,7 @@ class TestFoldTrainerPredict:
                 X_test=X_test,
                 run_dir=tmp_path,
                 meta_val=meta_val,
+                meta_test=meta_test,
                 ohlcv=ohlcv,
             )
 
@@ -559,8 +562,9 @@ class TestFoldTrainerPredict:
             val_kw = mock_predict.call_args_list[0][1]
             assert val_kw["meta"] is meta_val
             assert val_kw["ohlcv"] is ohlcv
-            # Test predict: meta=None (no meta_test), ohlcv=ohlcv
+            # Test predict: meta=meta_test, ohlcv=ohlcv
             test_kw = mock_predict.call_args_list[1][1]
+            assert test_kw["meta"] is meta_test
             assert test_kw["ohlcv"] is ohlcv
 
 
@@ -725,12 +729,15 @@ class TestFoldTrainerEdgeCases:
         assert nested_dir.exists()
 
     def test_optional_params_default_none(self, config, make_fold_data, tmp_path):
-        """#028 — meta_train, meta_val, ohlcv default to None when omitted."""
+        """#028 — meta_train, meta_val, meta_test, ohlcv default to None when omitted."""
         X_train, y_train, X_val, y_val, X_test = make_fold_data()
         model = DummyModel(seed=7)
         trainer = FoldTrainer(config=config)
 
-        with patch.object(model, "fit", wraps=model.fit) as mock_fit:
+        with (
+            patch.object(model, "fit", wraps=model.fit) as mock_fit,
+            patch.object(model, "predict", wraps=model.predict) as mock_predict,
+        ):
             trainer.train_fold(
                 model=model,
                 X_train=X_train,
@@ -745,3 +752,85 @@ class TestFoldTrainerEdgeCases:
             assert kwargs["meta_train"] is None
             assert kwargs["meta_val"] is None
             assert kwargs["ohlcv"] is None
+
+            # Both predict calls should have meta=None
+            assert mock_predict.call_count == 2
+            for call in mock_predict.call_args_list:
+                assert call[1].get("meta") is None
+
+
+# ---------------------------------------------------------------------------
+# Integration: FoldTrainer + SmaRuleBaseline (meta_test forwarding)
+# ---------------------------------------------------------------------------
+
+
+class TestFoldTrainerSmaIntegration:
+    """RC-0006 B-1 — Verify FoldTrainer correctly forwards meta_test to
+    SmaRuleBaseline.predict() for the test split."""
+
+    def test_sma_baseline_through_trainer(self, config, tmp_path):
+        """RC-0006 B-1 — SmaRuleBaseline runs through FoldTrainer without error."""
+        from ai_trading.baselines.sma_rule import SmaRuleBaseline
+
+        n_bars = 200
+        rng = np.random.default_rng(42)
+        close = 100.0 + np.cumsum(rng.standard_normal(n_bars) * 0.5)
+        idx = pd.date_range("2024-01-01", periods=n_bars, freq="1h")
+        ohlcv = pd.DataFrame(
+            {
+                "open": close + 0.1,
+                "high": close + 1.0,
+                "low": close - 1.0,
+                "close": close,
+                "volume": np.full(n_bars, 1000.0),
+            },
+            index=idx,
+        )
+
+        interval = idx[1] - idx[0]
+        L, F = 24, 9
+
+        # Build samples in the tail of the bar range (after SMA warmup)
+        n_train, n_val, n_test = 30, 15, 10
+        total = n_train + n_val + n_test
+        start = n_bars - total
+        sample_indices = np.arange(start, start + total)
+
+        X_train = rng.standard_normal((n_train, L, F)).astype(np.float32)
+        y_train = rng.standard_normal(n_train).astype(np.float32)
+        X_val = rng.standard_normal((n_val, L, F)).astype(np.float32)
+        y_val = rng.standard_normal(n_val).astype(np.float32)
+        X_test = rng.standard_normal((n_test, L, F)).astype(np.float32)
+
+        train_idx = sample_indices[:n_train]
+        val_idx = sample_indices[n_train : n_train + n_val]
+        test_idx = sample_indices[n_train + n_val :]
+
+        meta_train = {"decision_time": idx[train_idx] + interval}
+        meta_val = {"decision_time": idx[val_idx] + interval}
+        meta_test = {"decision_time": idx[test_idx] + interval}
+
+        model = SmaRuleBaseline()
+        trainer = FoldTrainer(config=config)
+
+        result = trainer.train_fold(
+            model=model,
+            X_train=X_train,
+            y_train=y_train,
+            X_val=X_val,
+            y_val=y_val,
+            X_test=X_test,
+            run_dir=tmp_path,
+            meta_train=meta_train,
+            meta_val=meta_val,
+            meta_test=meta_test,
+            ohlcv=ohlcv,
+        )
+
+        assert result["y_hat_val"].shape == (n_val,)
+        assert result["y_hat_test"].shape == (n_test,)
+        assert result["y_hat_val"].dtype == np.float32
+        assert result["y_hat_test"].dtype == np.float32
+        # Signals must be binary 0.0 or 1.0
+        assert set(np.unique(result["y_hat_val"])).issubset({0.0, 1.0})
+        assert set(np.unique(result["y_hat_test"])).issubset({0.0, 1.0})

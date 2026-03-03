@@ -50,6 +50,7 @@ class FoldTrainer:
         run_dir: Path,
         meta_train: Any = None,
         meta_val: Any = None,
+        meta_test: Any = None,
         ohlcv: Any = None,
     ) -> dict[str, Any]:
         """Run the full fold workflow.
@@ -74,6 +75,8 @@ class FoldTrainer:
             Metadata for training samples (passed to model). Default ``None``.
         meta_val : Any, optional
             Metadata for validation samples (passed to model). Default ``None``.
+        meta_test : Any, optional
+            Metadata for test samples (passed to model). Default ``None``.
         ohlcv : Any, optional
             Raw OHLCV data (passed to model for RL context). Default ``None``.
 
@@ -106,7 +109,7 @@ class FoldTrainer:
 
         # --- 3. Predict ---
         y_hat_val = model.predict(X=x_val_scaled, meta=meta_val, ohlcv=ohlcv)
-        y_hat_test = model.predict(X=x_test_scaled, ohlcv=ohlcv)
+        y_hat_test = model.predict(X=x_test_scaled, meta=meta_test, ohlcv=ohlcv)
 
         # --- 4. Save ---
         model.save(run_dir / "model")
