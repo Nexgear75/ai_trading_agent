@@ -212,7 +212,7 @@ class TestErrorNon3D:
 
     def test_0d_raises(self):
         """#059 — Scalar (0D) array should raise ValueError."""
-        x_0d = np.float32(42.0)
+        x_0d = np.array(42.0, dtype=np.float32)
         with pytest.raises(ValueError, match="3D"):
             flatten_seq_to_tab(x_0d, [])
 
