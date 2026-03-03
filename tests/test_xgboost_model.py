@@ -122,12 +122,6 @@ class TestXGBoostRegModelAttributes:
 class TestXGBoostRegModelStubs:
     """#060 — Remaining stub methods must raise NotImplementedError."""
 
-    def test_predict_raises_not_implemented(self):
-        mod = _reload_xgboost_module()
-        model = mod.XGBoostRegModel()
-        with pytest.raises(NotImplementedError):
-            model.predict(X=_X_TRAIN)
-
     def test_save_raises_not_implemented(self, tmp_path: Path):
         mod = _reload_xgboost_module()
         model = mod.XGBoostRegModel()
@@ -139,13 +133,6 @@ class TestXGBoostRegModelStubs:
         model = mod.XGBoostRegModel()
         with pytest.raises(NotImplementedError):
             model.load(path=tmp_path / "model.json")
-
-    def test_predict_with_optional_params_raises_not_implemented(self):
-        """predict() with meta and ohlcv also raises."""
-        mod = _reload_xgboost_module()
-        model = mod.XGBoostRegModel()
-        with pytest.raises(NotImplementedError):
-            model.predict(X=_X_TRAIN, meta={"example": 1}, ohlcv=None)
 
 
 # ---------------------------------------------------------------------------
@@ -824,3 +811,174 @@ class TestXGBoostRegModelFitArtifacts:
             run_dir=tmp_path,
         )
         assert result["n_features_in"] == seq_len * n_feat  # 5 * 3 = 15
+
+
+# ---------------------------------------------------------------------------
+# Fixture: fitted model for predict tests (#065)
+# ---------------------------------------------------------------------------
+
+_RNG_PRED = np.random.default_rng(65)
+_N_PRED, _L_PRED, _F_PRED = 80, 10, 5
+_X_TRAIN_PRED = _RNG_PRED.standard_normal((_N_PRED, _L_PRED, _F_PRED)).astype(np.float32)
+_Y_TRAIN_PRED = _RNG_PRED.standard_normal((_N_PRED,)).astype(np.float32)
+_X_VAL_PRED = _RNG_PRED.standard_normal((25, _L_PRED, _F_PRED)).astype(np.float32)
+_Y_VAL_PRED = _RNG_PRED.standard_normal((25,)).astype(np.float32)
+_X_TEST_PRED = _RNG_PRED.standard_normal((15, _L_PRED, _F_PRED)).astype(np.float32)
+
+
+@pytest.fixture()
+def fitted_model(default_config, tmp_path):
+    """Return a fitted XGBoostRegModel ready for predict() tests.
+
+    Overrides n_estimators to 10 (from 500) for performance: predict tests
+    do not depend on model quality, and this avoids 17+ slow fits.
+    """
+    default_config.models.xgboost.n_estimators = 10
+    model = _make_xgb_model()
+    model.fit(
+        X_train=_X_TRAIN_PRED,
+        y_train=_Y_TRAIN_PRED,
+        X_val=_X_VAL_PRED,
+        y_val=_Y_VAL_PRED,
+        config=default_config,
+        run_dir=tmp_path,
+    )
+    return model
+
+
+# ---------------------------------------------------------------------------
+# Tests — predict() (#065)
+# ---------------------------------------------------------------------------
+
+
+class TestXGBoostRegModelPredict:
+    """#065 — XGBoostRegModel.predict() validation, output shape/dtype, determinism."""
+
+    # --- Validation: not fitted ---
+
+    def test_predict_raises_runtime_error_if_not_fitted(self):
+        """#065 — RuntimeError if fit() has not been called."""
+        model = _make_xgb_model()
+        with pytest.raises(RuntimeError, match="Model not fitted"):
+            model.predict(X=_X_TEST_PRED)
+
+    def test_predict_raises_runtime_error_if_feature_names_none(self):
+        """#065 PR-FIX — RuntimeError if _feature_names is None (e.g. after load)."""
+        model = _make_xgb_model()
+        # Simulate a loaded model with _model set but _feature_names still None
+        model._model = object()  # non-None so the first guard passes
+        with pytest.raises(RuntimeError, match="Feature names are not set"):
+            model.predict(X=_X_TEST_PRED)
+
+    # --- Validation: shape errors ---
+
+    def test_predict_raises_valueerror_if_x_2d(self, fitted_model):
+        """#065 — ValueError if X is 2D instead of 3D."""
+        x_2d = _X_TEST_PRED.reshape(_X_TEST_PRED.shape[0], -1)
+        with pytest.raises(ValueError, match="3D"):
+            fitted_model.predict(X=x_2d)
+
+    def test_predict_raises_valueerror_if_x_1d(self, fitted_model):
+        """#065 — ValueError if X is 1D."""
+        x_1d = np.ones(10, dtype=np.float32)
+        with pytest.raises(ValueError, match="3D"):
+            fitted_model.predict(X=x_1d)
+
+    def test_predict_raises_valueerror_if_x_4d(self, fitted_model):
+        """#065 — ValueError if X is 4D."""
+        x_4d = np.ones((5, 10, 5, 1), dtype=np.float32)
+        with pytest.raises(ValueError, match="3D"):
+            fitted_model.predict(X=x_4d)
+
+    # --- Validation: dtype errors ---
+
+    def test_predict_raises_typeerror_if_x_float64(self, fitted_model):
+        """#065 — TypeError if X.dtype is float64."""
+        x_f64 = _X_TEST_PRED.astype(np.float64)
+        with pytest.raises(TypeError, match="float32"):
+            fitted_model.predict(X=x_f64)
+
+    def test_predict_raises_typeerror_if_x_int32(self, fitted_model):
+        """#065 — TypeError if X.dtype is int32."""
+        x_int = _X_TEST_PRED.astype(np.int32)
+        with pytest.raises(TypeError, match="float32"):
+            fitted_model.predict(X=x_int)
+
+    # --- Nominal: output shape and dtype ---
+
+    def test_predict_returns_ndarray(self, fitted_model):
+        """#065 — predict() returns a numpy ndarray."""
+        y_hat = fitted_model.predict(X=_X_TEST_PRED)
+        assert isinstance(y_hat, np.ndarray)
+
+    def test_predict_output_shape_n(self, fitted_model):
+        """#065 — predict() output shape is (N,)."""
+        y_hat = fitted_model.predict(X=_X_TEST_PRED)
+        assert y_hat.shape == (_X_TEST_PRED.shape[0],)
+
+    def test_predict_output_dtype_float32(self, fitted_model):
+        """#065 — predict() output dtype is float32 (cast from XGBoost float64)."""
+        y_hat = fitted_model.predict(X=_X_TEST_PRED)
+        assert y_hat.dtype == np.float32
+
+    def test_predict_values_are_continuous(self, fitted_model):
+        """#065 — Predictions are continuous floats (not bounded to 0/1)."""
+        y_hat = fitted_model.predict(X=_X_TEST_PRED)
+        # For regression on random data, not all values will be exactly 0 or 1
+        assert not np.all(np.isin(y_hat, [0.0, 1.0]))
+
+    def test_predict_values_are_finite(self, fitted_model):
+        """#065 — All predictions are finite (no NaN or Inf)."""
+        y_hat = fitted_model.predict(X=_X_TEST_PRED)
+        assert np.all(np.isfinite(y_hat))
+
+    # --- Determinism ---
+
+    def test_predict_deterministic_same_result(self, fitted_model):
+        """#065 — Multiple predict() calls with same data → identical results."""
+        y1 = fitted_model.predict(X=_X_TEST_PRED)
+        y2 = fitted_model.predict(X=_X_TEST_PRED)
+        np.testing.assert_array_equal(y1, y2)
+
+    # --- meta and ohlcv are ignored ---
+
+    def test_predict_meta_ignored(self, fitted_model):
+        """#065 — meta param is accepted but does not affect output."""
+        y_no_meta = fitted_model.predict(X=_X_TEST_PRED)
+        y_with_meta = fitted_model.predict(X=_X_TEST_PRED, meta={"key": "value"})
+        np.testing.assert_array_equal(y_no_meta, y_with_meta)
+
+    def test_predict_ohlcv_ignored(self, fitted_model):
+        """#065 — ohlcv param is accepted but does not affect output."""
+        y_no_ohlcv = fitted_model.predict(X=_X_TEST_PRED)
+        y_with_ohlcv = fitted_model.predict(
+            X=_X_TEST_PRED, ohlcv=np.ones((15, 5))
+        )
+        np.testing.assert_array_equal(y_no_ohlcv, y_with_ohlcv)
+
+    def test_predict_meta_and_ohlcv_together(self, fitted_model):
+        """#065 — Both meta and ohlcv together are accepted without error."""
+        y_hat = fitted_model.predict(
+            X=_X_TEST_PRED, meta={"a": 1}, ohlcv=np.zeros((15, 4))
+        )
+        assert y_hat.shape == (_X_TEST_PRED.shape[0],)
+        assert y_hat.dtype == np.float32
+
+    # --- Boundary: N=1 ---
+
+    def test_predict_single_sample(self, fitted_model):
+        """#065 — predict() works with a single sample (N=1)."""
+        rng = np.random.default_rng(6501)
+        x_single = rng.standard_normal((1, _L_PRED, _F_PRED)).astype(np.float32)
+        y_hat = fitted_model.predict(X=x_single)
+        assert y_hat.shape == (1,)
+        assert y_hat.dtype == np.float32
+
+    # --- Boundary: N=0 ---
+
+    def test_predict_boundary_n_zero(self, fitted_model):
+        """#065 — predict() with empty array (0, L, F) returns empty (0,) float32."""
+        x_empty = np.empty((0, _L_PRED, _F_PRED), dtype=np.float32)
+        y_hat = fitted_model.predict(X=x_empty)
+        assert y_hat.shape == (0,)
+        assert y_hat.dtype == np.float32

@@ -26,6 +26,7 @@ class XGBoostRegModel(BaseModel):
 
     def __init__(self) -> None:
         self._model = None
+        self._feature_names: list[str] | None = None
 
     def fit(
         self,
@@ -102,6 +103,7 @@ class XGBoostRegModel(BaseModel):
         # --- Flatten 3D → 2D via adapter ---
         n_features = X_train.shape[2]
         feature_names = [f"f{i}" for i in range(n_features)]
+        self._feature_names = feature_names
         x_tab_train, _ = flatten_seq_to_tab(X_train, feature_names)
         x_tab_val, _ = flatten_seq_to_tab(X_val, feature_names)
 
@@ -142,8 +144,29 @@ class XGBoostRegModel(BaseModel):
         meta: Any = None,
         ohlcv: Any = None,
     ) -> np.ndarray:
-        """Not implemented yet — stub for WS-XGB-4."""
-        raise NotImplementedError("XGBoostRegModel.predict() is not implemented yet.")
+        """Generate predictions for input features.
+
+        Validates inputs, flattens 3D sequences via ``flatten_seq_to_tab``,
+        runs prediction, and casts output to float32.
+
+        Task #065 (WS-XGB-4).
+        """
+        if self._model is None:
+            raise RuntimeError("Model not fitted. Call fit() before predict().")
+        if X.ndim != 3:
+            raise ValueError(f"X must be 3D (N, L, F), got {X.ndim}D.")
+        if X.dtype != np.float32:
+            raise TypeError(f"X.dtype must be float32, got {X.dtype}.")
+        if X.shape[0] == 0:
+            return np.empty((0,), dtype=np.float32)
+        if self._feature_names is None:
+            raise RuntimeError(
+                "Feature names are not set. Ensure the model was fitted or properly "
+                "loaded before calling predict()."
+            )
+        x_tab, _ = flatten_seq_to_tab(X, self._feature_names)
+        y_hat = self._model.predict(x_tab)
+        return y_hat.astype(np.float32)
 
     def save(self, path: Path) -> None:
         """Not implemented yet — stub for WS-XGB-5."""
