@@ -10,6 +10,7 @@ import json
 from pathlib import Path
 
 import pytest
+from jsonschema import ValidationError
 
 from ai_trading.artifacts.validation import (
     _load_schema,
@@ -127,32 +128,32 @@ class TestMissingRequiredField:
     def test_manifest_missing_run_id(self, example_manifest):
         data = copy.deepcopy(example_manifest)
         del data["run_id"]
-        with pytest.raises(Exception, match="run_id"):
+        with pytest.raises(ValidationError, match="run_id"):
             validate_manifest(data)
 
     def test_manifest_missing_dataset(self, example_manifest):
         data = copy.deepcopy(example_manifest)
         del data["dataset"]
-        with pytest.raises(Exception, match="dataset"):
+        with pytest.raises(ValidationError, match="dataset"):
             validate_manifest(data)
 
     def test_metrics_missing_run_id(self, example_metrics):
         data = copy.deepcopy(example_metrics)
         del data["run_id"]
-        with pytest.raises(Exception, match="run_id"):
+        with pytest.raises(ValidationError, match="run_id"):
             validate_metrics(data)
 
     def test_metrics_missing_folds(self, example_metrics):
         data = copy.deepcopy(example_metrics)
         del data["folds"]
-        with pytest.raises(Exception, match="folds"):
+        with pytest.raises(ValidationError, match="folds"):
             validate_metrics(data)
 
     def test_manifest_missing_nested_required(self, example_manifest):
         """Missing a required field inside a nested object (dataset.exchange)."""
         data = copy.deepcopy(example_manifest)
         del data["dataset"]["exchange"]
-        with pytest.raises(Exception, match="exchange"):
+        with pytest.raises(ValidationError, match="exchange"):
             validate_manifest(data)
 
 
@@ -167,25 +168,25 @@ class TestIncorrectType:
     def test_manifest_run_id_not_string(self, example_manifest):
         data = copy.deepcopy(example_manifest)
         data["run_id"] = 12345
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             validate_manifest(data)
 
     def test_manifest_dataset_symbols_not_array(self, example_manifest):
         data = copy.deepcopy(example_manifest)
         data["dataset"]["symbols"] = "BTCUSDT"  # should be array
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             validate_manifest(data)
 
     def test_metrics_fold_id_not_integer(self, example_metrics):
         data = copy.deepcopy(example_metrics)
         data["folds"][0]["fold_id"] = "zero"
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             validate_metrics(data)
 
     def test_metrics_n_trades_not_integer(self, example_metrics):
         data = copy.deepcopy(example_metrics)
         data["folds"][0]["trading"]["n_trades"] = 3.5
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             validate_metrics(data)
 
 
@@ -200,31 +201,31 @@ class TestEnumViolation:
     def test_manifest_exchange_invalid_enum(self, example_manifest):
         data = copy.deepcopy(example_manifest)
         data["dataset"]["exchange"] = "kraken"
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             validate_manifest(data)
 
     def test_manifest_strategy_type_invalid_enum(self, example_manifest):
         data = copy.deepcopy(example_manifest)
         data["strategy"]["strategy_type"] = "ensemble"
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             validate_manifest(data)
 
     def test_manifest_cost_model_invalid_enum(self, example_manifest):
         data = copy.deepcopy(example_manifest)
         data["costs"]["cost_model"] = "flat_fee"
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             validate_manifest(data)
 
     def test_metrics_strategy_type_invalid_enum(self, example_metrics):
         data = copy.deepcopy(example_metrics)
         data["strategy"]["strategy_type"] = "hybrid"
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             validate_metrics(data)
 
     def test_metrics_threshold_method_invalid_enum(self, example_metrics):
         data = copy.deepcopy(example_metrics)
         data["folds"][0]["threshold"]["method"] = "percentile"
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             validate_metrics(data)
 
 
@@ -237,44 +238,44 @@ class TestEdgeCases:
     """#047 — Edge cases and boundary scenarios."""
 
     def test_validate_manifest_empty_dict(self):
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             validate_manifest({})
 
     def test_validate_metrics_empty_dict(self):
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             validate_metrics({})
 
     def test_manifest_additional_property_rejected(self, example_manifest):
         """Schema has additionalProperties: false at top level."""
         data = copy.deepcopy(example_manifest)
         data["unexpected_field"] = "surprise"
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             validate_manifest(data)
 
     def test_metrics_additional_property_rejected(self, example_metrics):
         """Schema has additionalProperties: false at top level."""
         data = copy.deepcopy(example_metrics)
         data["unexpected_field"] = "surprise"
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             validate_metrics(data)
 
     def test_manifest_empty_symbols_array(self, example_manifest):
         """minItems: 1 on symbols array."""
         data = copy.deepcopy(example_manifest)
         data["dataset"]["symbols"] = []
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             validate_manifest(data)
 
     def test_metrics_empty_folds_array(self, example_metrics):
         """minItems: 1 on folds array."""
         data = copy.deepcopy(example_metrics)
         data["folds"] = []
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             validate_metrics(data)
 
     def test_manifest_negative_horizon(self, example_manifest):
         """horizon_H_bars minimum: 1."""
         data = copy.deepcopy(example_manifest)
         data["label"]["horizon_H_bars"] = 0
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             validate_manifest(data)

@@ -1,6 +1,6 @@
 # Tâche — Validation des schémas JSON
 
-Statut : TODO
+Statut : DONE
 Ordre : 047
 Workstream : WS-11
 Milestone : M5
@@ -39,27 +39,27 @@ Les schémas JSON sont chargés depuis `docs/specifications/manifest.schema.json
 - Fonction utilitaire `_load_schema(schema_name: str) -> dict` pour charger les schémas JSON.
 
 ## Critères d'acceptation
-- [ ] Le module `ai_trading/artifacts/validation.py` existe et est importable.
-- [ ] Les exemples fournis (`example_manifest.json`, `example_metrics.json`) passent la validation sans erreur.
-- [ ] Tests de violation : un champ requis manquant → erreur explicite avec message clair.
-- [ ] Tests de violation : un type incorrect → erreur explicite.
-- [ ] Tests de violation : une valeur hors enum → erreur explicite.
-- [ ] La validation utilise Draft 2020-12 de JSON Schema.
-- [ ] Tests couvrent les scénarios nominaux + erreurs + bords.
-- [ ] Suite de tests verte après implémentation.
-- [ ] `ruff check` passe sans erreur.
+- [x] Le module `ai_trading/artifacts/validation.py` existe et est importable.
+- [x] Les exemples fournis (`example_manifest.json`, `example_metrics.json`) passent la validation sans erreur.
+- [x] Tests de violation : un champ requis manquant → erreur explicite avec message clair.
+- [x] Tests de violation : un type incorrect → erreur explicite.
+- [x] Tests de violation : une valeur hors enum → erreur explicite.
+- [x] La validation utilise Draft 2020-12 de JSON Schema.
+- [x] Tests couvrent les scénarios nominaux + erreurs + bords.
+- [x] Suite de tests verte après implémentation.
+- [x] `ruff check` passe sans erreur.
 
 ## Pré-condition de démarrage
 - **Tous les tests existants sont GREEN** avant de commencer.
 - **Créer une branche dédiée** `task/047-json-schema-validation` depuis `Max6000i1`.
 
 ## Checklist de fin de tâche
-- [ ] Branche `task/047-json-schema-validation` créée depuis `Max6000i1`.
-- [ ] Tests RED écrits avant implémentation.
-- [ ] **Commit RED** : `[WS-11] #047 RED: tests validation schémas JSON`.
-- [ ] Tests GREEN passants et reproductibles.
-- [ ] Critères d'acceptation tous satisfaits.
-- [ ] `ruff check ai_trading/ tests/` passe sans erreur.
-- [ ] Fichier de tâche mis à jour (statut DONE, critères cochés).
+- [x] Branche `task/047-json-schema-validation` créée depuis `Max6000i1`.
+- [x] Tests RED écrits avant implémentation.
+- [x] **Commit RED** : `[WS-11] #047 RED: tests validation schémas JSON`.
+- [x] Tests GREEN passants et reproductibles.
+- [x] Critères d'acceptation tous satisfaits.
+- [x] `ruff check ai_trading/ tests/` passe sans erreur.
+- [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
 - [ ] **Commit GREEN** : `[WS-11] #047 GREEN: validation schémas JSON`.
 - [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-11] #047 — Validation des schémas JSON`.

@@ -16,6 +16,10 @@ from .run_dir import (
     generate_run_id,
     save_config_snapshot,
 )
+from .validation import (
+    validate_manifest,
+    validate_metrics,
+)
 
 __all__ = [
     "STRATEGY_FRAMEWORK_MAP",
@@ -25,6 +29,8 @@ __all__ = [
     "generate_run_id",
     "get_git_commit",
     "save_config_snapshot",
+    "validate_manifest",
+    "validate_metrics",
     "write_fold_metrics",
     "write_manifest",
     "write_metrics",
