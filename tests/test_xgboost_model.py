@@ -117,15 +117,6 @@ class TestXGBoostRegModelAttributes:
 # ---------------------------------------------------------------------------
 # Tests — Stub methods raise NotImplementedError
 # ---------------------------------------------------------------------------
-
-
-class TestXGBoostRegModelStubs:
-    """#060 — Remaining stub methods (none currently)."""
-
-    pass
-
-
-# ---------------------------------------------------------------------------
 # Tests — Import via package
 # ---------------------------------------------------------------------------
 
