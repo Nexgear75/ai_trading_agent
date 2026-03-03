@@ -217,6 +217,8 @@ class TrainingConfig(_StrictBase):
 
 
 class XGBoostModelConfig(_StrictBase):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+
     max_depth: int = Field(gt=0)
     n_estimators: int = Field(gt=0)
     learning_rate: float = Field(gt=0, le=1)

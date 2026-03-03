@@ -90,5 +90,5 @@ Ajouter les contraintes de validation Pydantic à `XGBoostModelConfig` conformé
 - [x] Critères d'acceptation tous satisfaits.
 - [x] `ruff check ai_trading/ tests/` passe sans erreur.
 - [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
-- [ ] **Commit GREEN** : `[WS-XGB-6] #061 GREEN: validation Pydantic XGBoostModelConfig`.
+- [x] **Commit GREEN** : `[WS-XGB-6] #061 GREEN: validation Pydantic XGBoostModelConfig`.
 - [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-XGB-6] #061 — Validation Pydantic XGBoostModelConfig`.

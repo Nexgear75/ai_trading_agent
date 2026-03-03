@@ -7,7 +7,7 @@ field constraints from spec §11.1.
 import pytest
 from pydantic import ValidationError
 
-from ai_trading.config import XGBoostModelConfig, load_config
+from ai_trading.config import XGBoostModelConfig
 
 # ---------------------------------------------------------------------------
 # Fixture: valid defaults for all 7 fields
@@ -171,6 +171,14 @@ class TestRegAlpha:
         cfg = _make(reg_alpha=1.5)
         assert cfg.reg_alpha == 1.5
 
+    def test_reg_alpha_inf_rejected(self):
+        with pytest.raises(ValidationError):
+            _make(reg_alpha=float("inf"))
+
+    def test_reg_alpha_nan_rejected(self):
+        with pytest.raises(ValidationError):
+            _make(reg_alpha=float("nan"))
+
 
 # ===========================================================================
 # reg_lambda — Field(ge=0): non-negative float
@@ -192,6 +200,14 @@ class TestRegLambda:
         cfg = _make(reg_lambda=10.0)
         assert cfg.reg_lambda == 10.0
 
+    def test_reg_lambda_inf_rejected(self):
+        with pytest.raises(ValidationError):
+            _make(reg_lambda=float("inf"))
+
+    def test_reg_lambda_nan_rejected(self):
+        with pytest.raises(ValidationError):
+            _make(reg_lambda=float("nan"))
+
 
 # ===========================================================================
 # Integration: default.yaml must parse without error
@@ -201,9 +217,8 @@ class TestRegLambda:
 class TestDefaultConfigIntegration:
     """#061 — configs/default.yaml must pass validation with new constraints."""
 
-    def test_default_yaml_xgboost_block_valid(self):
-        cfg = load_config("configs/default.yaml")
-        xgb = cfg.models.xgboost
+    def test_default_yaml_xgboost_block_valid(self, default_config):
+        xgb = default_config.models.xgboost
         assert xgb.max_depth > 0
         assert xgb.n_estimators > 0
         assert 0 < xgb.learning_rate <= 1
