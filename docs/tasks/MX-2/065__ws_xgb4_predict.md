@@ -89,4 +89,4 @@ Implémenter la méthode `predict()` de `XGBoostRegModel` :
 - [x] `ruff check ai_trading/ tests/` passe sans erreur.
 - [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
 - [x] **Commit GREEN** : `[WS-XGB-4] #065 GREEN: predict XGBoostRegModel`.
-- [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-XGB-4] #065 — Prédiction XGBoost et cast float32`.
+- [x] **Pull Request ouverte** vers `Max6000i1` : `[WS-XGB-4] #065 — Prédiction XGBoost et cast float32`.
