@@ -222,7 +222,7 @@ class TestFullscaleRunAll:
 
         Aggregate:
         - mean and std present for each trading metric
-        - All mean/std values are finite floats
+        - All mean/std values are finite floats or null
         """
         run_dir = _get_run_dir()
         metrics = _load_json(run_dir / "metrics.json")
