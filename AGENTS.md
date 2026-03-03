@@ -63,6 +63,7 @@ Si specs ou tâche ambiguës → demander des clarifications avant d'implémente
 - **WS-10** Métriques et agrégation inter-fold : prédiction (MSE, MAE, R², IC), trading (Sharpe, MDD, Win Rate, P&L net)
 - **WS-11** Artefacts, manifest et schémas JSON : arborescence run, `manifest.json`, `metrics.json`
 - **WS-12** Reproductibilité et orchestration : seed manager, orchestrateur, CLI entry point, Dockerfile
+- **WS-13** Tests full-scale réseau (Bitcoin) : config dédiée `fullscale_btc.yaml`, test `make run-all` grandeur nature BTCUSDT 2017–2026, validation métriques sur données réelles
 
 ## Milestones
 - **M1** Fondations (WS-1, WS-2) : config chargeable, données brutes téléchargées et QA passé
@@ -70,9 +71,10 @@ Si specs ou tâche ambiguës → demander des clarifications avant d'implémente
 - **M3** Training Framework (WS-6, WS-7) : interface modèle, boucle d'entraînement, calibration θ
 - **M4** Evaluation Engine (WS-8, WS-9, WS-10) : backtest, baselines, métriques
 - **M5** Production Readiness (WS-11, WS-12) : artefacts, orchestrateur, run reproductible bout-en-bout
+- **M6** Full-Scale Integration Tests (WS-13) : test grandeur nature `make run-all` sur BTCUSDT réel depuis 2017, config dédiée, sans fixtures
 
 ## Priorisation
-M1 → M2 → M3 → M4 → M5 (séquentiel, chaque milestone dépend du précédent).
+M1 → M2 → M3 → M4 → M5 → M6 (séquentiel, chaque milestone dépend du précédent).
 
 ## Skills
 

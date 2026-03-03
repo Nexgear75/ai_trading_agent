@@ -25,6 +25,7 @@
 - [WS-10 — Métriques et agrégation inter-fold](#ws-10--métriques-et-agrégation-inter-fold)
 - [WS-11 — Artefacts, manifest et schémas JSON](#ws-11--artefacts-manifest-et-schémas-json)
 - [WS-12 — Reproductibilité et orchestration](#ws-12--reproductibilité-et-orchestration)
+- [WS-13 — Tests full-scale réseau (Bitcoin)](#ws-13--tests-full-scale-réseau-bitcoin)
 - [Arborescence cible du code](#arborescence-cible-du-code)
 - [Conventions](#conventions)
 - [Légende des annotations](#légende-des-annotations)
@@ -62,6 +63,9 @@ flowchart LR
     WS11[WS-11 Artefacts]
     WS12[WS-12 Reproducibilité + Orchestrateur]
   end
+  subgraph M6["Milestone 6 — Full-Scale Integration Tests"]
+    WS13[WS-13 Tests full-scale réseau Bitcoin]
+  end
   WS3 --> GF --> WS4
   WS4 --> GS --> WS5
   WS5 --> WS6
@@ -71,7 +75,7 @@ flowchart LR
   WS8b --> GB --> WS9
   GB --> WS10
   WS7 --> GD
-  M1 --> M2 --> M3 --> M4 --> M5
+  M1 --> M2 --> M3 --> M4 --> M5 --> M6
 ```
 
 | Milestone | Work Streams | Description | Gate |
@@ -81,6 +85,7 @@ flowchart LR
 | **M3** | WS-6, WS-7, WS-8.1/8.2/8.3 | Interface plug-in modèle, boucle d'entraînement, calibration θ, moteur de backtest (exécution, coûts, equity) | DummyModel réussit fit/predict/calibration sur données synthétiques, backtest déterministe |
 | **M4** | WS-8.4, WS-9, WS-10 | Journal de trades, 3 baselines, métriques de prédiction et trading | Métriques cohérentes sur données synthétiques et baselines |
 | **M5** | WS-11, WS-12 | Artefacts conformes aux schémas JSON, orchestrateur bout-en-bout, Makefile, Docker | Run complet reproductible avec manifest.json + metrics.json valides, `make run-all` fonctionnel |
+| **M6** | WS-13 | Tests full-scale avec données réelles BTCUSDT (2017–2026) via réseau Binance, `make run-all` grandeur nature | Run complet sur données réelles Bitcoin, artefacts valides, métriques cohérentes, pas de crash |
 
 > **Note sur le phasage WS-11/WS-12** : bien que WS-11 et WS-12 soient rattachés au milestone M5 (production readiness), certaines sous-tâches fondamentales — **WS-11.1** (arborescence run) et **WS-12.1** (seed manager) — ne dépendent que de WS-1.2 (M1) et sont nécessaires dès M3 (l'orchestrateur WS-12.2 les invoque). Leur implémentation **peut donc être anticipée** dès M1 terminé. **Règle de séquencement clarifiée** : le séquencement inter-milestones (M1 → M2 → M3 → M4 → M5) est la règle par défaut ; les exceptions WS-11.1 et WS-12.1 sont explicitement autorisées car leurs dépendances techniques sont satisfaites dès M1. Le rattachement à M5 reflète le gate de validation global (reproductibilité E2E, schémas JSON, CI), pas une contrainte d'ordonnancement sur ces deux modules.
 
@@ -91,7 +96,7 @@ Objectif : rendre les gates de milestone auditables, comparables entre runs, et 
 
 Les gates sont organisés en **deux niveaux** de vérification ponctuelle, complétés par des catégories transversales :
 
-**Niveau 1 — Gates de milestone (M1–M5)** : points de décision GO/NO-GO aux frontières entre milestones. Bloquants pour la progression.
+**Niveau 1 — Gates de milestone (M1–M6)** : points de décision GO/NO-GO aux frontières entre milestones. Bloquants pour la progression.
 
 **Niveau 2 — Gates intermédiaires** : points de vérification au sein d'un milestone, bloquants pour les WS ou gates en aval.
 - **Gates intra-milestone (G-Features, G-Split, G-Backtest)** : détection précoce des défauts structurels. Bloquants pour les WS en aval au sein du même milestone.
@@ -101,7 +106,7 @@ Les gates sont organisés en **deux niveaux** de vérification ponctuelle, compl
 - **Gate transversal anti-fuite (G-Leak)** : vérification continue appliquée à chaque étape manipulant des données temporelles. Intégré dans les critères de chaque gate intermédiaire et de milestone.
 - **Gate de performance (G-Perf)** : benchmark post-MVP, non bloquant (cf. annexe).
 
-### Gates de milestone (M1–M5)
+### Gates de milestone (M1–M6)
 
 | Milestone | Critères de gate | Seuil / règle de décision | Preuves attendues | Décision |
 |---|---|---|---|---|
@@ -110,6 +115,7 @@ Les gates sont organisés en **deux niveaux** de vérification ponctuelle, compl
 | **M3** | Framework d'entraînement et backtest exploitables | `fit/predict` OK pour DummyModel (les modèles ML/DL réels sont hors scope plan, cf. §10), calibration `theta` exécutable sur `100%` des folds valides (avec DummyModel), bypass `theta` fonctionnel pour `output_type == "signal"`, `0` crash entraînement sur `3` seeds (`42, 43, 44`), backtest déterministe et correct (WS-8.1/8.2/8.3, vérifié par tests unitaires — la vérification E2E avec SHA-256 sur `trades.csv` et equity est déportée au gate G-Backtest en M4), `>= 90%` couverture tests WS-6/WS-7/WS-8 (partiel) (mesurée via `pytest --cov=ai_trading.training --cov=ai_trading.calibration --cov=ai_trading.backtest --cov-fail-under=90`) | Logs d'entraînement, courbes/pertes, artefact de calibration, tests unitaires WS-6/WS-7/WS-8.1-8.3, `pytest` ciblé WS-6/WS-7/WS-8 (partiel) avec couverture | `GO` si exécution complète sans crash, calibration disponible pour `output_type == "regression"`, backtest déterministe vérifié, et couverture >= 90% atteinte |
 | **M4** | Evaluation trading robuste | **M4-framework (scope plan)** : (a) Déterminisme backtest : delta Sharpe **non-annualisé** absolu `<= 0.02` et delta MDD absolu `<= 0.5` point de pourcentage entre `2` runs même seed (DummyModel + données synthétiques). (b) Pipeline complet sans crash pour DummyModel + 3 baselines (no_trade, buy_hold, sma_rule). (c) Métriques cohérentes : no_trade → `net_pnl=0, n_trades=0, MDD=0` ; buy_hold → `n_trades=1` ; sma_rule → `n_trades >= 0`. (d) `>= 95%` couverture tests WS-8.4/WS-9/WS-10. (e) Complétude registres MVP : `set(MODEL_REGISTRY) == set(VALID_STRATEGIES_MVP)` où `VALID_STRATEGIES_MVP = {"dummy", "no_trade", "buy_hold", "sma_rule"}` (vérifie que toutes les stratégies MVP ont une implémentation enregistrée, et inversement ; les modèles ML/DL hors scope plan — `xgboost_reg`, `cnn1d_reg`, `gru_reg`, `lstm_reg`, `patchtst_reg`, `rl_ppo` — sont exclus de cette vérification et seront ajoutés progressivement hors plan). **M4-performance (post-intégration modèle réel, hors scope plan)** : Non-régression vs baseline de référence : Sharpe **non-annualisé** stratégie `>=` Sharpe baseline `- 0.05`, MDD stratégie `<=` MDD baseline `+ 1.0` pp, retour cumulé stratégie `>=` baseline `- 2.0` pp — évalué via `scripts/compare_runs.py` (WS-12.5) | Journaux de trades, equity curves, tests d'intégration baselines et métriques, tableau comparatif stratégie vs baselines (M4-performance uniquement) | `GO` si M4-framework (a+b+c+d+e) atteint. M4-performance évalué séparément post-intégration modèle |
 | **M5** | Readiness de livraison | Reproductibilité e2e : `>= 95%` des champs numériques clés de `metrics.json` dans une tolérance relative `<= 1%` (même seed, cross-plateforme). **Champs numériques clés** : dans `aggregate` — `trading.mean.*` et `trading.std.*` (net_pnl, net_return, max_drawdown, sharpe, profit_factor, hit_rate, n_trades, avg_trade_return, median_trade_return, exposure_time_frac), `prediction.mean.*` et `prediction.std.*` (mae, rmse, directional_accuracy, spearman_ic — si applicable) ; par fold — `theta`, `n_trades`, `net_pnl`, `sharpe`, `max_drawdown`. Conformité artefacts : `100%` de validation JSON Schema. Exécution : `make run-all` + pipeline CI en succès (`0` job rouge) | Exécution CI verte, validation JSON Schema, dossier d'artefacts complet, logs d'orchestrateur, rapport de gate `gate_report_M5.json` | `GO` si les 3 seuils sont atteints, sinon `NO-GO` |
+| **M6** | Validation full-scale réseau | (a) `make run-all CONFIG=configs/fullscale_btc.yaml` s'exécute sans crash (exit code 0). (b) Données BTCUSDT 1h téléchargées depuis Binance couvrant `[2017-08-17, 2026-01-01[` (~73 000 bougies). (c) QA passe sur données réelles (0 erreur bloquante). (d) `manifest.json` et `metrics.json` valides (JSON Schema). (e) Au moins 1 fold complété avec métriques non nulles. (f) Artefacts complets (`equity_curve_stitched.csv`, `trades.csv` par fold, `config_snapshot.yaml`). (g) Pas de fixture pytest utilisée — accès réseau réel obligatoire. | Run directory complet, `manifest.json`, `metrics.json`, equity curves, trade journals, logs pipeline, rapport `gate_report_M6.json` | `GO` si (a)–(g) atteints, sinon `NO-GO` |
 
 ### Gates intra-milestone
 
@@ -164,7 +170,7 @@ Règles transverses (applicables à tous les gates — milestone et intra-milest
 - Evidences minimales : chaque gate doit produire des traces horodatées (logs + artefacts) dans le `run_dir`.
 - Données de test : les gates M1-M5 et les gates intra-milestone doivent être **vérifiables sur données synthétiques** (fixture CI, cf. WS-12.4) sans accès réseau. Les vérifications sur données réelles Binance sont complémentaires mais non bloquantes pour la décision de gate.
 - Format des preuves : chaque gate produit un fichier `gate_report_<ID>.json` dans `reports/` (ou dans le `run_dir` pour les gates nécessitant un run) contenant : `date_utc`, `pipeline_version`, `gate`, résultats par critère (`criterion`, `threshold`, `actual`, `passed`), et statut global `GO`/`NO-GO`. Convention de nommage : `gate_report_M1.json` à `gate_report_M5.json` pour les milestones, `gate_report_G_Features.json`, `gate_report_G_Split.json`, `gate_report_G_Backtest.json` pour les gates intra-milestone, `gate_report_G_Doc.json` pour le pré-gate.
-- Automatisation : les cibles Makefile `gate-m1` à `gate-m5` et `gate-features`, `gate-split`, `gate-backtest`, `gate-doc`, `gate-perf` (cf. WS-12.6) exécutent les vérifications automatisables et génèrent les rapports.
+- Automatisation : les cibles Makefile `gate-m1` à `gate-m6` et `gate-features`, `gate-split`, `gate-backtest`, `gate-doc`, `gate-perf` (cf. WS-12.6, WS-13.4) exécutent les vérifications automatisables et génèrent les rapports.
 - Anti-fuite (G-Leak) : aucun gate ne peut être `GO` si une fuite temporelle est détectée dans son périmètre, même si tous les autres critères sont satisfaits.
 - Statut intermédiaire : utiliser `GO avec réserves` uniquement si un plan d'action daté est documenté.
 - Ordre d'exécution : au sein d'un milestone, les gates intra-milestone sont exécutés **avant** le gate de milestone. Un gate de milestone ne peut être `GO` que si tous les gates intra-milestone de son périmètre sont `GO`.
@@ -940,6 +946,52 @@ On confirme : `test_end[0] = 2024-07-29 03:00` et `test_start[1] = 2024-07-29 04
 ---
 
 
+## WS-13 — Tests full-scale réseau (Bitcoin)
+
+**Objectif** : valider le pipeline de bout en bout sur données réelles BTCUSDT téléchargées depuis Binance, en conditions grandeur nature (≈73 000 bougies horaires, 2017–2026). Aucune fixture pytest ni donnée synthétique — accès réseau réel obligatoire.
+**Réf. spec** : §3, §4, §17
+**Milestone** : M6
+
+### WS-13.1 — Fichier de configuration full-scale
+
+| Champ | Valeur |
+|---|---|
+| **Description** | Créer `configs/fullscale_btc.yaml` — configuration dédiée au test grandeur nature sur BTCUSDT. Réplique de `configs/default.yaml` avec les paramètres ajustés pour un run réaliste complet : période `[2017-08-17, 2026-01-01[` (début du listing BTC sur Binance), `window.L = 128`, `window.min_warmup = 200`, `splits.train_days = 180`, `splits.test_days = 30`, `splits.step_days = 30`, stratégie `dummy` (pour valider le pipeline sans dépendance modèle ML). Les paramètres de features, scaling, coûts, backtest et thresholding sont identiques à `default.yaml`. Ce fichier config est versionné et ne doit **pas** être généré dynamiquement par les tests. |
+| **Réf. spec** | §3, §4.1 |
+| **Critères d'acceptation** | `configs/fullscale_btc.yaml` existe, est parsé sans erreur par le config loader (WS-1.2), et passe la validation stricte (WS-1.3). La seule différence avec `default.yaml` est la période temporelle étendue et la stratégie `dummy`. |
+| **Dépendances** | WS-1.2, WS-1.3 |
+
+### WS-13.2 — Test full-scale `make run-all`
+
+| Champ | Valeur |
+|---|---|
+| **Description** | Test pytest marqué `@pytest.mark.fullscale` (skipped par défaut via `addopts = "-m 'not fullscale'"` dans `pyproject.toml`). Le test exécute le pipeline complet `make run-all CONFIG=configs/fullscale_btc.yaml` via `subprocess` (pas de fixtures, pas de mock, accès réseau réel). **Étapes validées** : (1) `fetch` télécharge les données BTCUSDT Parquet (~73 000 bougies), (2) `qa` passe sans erreur bloquante, (3) `run` produit un run directory complet. **Assertions** : fichier Parquet créé avec ≥ 70 000 lignes, `manifest.json` et `metrics.json` valides (JSON Schema), au moins 1 fold complété, `equity_curve_stitched.csv` présent, `config_snapshot.yaml` présent, chaque fold contient `metrics.json` et `trades.csv`. **Timeout** : 600 secondes (le téléchargement initial peut être long). Ce test ne doit **jamais** utiliser de fixture `tmp_path` pour les données — les chemins réels de `configs/fullscale_btc.yaml` sont utilisés (raw_dir, output_dir pointent vers des répertoires projet réels ou un répertoire dédié `data/fullscale/`). |
+| **Réf. spec** | §3 (dataflow complet), §17.3 (`make run-all`) |
+| **Critères d'acceptation** | `pytest -m fullscale tests/test_fullscale_btc.py -v --timeout=600` passe en GREEN avec accès réseau. L'exécution produit un run directory complet avec tous les artefacts attendus. |
+| **Dépendances** | WS-13.1, M5 (pipeline complet fonctionnel) |
+
+### WS-13.3 — Validation des métriques sur données réelles
+
+| Champ | Valeur |
+|---|---|
+| **Description** | Dans le même test ou dans un test complémentaire marqué `@pytest.mark.fullscale`, valider la cohérence des métriques produites sur données réelles : (1) `net_pnl` est un float fini (pas NaN, pas Inf), (2) `max_drawdown` ∈ [0, 1], (3) `n_trades >= 0` par fold, (4) `sharpe` est un float fini, (5) l'agrégation inter-fold (`aggregated`) contient `mean` et `std` pour chaque métrique, (6) `hit_rate` ∈ [0, 1] si `n_trades > 0`. Ces assertions vérifient la robustesse du pipeline sur un volume de données réaliste (vs données synthétiques de 500 bougies). |
+| **Réf. spec** | §13, §14 |
+| **Critères d'acceptation** | Les métriques de chaque fold et les agrégats sont numériquement cohérents (pas de NaN/Inf, plages respectées). |
+| **Dépendances** | WS-13.2 |
+
+### WS-13.4 — Cible Makefile `gate-m6`
+
+| Champ | Valeur |
+|---|---|
+| **Description** | Ajouter la cible `gate-m6` au Makefile. Elle exécute `pytest -m fullscale tests/test_fullscale_btc.py -v --timeout=600` et génère `reports/gate_report_M6.json` avec les critères GO/NO-GO du M6. **Dépendance Makefile** : `gate-m6` dépend de `gate-m5`. La chaîne complète devient : GM1 → G-Features → G-Split → GM2 → G-Doc → GM3 → G-Backtest → GM4 → GM5 → GM6. |
+| **Réf. spec** | §17.3 |
+| **Critères d'acceptation** | `make gate-m6` exécute les tests fullscale et produit `reports/gate_report_M6.json`. La cible échoue si `gate-m5` n'est pas `GO`. |
+| **Dépendances** | WS-12.6, WS-13.2 |
+
+
+---
+
+
 ## Arborescence cible du code
 
 ```
@@ -1107,10 +1159,14 @@ flowchart LR
   subgraph M5["M5 — Production Readiness"]
     GM5((Gate M5))
   end
+  subgraph M6["M6 — Full-Scale Integration Tests"]
+    GM6((Gate M6))
+  end
   GM1 --> GF
   GM2 --> GD
   GM3 --> GB
   GM4 --> GM5
+  GM5 --> GM6
   GP((G-Perf\npost-MVP\nnon-bloquant)) -.->|informatif| GM5
 
   style GF fill:#f9f,stroke:#333
@@ -1131,5 +1187,6 @@ flowchart LR
 | 7 | **G-Backtest** | Intra-milestone | Après WS-8.4 | Oui (WS-9, WS-10) | `gate-backtest` | `gate_report_G_Backtest.json` |
 | 8 | **M4** | Milestone | Fin M4 (après WS-10) | Oui | `gate-m4` | `gate_report_M4.json` |
 | 9 | **M5** | Milestone | Fin M5 (après WS-12) | Oui | `gate-m5` | `gate_report_M5.json` |
+| 10 | **M6** | Milestone | Fin M6 (après WS-13) | Oui | `gate-m6` | `gate_report_M6.json` |
 | — | **G-Leak** | Transversal | Continu (toutes étapes) | Oui (implicite) | Intégré dans chaque gate | — |
 | — | **G-Perf** | Performance | Post-MVP | Non | `gate-perf` | `gate_report_G_Perf.json` |
