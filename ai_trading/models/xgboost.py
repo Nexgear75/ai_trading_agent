@@ -194,5 +194,14 @@ class XGBoostRegModel(BaseModel):
         self._model.save_model(str(resolved))
 
     def load(self, path: Path) -> None:
-        """Not implemented yet — stub for WS-XGB-5."""
-        raise NotImplementedError("XGBoostRegModel.load() is not implemented yet.")
+        """Restore a trained XGBoost model from JSON format.
+
+        Task #067 (WS-XGB-5).
+        """
+        resolved = self._resolve_path(path)
+        if not resolved.exists():
+            raise FileNotFoundError(f"Model file not found: {resolved}")
+        if not resolved.is_file():
+            raise IsADirectoryError(f"Expected a model file but found a directory: {resolved}")
+        self._model = xgb.XGBRegressor()
+        self._model.load_model(str(resolved))

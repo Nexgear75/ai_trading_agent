@@ -1,6 +1,6 @@
 # Tâche — Chargement JSON native XGBoost
 
-Statut : TODO
+Statut : DONE
 Ordre : 067
 Workstream : WS-XGB-5
 Milestone : MX-2
@@ -53,15 +53,15 @@ Implémenter la méthode `load()` de `XGBoostRegModel` :
 
 ## Critères d'acceptation
 
-- [ ] `load()` restaure un modèle fonctionnel (capable de `predict()`)
-- [ ] Round-trip : `save()` → `load()` → `predict()` retourne les mêmes résultats que `predict()` avant `save()` (bit-exact)
-- [ ] `FileNotFoundError` si le fichier n'existe pas
-- [ ] Résolution de chemin directory → `xgboost_model.json` appendé
-- [ ] Résolution de chemin fichier → utilisé tel quel
-- [ ] `predict()` fonctionne après `load()` sans erreur
-- [ ] Tests couvrent les scénarios nominaux + erreurs + bords
-- [ ] Suite de tests verte après implémentation
-- [ ] `ruff check` passe sans erreur
+- [x] `load()` restaure un modèle fonctionnel (capable de `predict()`)
+- [x] Round-trip : `save()` → `load()` → `predict()` retourne les mêmes résultats que `predict()` avant `save()` (bit-exact)
+- [x] `FileNotFoundError` si le fichier n'existe pas
+- [x] Résolution de chemin directory → `xgboost_model.json` appendé
+- [x] Résolution de chemin fichier → utilisé tel quel
+- [x] `predict()` fonctionne après `load()` sans erreur
+- [x] Tests couvrent les scénarios nominaux + erreurs + bords
+- [x] Suite de tests verte après implémentation
+- [x] `ruff check` passe sans erreur
 
 ## Pré-condition de démarrage
 
@@ -70,12 +70,12 @@ Implémenter la méthode `load()` de `XGBoostRegModel` :
 
 ## Checklist de fin de tâche
 
-- [ ] Branche `task/067-xgb-load-json` créée depuis `Max6000i1`.
-- [ ] Tests RED écrits avant implémentation.
-- [ ] **Commit RED** : `[WS-XGB-5] #067 RED: tests load XGBoostRegModel` (fichiers de tests uniquement).
-- [ ] Tests GREEN passants et reproductibles.
-- [ ] Critères d'acceptation tous satisfaits.
-- [ ] `ruff check ai_trading/ tests/` passe sans erreur.
-- [ ] Fichier de tâche mis à jour (statut DONE, critères cochés).
-- [ ] **Commit GREEN** : `[WS-XGB-5] #067 GREEN: load JSON natif XGBoostRegModel`.
-- [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-XGB-5] #067 — Chargement JSON native XGBoost`.
+- [x] Branche `task/067-xgb-load-json` créée depuis `Max6000i1`.
+- [x] Tests RED écrits avant implémentation.
+- [x] **Commit RED** : `[WS-XGB-5] #067 RED: tests load XGBoostRegModel` (fichiers de tests uniquement).
+- [x] Tests GREEN passants et reproductibles.
+- [x] Critères d'acceptation tous satisfaits.
+- [x] `ruff check ai_trading/ tests/` passe sans erreur.
+- [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
+- [x] **Commit GREEN** : `[WS-XGB-5] #067 GREEN: load JSON natif XGBoostRegModel`.
+- [x] **Pull Request ouverte** vers `Max6000i1` : `[WS-XGB-5] #067 — Chargement JSON native XGBoost`.
