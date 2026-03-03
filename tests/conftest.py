@@ -335,3 +335,189 @@ def synthetic_ohlcv() -> pd.DataFrame:
             "volume": volume,
         },
     )
+
+
+# ---------------------------------------------------------------------------
+# Integration helpers — shared config builder (tasks #051, #054)
+# ---------------------------------------------------------------------------
+
+
+def write_integration_parquet(
+    ohlcv_df: pd.DataFrame, raw_dir: Path, symbol: str,
+) -> None:
+    """Write OHLCV DataFrame to parquet matching the ingestion convention."""
+    raw_dir.mkdir(parents=True, exist_ok=True)
+    path = raw_dir / f"{symbol}_1h.parquet"
+    ohlcv_df.to_parquet(path, index=False)
+
+
+def make_integration_config(
+    tmp_path: Path,
+    ohlcv_df: pd.DataFrame,
+    *,
+    strategy_name: str = "dummy",
+    strategy_type: str = "model",
+    seed: int = 42,
+) -> Path:
+    """Build a YAML config for integration / gate testing and return its path.
+
+    Uses short windows and few folds to keep tests fast.
+    """
+    raw_dir = tmp_path / "data" / "raw"
+    output_dir = tmp_path / "runs"
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    write_integration_parquet(ohlcv_df, raw_dir, "BTCUSDT")
+
+    start_ts = ohlcv_df["timestamp_utc"].iloc[0]
+    end_ts = ohlcv_df["timestamp_utc"].iloc[-1] + pd.Timedelta(hours=1)
+
+    cfg = {
+        "logging": {"level": "WARNING", "format": "text", "file": "pipeline.log"},
+        "dataset": {
+            "exchange": "binance",
+            "symbols": ["BTCUSDT"],
+            "timeframe": "1h",
+            "start": start_ts.strftime("%Y-%m-%d"),
+            "end": end_ts.strftime("%Y-%m-%d"),
+            "timezone": "UTC",
+            "raw_dir": str(raw_dir),
+            "ingestion": {
+                "page_limit": 1000,
+                "max_retries": 3,
+                "base_backoff_s": 1.0,
+            },
+        },
+        "qa": {"zero_volume_min_streak": 2},
+        "label": {"horizon_H_bars": 4, "target_type": "log_return_trade"},
+        "window": {"L": 24, "min_warmup": 80},
+        "features": {
+            "feature_version": "mvp_v1",
+            "feature_list": [
+                "logret_1", "logret_2", "logret_4",
+                "vol_24", "vol_72", "logvol", "dlogvol",
+                "rsi_14", "ema_ratio_12_26",
+            ],
+            "params": {
+                "rsi_period": 14,
+                "rsi_epsilon": 1e-12,
+                "ema_fast": 12,
+                "ema_slow": 26,
+                "vol_windows": [24, 72],
+                "logvol_epsilon": 1e-8,
+                "volatility_ddof": 0,
+            },
+        },
+        "splits": {
+            "scheme": "walk_forward_rolling",
+            "train_days": 10,
+            "test_days": 3,
+            "step_days": 3,
+            "val_frac_in_train": 0.2,
+            "embargo_bars": 4,
+            "min_samples_train": 10,
+            "min_samples_test": 1,
+        },
+        "scaling": {
+            "method": "standard",
+            "epsilon": 1e-12,
+            "robust_quantile_low": 0.005,
+            "robust_quantile_high": 0.995,
+            "rolling_window": 720,
+        },
+        "strategy": {
+            "strategy_type": strategy_type,
+            "name": strategy_name,
+        },
+        "thresholding": {
+            "method": "quantile_grid",
+            "q_grid": [0.5, 0.7, 0.9],
+            "objective": "max_net_pnl_with_mdd_cap",
+            "mdd_cap": 0.25,
+            "min_trades": 1,
+        },
+        "costs": {
+            "cost_model": "per_side_multiplicative",
+            "fee_rate_per_side": 0.0005,
+            "slippage_rate_per_side": 0.00025,
+        },
+        "backtest": {
+            "mode": "one_at_a_time",
+            "direction": "long_only",
+            "initial_equity": 1.0,
+            "position_fraction": 1.0,
+        },
+        "baselines": {"sma": {"fast": 20, "slow": 50}},
+        "training": {
+            "loss": "mse",
+            "optimizer": "adam",
+            "learning_rate": 1e-3,
+            "batch_size": 64,
+            "max_epochs": 100,
+            "early_stopping_patience": 10,
+        },
+        "models": {
+            "xgboost": {
+                "max_depth": 5,
+                "n_estimators": 500,
+                "learning_rate": 0.05,
+                "subsample": 0.8,
+                "colsample_bytree": 0.8,
+                "reg_alpha": 0.0,
+                "reg_lambda": 1.0,
+            },
+            "cnn1d": {
+                "n_conv_layers": 2,
+                "filters": 64,
+                "kernel_size": 3,
+                "dropout": 0.2,
+                "pool": "global_avg",
+            },
+            "gru": {
+                "hidden_size": 64,
+                "num_layers": 1,
+                "bidirectional": False,
+                "dropout": 0.2,
+            },
+            "lstm": {
+                "hidden_size": 64,
+                "num_layers": 1,
+                "bidirectional": False,
+                "dropout": 0.2,
+            },
+            "patchtst": {
+                "patch_size": 16,
+                "stride": 8,
+                "d_model": 64,
+                "n_heads": 4,
+                "n_layers": 2,
+                "ff_dim": 128,
+                "dropout": 0.2,
+            },
+            "rl_ppo": {
+                "hidden_sizes": [64, 64],
+                "clip_epsilon": 0.2,
+                "gamma": 0.99,
+                "gae_lambda": 0.95,
+                "n_epochs_ppo": 4,
+                "max_episodes": 200,
+                "rollout_steps": 512,
+                "value_loss_coeff": 0.5,
+                "entropy_coeff": 0.01,
+                "learning_rate": 3e-4,
+                "deterministic_eval": True,
+            },
+        },
+        "metrics": {"sharpe_annualized": False, "sharpe_epsilon": 1e-12},
+        "reproducibility": {"global_seed": seed, "deterministic_torch": False},
+        "artifacts": {
+            "output_dir": str(output_dir),
+            "save_model": True,
+            "save_equity_curve": True,
+            "save_predictions": True,
+        },
+    }
+
+    cfg_path = tmp_path / "config.yaml"
+    cfg_path.write_text(yaml.dump(cfg, default_flow_style=False), encoding="utf-8")
+    return cfg_path
