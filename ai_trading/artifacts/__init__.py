@@ -1,12 +1,12 @@
 """Artifacts — run directory, manifest, metrics builder, schema validation."""
 
-from ai_trading.artifacts.manifest import (
+from .manifest import (
     STRATEGY_FRAMEWORK_MAP,
     build_manifest,
     get_git_commit,
     write_manifest,
 )
-from ai_trading.artifacts.run_dir import (
+from .run_dir import (
     create_run_dir,
     generate_run_id,
     save_config_snapshot,
