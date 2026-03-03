@@ -72,5 +72,5 @@ Compléter le retour de `fit()` avec un dictionnaire contenant au minimum :
 - [x] Critères d'acceptation tous satisfaits.
 - [x] `ruff check ai_trading/ tests/` passe sans erreur.
 - [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
-- [ ] **Commit GREEN** : `[WS-XGB-3] #064 GREEN: artefacts d'entraînement XGBoostRegModel`.
+- [x] **Commit GREEN** : `[WS-XGB-3] #064 GREEN: artefacts d'entraînement XGBoostRegModel`.
 - [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-XGB-3] #064 — Artefacts d'entraînement XGBoost`.
