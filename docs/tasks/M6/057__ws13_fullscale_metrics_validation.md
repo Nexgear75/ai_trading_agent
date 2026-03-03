@@ -1,6 +1,6 @@
 # Tâche — Validation des métriques sur données réelles BTCUSDT
 
-Statut : TODO
+Statut : DONE
 Ordre : 057
 Workstream : WS-13
 Milestone : M6
@@ -37,29 +37,29 @@ Ajouter dans `tests/test_fullscale_btc.py` un ou plusieurs tests marqués `@pyte
   7. Les valeurs `mean` et `std` sont des floats finis.
 
 ## Critères d'acceptation
-- [ ] Test `test_fullscale_metrics_coherence` existe dans `tests/test_fullscale_btc.py`, marqué `@pytest.mark.fullscale`.
-- [ ] Pour chaque fold : `net_pnl` est un float fini.
-- [ ] Pour chaque fold : `max_drawdown` ∈ [0, 1].
-- [ ] Pour chaque fold : `n_trades >= 0`.
-- [ ] Pour chaque fold : `sharpe` est un float fini.
-- [ ] Pour chaque fold : `hit_rate` ∈ [0, 1] si `n_trades > 0`.
-- [ ] Agrégation inter-fold contient `mean` et `std` pour chaque métrique de trading.
-- [ ] Toutes les valeurs agrégées sont des floats finis.
-- [ ] Tests couvrent les scénarios nominaux + erreurs + bords.
-- [ ] Suite de tests standard verte après implémentation.
-- [ ] `ruff check` passe sans erreur.
+- [x] Test `test_fullscale_metrics_coherence` existe dans `tests/test_fullscale_btc.py`, marqué `@pytest.mark.fullscale`.
+- [x] Pour chaque fold : `net_pnl` est un float fini.
+- [x] Pour chaque fold : `max_drawdown` ∈ [0, 1].
+- [x] Pour chaque fold : `n_trades >= 0`.
+- [x] Pour chaque fold : `sharpe` est un float fini.
+- [x] Pour chaque fold : `hit_rate` ∈ [0, 1] si `n_trades > 0`.
+- [x] Agrégation inter-fold contient `mean` et `std` pour chaque métrique de trading.
+- [x] Toutes les valeurs agrégées sont des floats finis.
+- [x] Tests couvrent les scénarios nominaux + erreurs + bords.
+- [x] Suite de tests standard verte après implémentation.
+- [x] `ruff check` passe sans erreur.
 
 ## Pré-condition de démarrage
 - **Tous les tests existants sont GREEN** avant de commencer.
 - **Créer une branche dédiée** `task/057-fullscale-metrics-validation` depuis `Max6000i1`.
 
 ## Checklist de fin de tâche
-- [ ] Branche `task/057-fullscale-metrics-validation` créée depuis `Max6000i1`.
-- [ ] Tests RED écrits avant implémentation.
-- [ ] **Commit RED** : `[WS-13] #057 RED: tests validation métriques fullscale`.
-- [ ] Tests GREEN passants et reproductibles.
-- [ ] Critères d'acceptation tous satisfaits.
-- [ ] `ruff check ai_trading/ tests/` passe sans erreur.
-- [ ] Fichier de tâche mis à jour (statut DONE, critères cochés).
-- [ ] **Commit GREEN** : `[WS-13] #057 GREEN: validation métriques fullscale BTCUSDT`.
+- [x] Branche `task/057-fullscale-metrics-validation` créée depuis `Max6000i1`.
+- [x] Tests RED écrits avant implémentation.
+- [x] **Commit RED** : `[WS-13] #057 RED: tests validation métriques fullscale`.
+- [x] Tests GREEN passants et reproductibles.
+- [x] Critères d'acceptation tous satisfaits.
+- [x] `ruff check ai_trading/ tests/` passe sans erreur.
+- [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
+- [x] **Commit GREEN** : `[WS-13] #057 GREEN: validation métriques fullscale BTCUSDT`.
 - [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-13] #057 — Validation métriques fullscale BTCUSDT`.
