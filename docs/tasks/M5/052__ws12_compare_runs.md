@@ -1,6 +1,6 @@
 # Tâche — Script de comparaison inter-stratégies (post-MVP)
 
-Statut : TODO
+Statut : DONE
 Ordre : 052
 Workstream : WS-12
 Milestone : M5
@@ -39,27 +39,27 @@ Implémenter le script `scripts/compare_runs.py` qui :
 - Fonction `check_criterion_14_4(comparison) -> bool`.
 
 ## Critères d'acceptation
-- [ ] Le script `scripts/compare_runs.py` existe et est exécutable.
-- [ ] Avec 2+ fichiers `metrics.json` synthétiques, le script identifie la meilleure stratégie.
-- [ ] Le critère §14.4 est vérifié et le résultat est affiché.
-- [ ] Les deux types de comparaison (Go/No-Go vs contextuelle) sont clairement séparés dans la sortie.
-- [ ] Le tableau CSV/Markdown est produit et lisible.
-- [ ] Erreur explicite si un `metrics.json` est invalide ou introuvable.
-- [ ] Tests couvrent les scénarios nominaux + erreurs + bords.
-- [ ] Suite de tests verte après implémentation.
-- [ ] `ruff check` passe sans erreur.
+- [x] Le script `scripts/compare_runs.py` existe et est exécutable.
+- [x] Avec 2+ fichiers `metrics.json` synthétiques, le script identifie la meilleure stratégie.
+- [x] Le critère §14.4 est vérifié et le résultat est affiché.
+- [x] Les deux types de comparaison (Go/No-Go vs contextuelle) sont clairement séparés dans la sortie.
+- [x] Le tableau CSV/Markdown est produit et lisible.
+- [x] Erreur explicite si un `metrics.json` est invalide ou introuvable.
+- [x] Tests couvrent les scénarios nominaux + erreurs + bords.
+- [x] Suite de tests verte après implémentation.
+- [x] `ruff check` passe sans erreur.
 
 ## Pré-condition de démarrage
 - **Tous les tests existants sont GREEN** avant de commencer.
 - **Créer une branche dédiée** `task/052-compare-runs` depuis `Max6000i1`.
 
 ## Checklist de fin de tâche
-- [ ] Branche `task/052-compare-runs` créée depuis `Max6000i1`.
-- [ ] Tests RED écrits avant implémentation.
-- [ ] **Commit RED** : `[WS-12] #052 RED: tests comparaison inter-stratégies`.
-- [ ] Tests GREEN passants et reproductibles.
-- [ ] Critères d'acceptation tous satisfaits.
-- [ ] `ruff check ai_trading/ tests/` passe sans erreur.
-- [ ] Fichier de tâche mis à jour (statut DONE, critères cochés).
-- [ ] **Commit GREEN** : `[WS-12] #052 GREEN: script comparaison inter-stratégies`.
-- [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-12] #052 — Script de comparaison inter-stratégies`.
+- [x] Branche `task/052-compare-runs` créée depuis `Max6000i1`.
+- [x] Tests RED écrits avant implémentation.
+- [x] **Commit RED** : `[WS-12] #052 RED: tests comparaison inter-stratégies`.
+- [x] Tests GREEN passants et reproductibles.
+- [x] Critères d'acceptation tous satisfaits.
+- [x] `ruff check ai_trading/ tests/` passe sans erreur.
+- [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
+- [x] **Commit GREEN** : `[WS-12] #052 GREEN: script comparaison inter-stratégies`.
+- [x] **Pull Request ouverte** vers `Max6000i1` : `[WS-12] #052 — Script de comparaison inter-stratégies`.
