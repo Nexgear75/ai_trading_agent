@@ -67,4 +67,4 @@ Ajouter des tests anti-fuite dans `tests/test_xgboost_integration.py` (classe d�
 - [x] `ruff check ai_trading/ tests/` passe sans erreur.
 - [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
 - [x] **Commit GREEN** : `[WS-XGB-7] #070 GREEN: anti-fuite XGBoost validée`.
-- [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-XGB-7] #070 — Anti-fuite XGBoost`.
+- [x] **Pull Request ouverte** vers `Max6000i1` : `[WS-XGB-7] #070 — Anti-fuite XGBoost` (PR #84).
