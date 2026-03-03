@@ -6,7 +6,6 @@ Task #042 — WS-10.
 from __future__ import annotations
 
 import logging
-import math
 
 import numpy as np
 import pandas as pd
@@ -210,33 +209,23 @@ class TestAggregateFoldMetrics:
         assert result["sharpe_std"] is None
 
     def test_single_fold(self):
-        """Single fold: mean = value, std = NaN (ddof=1 on 1 sample)."""
+        """Single fold: mean = value, std = 0.0 (only 1 sample)."""
         folds = [_make_fold_metrics(net_pnl=0.15)]
-        import warnings
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", RuntimeWarning)
-            result = aggregate_fold_metrics(folds)
+        result = aggregate_fold_metrics(folds)
         assert result["net_pnl_mean"] == pytest.approx(0.15)
-        # std with ddof=1 on 1 element is NaN
-        net_pnl_std = result["net_pnl_std"]
-        assert net_pnl_std is not None
-        assert math.isnan(net_pnl_std)
+        # std with 1 element is 0.0 by definition
+        assert result["net_pnl_std"] == pytest.approx(0.0)
 
     def test_single_non_none_among_nones(self):
-        """One non-None value among Nones: mean = value, std = NaN."""
+        """One non-None value among Nones: mean = value, std = 0.0."""
         folds = [
             _make_fold_metrics(sharpe=None),
             _make_fold_metrics(sharpe=2.5),
             _make_fold_metrics(sharpe=None),
         ]
-        import warnings
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", RuntimeWarning)
-            result = aggregate_fold_metrics(folds)
+        result = aggregate_fold_metrics(folds)
         assert result["sharpe_mean"] == pytest.approx(2.5)
-        sharpe_std = result["sharpe_std"]
-        assert sharpe_std is not None
-        assert math.isnan(sharpe_std)
+        assert result["sharpe_std"] == pytest.approx(0.0)
 
     def test_float64_precision(self):
         """Results are float64."""

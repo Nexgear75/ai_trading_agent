@@ -19,6 +19,7 @@ import pandas as pd
 
 import ai_trading
 import ai_trading.baselines  # noqa: F401
+import ai_trading.features  # noqa: F401
 import ai_trading.models  # noqa: F401
 from ai_trading.artifacts.manifest import (
     STRATEGY_FRAMEWORK_MAP,
@@ -40,11 +41,13 @@ from ai_trading.config import VALID_STRATEGIES, PipelineConfig
 from ai_trading.data.dataset import build_samples
 from ai_trading.data.labels import compute_labels
 from ai_trading.data.missing import compute_valid_mask
+from ai_trading.data.qa import run_qa_checks
 from ai_trading.data.splitter import WalkForwardSplitter, apply_purge
 from ai_trading.data.timeframes import TIMEFRAME_DELTA, parse_timeframe
 from ai_trading.features.pipeline import compute_features, resolve_features
 from ai_trading.features.warmup import apply_warmup
 from ai_trading.metrics.aggregation import (
+    PREDICTION_METRICS,
     aggregate_fold_metrics,
     check_acceptance_criteria,
     derive_comparison_type,
@@ -203,8 +206,6 @@ def run_pipeline(config: PipelineConfig) -> Path:
     # --- 3. Load and verify raw data + QA ---
     raw_df, parquet_path = _load_raw_ohlcv(config)
 
-    from ai_trading.data.qa import run_qa_checks
-
     qa_report = run_qa_checks(
         df=raw_df,
         timeframe=config.dataset.timeframe,
@@ -217,8 +218,6 @@ def run_pipeline(config: PipelineConfig) -> Path:
     logger.info("OHLCV indexed: %d bars, %s to %s", len(ohlcv), ohlcv.index[0], ohlcv.index[-1])
 
     # --- 5. Compute features ---
-    import ai_trading.features  # noqa: F401 — triggers feature registration
-
     features_df = compute_features(ohlcv, config)
     logger.info("Features computed: %s", list(features_df.columns))
 
@@ -319,6 +318,8 @@ def run_pipeline(config: PipelineConfig) -> Path:
         meta_test = {"decision_time": ts_test}
 
         # --- Instantiate model ---
+        # DummyModel requires seed; all other models use no-arg constructors.
+        # MVP: only DummyModel has this signature quirk.
         if strategy_name == "dummy":
             model = model_cls(seed=config.reproducibility.global_seed)  # type: ignore[call-arg]
         else:
@@ -352,39 +353,32 @@ def run_pipeline(config: PipelineConfig) -> Path:
             logger.info(
                 "Fold %d: output_type='signal' — bypassing θ calibration", k
             )
-            cal_result: dict = {
-                "theta": None,
-                "quantile": None,
-                "method": "none",
-                "net_pnl": None,
-                "mdd": None,
-                "n_trades": None,
-                "details": None,
-            }
+
+        # Calibrate on validation OHLCV (or bypass for signal models)
+        val_start = ts_val[0]
+        val_end = ts_val[-1]
+        ohlcv_val_mask = (ohlcv.index >= val_start) & (ohlcv.index <= val_end)
+        ohlcv_val = ohlcv.loc[ohlcv_val_mask]
+
+        cal_result: dict = calibrate_threshold(
+            y_hat_val=y_hat_val,
+            ohlcv_val=ohlcv_val,
+            q_grid=config.thresholding.q_grid,
+            horizon=config.label.horizon_H_bars,
+            fee_rate_per_side=config.costs.fee_rate_per_side,
+            slippage_rate_per_side=config.costs.slippage_rate_per_side,
+            initial_equity=config.backtest.initial_equity,
+            position_fraction=config.backtest.position_fraction,
+            objective=config.thresholding.objective,
+            mdd_cap=config.thresholding.mdd_cap,
+            min_trades=config.thresholding.min_trades,
+            output_type=output_type,
+        )
+
+        if output_type == "signal":
             # For signal models, predictions are already binary signals
             signals_test = y_hat_test.astype(np.int32)
         else:
-            # Calibrate on validation OHLCV
-            val_start = ts_val[0]
-            val_end = ts_val[-1]
-            ohlcv_val_mask = (ohlcv.index >= val_start) & (ohlcv.index <= val_end)
-            ohlcv_val = ohlcv.loc[ohlcv_val_mask]
-
-            cal_result = calibrate_threshold(
-                y_hat_val=y_hat_val,
-                ohlcv_val=ohlcv_val,
-                q_grid=config.thresholding.q_grid,
-                horizon=config.label.horizon_H_bars,
-                fee_rate_per_side=config.costs.fee_rate_per_side,
-                slippage_rate_per_side=config.costs.slippage_rate_per_side,
-                initial_equity=config.backtest.initial_equity,
-                position_fraction=config.backtest.position_fraction,
-                objective=config.thresholding.objective,
-                mdd_cap=config.thresholding.mdd_cap,
-                min_trades=config.thresholding.min_trades,
-                output_type=output_type,
-            )
-
             theta = cal_result["theta"]
             if theta is not None:
                 signals_test = apply_threshold(y_hat_test, theta)
@@ -400,11 +394,11 @@ def run_pipeline(config: PipelineConfig) -> Path:
         # Align signals to OHLCV test slice
         # signals_test has one entry per sample in the test set.
         # We need one signal per bar in ohlcv_test.
-        signals_full = np.zeros(len(ohlcv_test), dtype=np.int32)
-        for i, ts in enumerate(ts_test):
-            if ts in ohlcv_test.index:
-                loc = ohlcv_test.index.get_loc(ts)
-                signals_full[loc] = int(signals_test[i])
+        signals_series = pd.Series(signals_test, index=ts_test)
+        signals_full = np.asarray(
+            signals_series.reindex(ohlcv_test.index, fill_value=0),
+            dtype=np.int32,
+        )
 
         trades = execute_trades(
             signals=signals_full,
@@ -477,7 +471,7 @@ def run_pipeline(config: PipelineConfig) -> Path:
         threshold_info = {
             "method": schema_method,
             "theta": json_theta,
-            "selected_quantile": cal_result.get("quantile"),
+            "selected_quantile": cal_result["quantile"],
         }
 
         fold_data = {
@@ -521,17 +515,13 @@ def run_pipeline(config: PipelineConfig) -> Path:
     for key, val in aggregate.items():
         if key.endswith("_mean"):
             base = key[: -len("_mean")]
-            if base in (
-                "mae", "rmse", "directional_accuracy", "spearman_ic"
-            ):
+            if base in PREDICTION_METRICS:
                 pred_agg_mean[base] = val
             else:
                 trad_agg_mean[base] = val
         elif key.endswith("_std"):
             base = key[: -len("_std")]
-            if base in (
-                "mae", "rmse", "directional_accuracy", "spearman_ic"
-            ):
+            if base in PREDICTION_METRICS:
                 pred_agg_std[base] = val
             else:
                 trad_agg_std[base] = val

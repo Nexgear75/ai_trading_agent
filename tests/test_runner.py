@@ -670,25 +670,34 @@ class TestErrorPaths:
 
 
 class TestCausality:
-    """#049 — AC: modifying future OHLCV prices → past signals unchanged."""
+    """#049 — AC: modifying future OHLCV prices → past signals unchanged.
 
-    def test_causality_dummy_model(self, tmp_path):
+    Uses SMA baseline (data-dependent, causal) instead of DummyModel.
+    SMA signals depend on historical close prices — modifying future bars
+    must not alter signals for earlier bars.
+    """
+
+    def test_causality_sma_baseline(self, tmp_path):
         """Modify last 200 bars of OHLCV close prices.
 
-        Signals for bars before the modification point must be identical.
+        Signals for the first fold's test period must be identical between
+        the original and perturbed runs, because SMA is backward-looking.
         """
         from ai_trading.config import load_config
         from ai_trading.pipeline.runner import run_pipeline
 
         # Run 1: original data
-        cfg_dict_1 = _make_config_dict(tmp_path / "run1", strategy_name="dummy")
+        cfg_dict_1 = _make_config_dict(
+            tmp_path / "run1", strategy_name="sma_rule", strategy_type="baseline"
+        )
         cfg_path_1 = _write_config(tmp_path / "run1", cfg_dict_1)
         config_1 = load_config(str(cfg_path_1))
         run_dir_1 = run_pipeline(config_1)
 
-        # Run 2: perturbed future data
-        cfg_dict_2 = _make_config_dict(tmp_path / "run2", strategy_name="dummy")
-        # Modify last 200 bars of the parquet
+        # Run 2: perturbed future data (last 200 bars)
+        cfg_dict_2 = _make_config_dict(
+            tmp_path / "run2", strategy_name="sma_rule", strategy_type="baseline"
+        )
         raw_dir_2 = Path(cfg_dict_2["dataset"]["raw_dir"])
         pq_path = raw_dir_2 / "BTCUSDT_1h.parquet"
         df = pd.read_parquet(pq_path)
@@ -701,23 +710,56 @@ class TestCausality:
         config_2 = load_config(str(cfg_path_2))
         run_dir_2 = run_pipeline(config_2)
 
-        # Compare first fold's prediction metrics — they should be identical
-        # because DummyModel predictions are seed-based, independent of data
+        # Compare first fold metrics — must be identical since SMA is
+        # backward-looking and perturbation only affects the last 200 bars
         m1 = json.loads((run_dir_1 / "metrics.json").read_text())
         m2 = json.loads((run_dir_2 / "metrics.json").read_text())
-        # Both should have at least 1 fold
         assert len(m1["folds"]) >= 1
         assert len(m2["folds"]) >= 1
-        # First fold prediction metrics must match (DummyModel is data-independent)
-        pred1 = m1["folds"][0]["prediction"]
-        pred2 = m2["folds"][0]["prediction"]
-        for key in ("mae", "rmse"):
-            if pred1[key] is not None and pred2[key] is not None:
-                # With same seed and same train size, predictions are identical
-                # but y_true may differ due to different close prices
-                # So we just verify both runs completed successfully
-                assert isinstance(pred1[key], float)
-                assert isinstance(pred2[key], float)
+
+        # First fold's test period ends well before the perturbation zone,
+        # so trading metrics (including signals) must be strictly identical.
+        t1 = m1["folds"][0]["trading"]
+        t2 = m2["folds"][0]["trading"]
+        for key in ("n_trades", "net_pnl", "net_return", "max_drawdown"):
+            assert t1[key] == pytest.approx(t2[key], abs=1e-12), (
+                f"First fold trading metric '{key}' differs: {t1[key]} vs {t2[key]}"
+            )
+
+
+# ---------------------------------------------------------------------------
+# 10b. Edge cases: few folds
+# ---------------------------------------------------------------------------
+
+
+class TestEdgeCaseFolds:
+    """#049 — Edge cases: very large windows → 0 or 1 fold."""
+
+    def test_single_fold(self, tmp_path):
+        """Reduced dataset that produces exactly 1 fold."""
+        from ai_trading.config import load_config
+        from ai_trading.pipeline.runner import run_pipeline
+
+        # With 2200 bars (~92 raw days), warmup+window eats ~228 bars,
+        # leaving ~83 days of samples → only 1 fold with default split params.
+        cfg_dict = _make_config_dict(tmp_path, strategy_name="dummy", n_bars=2200)
+        cfg_path = _write_config(tmp_path, cfg_dict)
+        config = load_config(str(cfg_path))
+        run_dir = run_pipeline(config)
+        metrics = json.loads((run_dir / "metrics.json").read_text())
+        assert len(metrics["folds"]) == 1
+
+    def test_zero_folds_raises(self, tmp_path):
+        """Dataset too small for any fold → pipeline raises."""
+        from ai_trading.config import load_config
+        from ai_trading.pipeline.runner import run_pipeline
+
+        # 500 bars (~21 days) with train_days=60 → 0 folds
+        cfg_dict = _make_config_dict(tmp_path, strategy_name="dummy", n_bars=500)
+        cfg_path = _write_config(tmp_path, cfg_dict)
+        config = load_config(str(cfg_path))
+        with pytest.raises((ValueError, IndexError)):
+            run_pipeline(config)
 
 
 # ---------------------------------------------------------------------------
