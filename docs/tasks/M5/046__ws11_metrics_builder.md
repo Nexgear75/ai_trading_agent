@@ -61,4 +61,4 @@ Implémenter le module `ai_trading/artifacts/metrics_builder.py` qui :
 - [x] `ruff check ai_trading/ tests/` passe sans erreur.
 - [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
 - [x] **Commit GREEN** : `[WS-11] #046 GREEN: metrics builder`.
-- [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-11] #046 — Metrics builder`.
+- [x] **Pull Request ouverte** vers `Max6000i1` : `[WS-11] #046 — Metrics builder`.
