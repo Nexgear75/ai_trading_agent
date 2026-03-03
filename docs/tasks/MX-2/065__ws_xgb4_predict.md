@@ -1,6 +1,6 @@
 # Tâche — Prédiction XGBoost et cast float32
 
-Statut : TODO
+Statut : DONE
 Ordre : 065
 Workstream : WS-XGB-4
 Milestone : MX-2
@@ -62,17 +62,17 @@ Implémenter la méthode `predict()` de `XGBoostRegModel` :
 
 ## Critères d'acceptation
 
-- [ ] `predict()` retourne un array numpy de shape $(N,)$ et dtype `float32`
-- [ ] `RuntimeError` si `fit()` n'a pas été appelé
-- [ ] `ValueError` si `X.ndim != 3`
-- [ ] `TypeError` si `X.dtype != float32`
-- [ ] Les valeurs retournées sont des floats continus (non bornés)
-- [ ] Appels multiples de `predict()` avec les mêmes données → résultats identiques
-- [ ] `meta` et `ohlcv` sont ignorés sans erreur
-- [ ] Cast explicite float64 → float32 vérifié
-- [ ] Tests couvrent les scénarios nominaux + erreurs + bords
-- [ ] Suite de tests verte après implémentation
-- [ ] `ruff check` passe sans erreur
+- [x] `predict()` retourne un array numpy de shape $(N,)$ et dtype `float32`
+- [x] `RuntimeError` si `fit()` n'a pas été appelé
+- [x] `ValueError` si `X.ndim != 3`
+- [x] `TypeError` si `X.dtype != float32`
+- [x] Les valeurs retournées sont des floats continus (non bornés)
+- [x] Appels multiples de `predict()` avec les mêmes données → résultats identiques
+- [x] `meta` et `ohlcv` sont ignorés sans erreur
+- [x] Cast explicite float64 → float32 vérifié
+- [x] Tests couvrent les scénarios nominaux + erreurs + bords
+- [x] Suite de tests verte après implémentation
+- [x] `ruff check` passe sans erreur
 
 ## Pré-condition de démarrage
 
@@ -81,12 +81,12 @@ Implémenter la méthode `predict()` de `XGBoostRegModel` :
 
 ## Checklist de fin de tâche
 
-- [ ] Branche `task/065-xgb-predict` créée depuis `Max6000i1`.
-- [ ] Tests RED écrits avant implémentation.
-- [ ] **Commit RED** : `[WS-XGB-4] #065 RED: tests predict XGBoostRegModel` (fichiers de tests uniquement).
-- [ ] Tests GREEN passants et reproductibles.
-- [ ] Critères d'acceptation tous satisfaits.
-- [ ] `ruff check ai_trading/ tests/` passe sans erreur.
-- [ ] Fichier de tâche mis à jour (statut DONE, critères cochés).
-- [ ] **Commit GREEN** : `[WS-XGB-4] #065 GREEN: predict XGBoostRegModel`.
+- [x] Branche `task/065-xgb-predict` créée depuis `Max6000i1`.
+- [x] Tests RED écrits avant implémentation.
+- [x] **Commit RED** : `[WS-XGB-4] #065 RED: tests predict XGBoostRegModel` (fichiers de tests uniquement).
+- [x] Tests GREEN passants et reproductibles.
+- [x] Critères d'acceptation tous satisfaits.
+- [x] `ruff check ai_trading/ tests/` passe sans erreur.
+- [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
+- [x] **Commit GREEN** : `[WS-XGB-4] #065 GREEN: predict XGBoostRegModel`.
 - [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-XGB-4] #065 — Prédiction XGBoost et cast float32`.

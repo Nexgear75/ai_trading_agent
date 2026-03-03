@@ -122,12 +122,6 @@ class TestXGBoostRegModelAttributes:
 class TestXGBoostRegModelStubs:
     """#060 — Remaining stub methods must raise NotImplementedError."""
 
-    def test_predict_raises_not_implemented(self):
-        mod = _reload_xgboost_module()
-        model = mod.XGBoostRegModel()
-        with pytest.raises(NotImplementedError):
-            model.predict(X=_X_TRAIN)
-
     def test_save_raises_not_implemented(self, tmp_path: Path):
         mod = _reload_xgboost_module()
         model = mod.XGBoostRegModel()
@@ -139,13 +133,6 @@ class TestXGBoostRegModelStubs:
         model = mod.XGBoostRegModel()
         with pytest.raises(NotImplementedError):
             model.load(path=tmp_path / "model.json")
-
-    def test_predict_with_optional_params_raises_not_implemented(self):
-        """predict() with meta and ohlcv also raises."""
-        mod = _reload_xgboost_module()
-        model = mod.XGBoostRegModel()
-        with pytest.raises(NotImplementedError):
-            model.predict(X=_X_TRAIN, meta={"example": 1}, ohlcv=None)
 
 
 # ---------------------------------------------------------------------------
