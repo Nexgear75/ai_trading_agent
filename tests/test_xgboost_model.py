@@ -57,8 +57,13 @@ _Y_VAL = _RNG.standard_normal((5,)).astype(np.float32)
 
 def _reload_xgboost_module():
     """Reload ai_trading.models.xgboost to trigger @register_model side-effect."""
-    import ai_trading.models.xgboost as xgb_mod
+    import sys
 
+    mod_name = "ai_trading.models.xgboost"
+    if mod_name not in sys.modules:
+        import ai_trading.models.xgboost  # noqa: F811
+        sys.modules[mod_name] = ai_trading.models.xgboost
+    xgb_mod = sys.modules[mod_name]
     importlib.reload(xgb_mod)
     return xgb_mod
 
@@ -1303,9 +1308,10 @@ class TestGateXGBReady:
 
     def test_ac5_registry_entry(self):
         """#068 AC5 — 'xgboost_reg' in MODEL_REGISTRY with output_type 'regression'."""
-        _reload_xgboost_module()
+        mod = _reload_xgboost_module()
         assert "xgboost_reg" in MODEL_REGISTRY
         cls = MODEL_REGISTRY["xgboost_reg"]
+        assert cls is mod.XGBoostRegModel
         assert cls.output_type == "regression"
 
     # --- AC6: Validation stricte ---
