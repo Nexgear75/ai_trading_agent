@@ -87,4 +87,4 @@ Implémenter le module `ai_trading/pipeline/runner.py` qui orchestre le pipeline
 - [x] `ruff check ai_trading/ tests/` passe sans erreur.
 - [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
 - [x] **Commit GREEN** : `[WS-12] #049 GREEN: orchestrateur runner`.
-- [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-12] #049 — Orchestrateur de run (runner)`.
+- [x] **Pull Request ouverte** vers `Max6000i1` : `[WS-12] #049 — Orchestrateur de run (runner)`.
