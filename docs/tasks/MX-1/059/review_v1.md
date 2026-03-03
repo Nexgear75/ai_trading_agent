@@ -64,9 +64,10 @@ Tâche d'audit de couverture des tests existants de `flatten_seq_to_tab()` par r
 
 ### Périmètre
 
-Fichiers modifiés (2) :
+Fichiers modifiés (3) :
 - `tests/test_adapter_xgboost.py` — 47 lignes ajoutées (7 nouveaux tests)
 - `docs/tasks/MX-1/059__ws_xgb1_adapter_validation.md` — 77 lignes (création de la tâche)
+- `docs/tasks/MX-1/059/review_v1.md` — ce fichier de revue (création)
 
 Aucun fichier `ai_trading/` modifié → les scans §R1–§R3 sur le code source sont N/A.
 

@@ -67,7 +67,7 @@ Compléter les tests si des cas de la spec ne sont pas couverts.
 ## Checklist de fin de tâche
 
 - [x] Branche `task/059-xgb-adapter-validation` créée depuis `Max6000i1`.
-- [x] Tests RED écrits avant implémentation.
+- [x] Commit RED (tests uniquement) créé — tests ajoutés déjà passants (tâche d'audit, pas de nouveau code fonctionnel).
 - [x] **Commit RED** : `[WS-XGB-1] #059 RED: tests complémentaires adapter tabulaire XGBoost` (fichiers de tests uniquement).
 - [x] Tests GREEN passants et reproductibles.
 - [x] Critères d'acceptation tous satisfaits.
