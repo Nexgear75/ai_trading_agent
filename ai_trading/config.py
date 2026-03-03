@@ -217,13 +217,15 @@ class TrainingConfig(_StrictBase):
 
 
 class XGBoostModelConfig(_StrictBase):
-    max_depth: int
-    n_estimators: int
-    learning_rate: float
-    subsample: float
-    colsample_bytree: float
-    reg_alpha: float
-    reg_lambda: float
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+
+    max_depth: int = Field(gt=0)
+    n_estimators: int = Field(gt=0)
+    learning_rate: float = Field(gt=0, le=1)
+    subsample: float = Field(gt=0, le=1)
+    colsample_bytree: float = Field(gt=0, le=1)
+    reg_alpha: float = Field(ge=0)
+    reg_lambda: float = Field(ge=0)
 
 
 class CNN1DModelConfig(_StrictBase):
