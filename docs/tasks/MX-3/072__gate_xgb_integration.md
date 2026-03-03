@@ -91,5 +91,5 @@ Note : `pytest --cov` avec instrumentation en-processus déclenche un bug connu 
 - [x] Critères d'acceptation tous satisfaits.
 - [x] `ruff check ai_trading/ tests/` passe sans erreur.
 - [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
-- [ ] **Commit GREEN** : `[WS-XGB-7] #072 GREEN: gate G-XGB-Integration validé`.
+- [x] **Commit GREEN** : `[WS-XGB-7] #072 GREEN: gate G-XGB-Integration validé`.
 - [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-XGB-7] #072 — Gate G-XGB-Integration`.
