@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import copy
 import importlib
+import json
 import math
 from pathlib import Path
 
@@ -1014,8 +1015,6 @@ class TestXGBoostRegModelSave:
 
     def test_save_file_is_valid_json_directory(self, fitted_model, tmp_path):
         """#066 — File created by save(directory) is parseable JSON."""
-        import json
-
         fitted_model.save(path=tmp_path)
         content = (tmp_path / "xgboost_model.json").read_text()
         parsed = json.loads(content)
@@ -1034,8 +1033,6 @@ class TestXGBoostRegModelSave:
 
     def test_save_explicit_path_is_valid_json(self, fitted_model, tmp_path):
         """#066 — File at explicit path is parseable JSON."""
-        import json
-
         explicit = tmp_path / "custom_name.json"
         fitted_model.save(path=explicit)
         content = explicit.read_text()
