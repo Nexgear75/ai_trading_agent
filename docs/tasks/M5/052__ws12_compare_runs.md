@@ -62,4 +62,4 @@ Implémenter le script `scripts/compare_runs.py` qui :
 - [x] `ruff check ai_trading/ tests/` passe sans erreur.
 - [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
 - [x] **Commit GREEN** : `[WS-12] #052 GREEN: script comparaison inter-stratégies`.
-- [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-12] #052 — Script de comparaison inter-stratégies`.
+- [x] **Pull Request ouverte** vers `Max6000i1` : `[WS-12] #052 — Script de comparaison inter-stratégies`.
