@@ -808,10 +808,10 @@ class TestXGBoostRegModelFitArtifacts:
     def test_fit_n_features_in_with_different_dimensions(self, default_config, tmp_path):
         """#064 — n_features_in adapts to different L and F values (L=5, F=3 → 15)."""
         rng = np.random.default_rng(6400)
-        l, f = 5, 3
-        x_train = rng.standard_normal((50, l, f)).astype(np.float32)
+        seq_len, n_feat = 5, 3
+        x_train = rng.standard_normal((50, seq_len, n_feat)).astype(np.float32)
         y_train = rng.standard_normal((50,)).astype(np.float32)
-        x_val = rng.standard_normal((20, l, f)).astype(np.float32)
+        x_val = rng.standard_normal((20, seq_len, n_feat)).astype(np.float32)
         y_val = rng.standard_normal((20,)).astype(np.float32)
 
         model = _make_xgb_model()
@@ -823,4 +823,4 @@ class TestXGBoostRegModelFitArtifacts:
             config=default_config,
             run_dir=tmp_path,
         )
-        assert result["n_features_in"] == l * f  # 5 * 3 = 15
+        assert result["n_features_in"] == seq_len * n_feat  # 5 * 3 = 15

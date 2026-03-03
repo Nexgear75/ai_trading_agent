@@ -1,6 +1,6 @@
 # Tâche — Artefacts d'entraînement XGBoost
 
-Statut : TODO
+Statut : DONE
 Ordre : 064
 Workstream : WS-XGB-3
 Milestone : MX-2
@@ -50,13 +50,13 @@ Compléter le retour de `fit()` avec un dictionnaire contenant au minimum :
 
 ## Critères d'acceptation
 
-- [ ] `fit()` retourne un dict contenant `"best_iteration"`, `"best_score"`, `"n_features_in"`
-- [ ] `"best_iteration"` est un `int` ≥ 0
-- [ ] `"best_score"` est un `float` fini (pas NaN, pas Inf)
-- [ ] `"n_features_in"` est un `int` égal à $L \times F$ (vérifiable avec L=10, F=5 → 50)
-- [ ] Tests couvrent les scénarios nominaux + vérification des types
-- [ ] Suite de tests verte après implémentation
-- [ ] `ruff check` passe sans erreur
+- [x] `fit()` retourne un dict contenant `"best_iteration"`, `"best_score"`, `"n_features_in"`
+- [x] `"best_iteration"` est un `int` ≥ 0
+- [x] `"best_score"` est un `float` fini (pas NaN, pas Inf)
+- [x] `"n_features_in"` est un `int` égal à $L \times F$ (vérifiable avec L=10, F=5 → 50)
+- [x] Tests couvrent les scénarios nominaux + vérification des types
+- [x] Suite de tests verte après implémentation
+- [x] `ruff check` passe sans erreur
 
 ## Pré-condition de démarrage
 
@@ -65,12 +65,12 @@ Compléter le retour de `fit()` avec un dictionnaire contenant au minimum :
 
 ## Checklist de fin de tâche
 
-- [ ] Branche `task/064-xgb-fit-artifacts` créée depuis `Max6000i1`.
-- [ ] Tests RED écrits avant implémentation.
-- [ ] **Commit RED** : `[WS-XGB-3] #064 RED: tests artefacts fit XGBoostRegModel` (fichiers de tests uniquement).
-- [ ] Tests GREEN passants et reproductibles.
-- [ ] Critères d'acceptation tous satisfaits.
-- [ ] `ruff check ai_trading/ tests/` passe sans erreur.
-- [ ] Fichier de tâche mis à jour (statut DONE, critères cochés).
+- [x] Branche `task/064-xgb-fit-artifacts` créée depuis `Max6000i1`.
+- [x] Tests RED écrits avant implémentation.
+- [x] **Commit RED** : `[WS-XGB-3] #064 RED: tests artefacts fit XGBoostRegModel` (fichiers de tests uniquement).
+- [x] Tests GREEN passants et reproductibles.
+- [x] Critères d'acceptation tous satisfaits.
+- [x] `ruff check ai_trading/ tests/` passe sans erreur.
+- [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
 - [ ] **Commit GREEN** : `[WS-XGB-3] #064 GREEN: artefacts d'entraînement XGBoostRegModel`.
 - [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-XGB-3] #064 — Artefacts d'entraînement XGBoost`.
