@@ -160,6 +160,7 @@ def compute_sharpe(
     sharpe = mean_r / (std_r + sharpe_epsilon)
 
     if sharpe_annualized:
+        # 365.25 = Julian year (implementation-defined, spec §14.2 uses 365)
         k = 365.25 * 24 / timeframe_hours
         sharpe = sharpe * np.sqrt(k)
 
