@@ -331,7 +331,7 @@ class TestGateM4Coverage:
 
 
 class TestGateM4RegistryCompleteness:
-    """#043 — Criterion (e): MODEL_REGISTRY contains exactly the 4 MVP models."""
+    """#043 — Criterion (e): MODEL_REGISTRY contains at least the 4 MVP models."""
 
     def test_model_registry_keys(self) -> None:
         """#043 — MODEL_REGISTRY keys contain at least the 4 MVP models."""
