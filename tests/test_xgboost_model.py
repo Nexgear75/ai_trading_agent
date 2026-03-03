@@ -279,6 +279,64 @@ class TestXGBoostRegModelFit:
                 run_dir=tmp_path,
             )
 
+    # --- Validation: y ndim errors ---
+
+    def test_fit_raises_valueerror_y_train_scalar_0d(self, default_config, tmp_path):
+        """#062 PR-FIX — ValueError if y_train is a 0D scalar."""
+        model = _make_xgb_model()
+        y_scalar = np.float32(1.0)  # 0D
+        with pytest.raises(ValueError, match="y_train must be 1D"):
+            model.fit(
+                X_train=_X_TRAIN_FIT,
+                y_train=y_scalar,
+                X_val=_X_VAL_FIT,
+                y_val=_Y_VAL_FIT,
+                config=default_config,
+                run_dir=tmp_path,
+            )
+
+    def test_fit_raises_valueerror_y_train_2d(self, default_config, tmp_path):
+        """#062 PR-FIX — ValueError if y_train is 2D (N, 1)."""
+        model = _make_xgb_model()
+        y_2d = _Y_TRAIN_FIT.reshape(-1, 1)  # (N, 1)
+        with pytest.raises(ValueError, match="y_train must be 1D"):
+            model.fit(
+                X_train=_X_TRAIN_FIT,
+                y_train=y_2d,
+                X_val=_X_VAL_FIT,
+                y_val=_Y_VAL_FIT,
+                config=default_config,
+                run_dir=tmp_path,
+            )
+
+    def test_fit_raises_valueerror_y_val_scalar_0d(self, default_config, tmp_path):
+        """#062 PR-FIX — ValueError if y_val is a 0D scalar."""
+        model = _make_xgb_model()
+        y_scalar = np.float32(1.0)  # 0D
+        with pytest.raises(ValueError, match="y_val must be 1D"):
+            model.fit(
+                X_train=_X_TRAIN_FIT,
+                y_train=_Y_TRAIN_FIT,
+                X_val=_X_VAL_FIT,
+                y_val=y_scalar,
+                config=default_config,
+                run_dir=tmp_path,
+            )
+
+    def test_fit_raises_valueerror_y_val_2d(self, default_config, tmp_path):
+        """#062 PR-FIX — ValueError if y_val is 2D (N, 1)."""
+        model = _make_xgb_model()
+        y_val_2d = _Y_VAL_FIT.reshape(-1, 1)  # (N, 1)
+        with pytest.raises(ValueError, match="y_val must be 1D"):
+            model.fit(
+                X_train=_X_TRAIN_FIT,
+                y_train=_Y_TRAIN_FIT,
+                X_val=_X_VAL_FIT,
+                y_val=y_val_2d,
+                config=default_config,
+                run_dir=tmp_path,
+            )
+
     # --- Validation: dtype errors ---
 
     def test_fit_raises_typeerror_x_train_not_float32(self, default_config, tmp_path):

@@ -58,6 +58,16 @@ class XGBoostRegModel(BaseModel):
                 f"X_val must be 3D (N, L, F), got {X_val.ndim}D "
                 f"with shape {X_val.shape}."
             )
+        if y_train.ndim != 1:
+            raise ValueError(
+                f"y_train must be 1D (N,), got {y_train.ndim}D "
+                f"with shape {y_train.shape}."
+            )
+        if y_val.ndim != 1:
+            raise ValueError(
+                f"y_val must be 1D (N,), got {y_val.ndim}D "
+                f"with shape {y_val.shape}."
+            )
         if X_train.shape[0] == 0:
             raise ValueError("X_train must have at least 1 sample, got 0.")
         if X_val.shape[0] == 0:
