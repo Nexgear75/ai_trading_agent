@@ -1,6 +1,6 @@
 # Tâche — Sauvegarde JSON native XGBoost
 
-Statut : TODO
+Statut : DONE
 Ordre : 066
 Workstream : WS-XGB-5
 Milestone : MX-2
@@ -55,15 +55,15 @@ Implémenter la méthode `save()` de `XGBoostRegModel` :
 
 ## Critères d'acceptation
 
-- [ ] `save()` crée un fichier `xgboost_model.json` dans le répertoire spécifié
-- [ ] Le fichier créé est un JSON valide (parseable)
-- [ ] `RuntimeError` si le modèle n'est pas entraîné
-- [ ] Résolution de chemin directory → `xgboost_model.json` appendé
-- [ ] Résolution de chemin fichier → utilisé tel quel
-- [ ] Le répertoire parent est créé si nécessaire
-- [ ] Tests couvrent les scénarios nominaux + erreurs + bords
-- [ ] Suite de tests verte après implémentation
-- [ ] `ruff check` passe sans erreur
+- [x] `save()` crée un fichier `xgboost_model.json` dans le répertoire spécifié
+- [x] Le fichier créé est un JSON valide (parseable)
+- [x] `RuntimeError` si le modèle n'est pas entraîné
+- [x] Résolution de chemin directory → `xgboost_model.json` appendé
+- [x] Résolution de chemin fichier → utilisé tel quel
+- [x] Le répertoire parent est créé si nécessaire
+- [x] Tests couvrent les scénarios nominaux + erreurs + bords
+- [x] Suite de tests verte après implémentation
+- [x] `ruff check` passe sans erreur
 
 ## Pré-condition de démarrage
 
@@ -72,12 +72,12 @@ Implémenter la méthode `save()` de `XGBoostRegModel` :
 
 ## Checklist de fin de tâche
 
-- [ ] Branche `task/066-xgb-save-json` créée depuis `Max6000i1`.
-- [ ] Tests RED écrits avant implémentation.
-- [ ] **Commit RED** : `[WS-XGB-5] #066 RED: tests save XGBoostRegModel` (fichiers de tests uniquement).
-- [ ] Tests GREEN passants et reproductibles.
-- [ ] Critères d'acceptation tous satisfaits.
-- [ ] `ruff check ai_trading/ tests/` passe sans erreur.
-- [ ] Fichier de tâche mis à jour (statut DONE, critères cochés).
-- [ ] **Commit GREEN** : `[WS-XGB-5] #066 GREEN: save JSON natif XGBoostRegModel`.
+- [x] Branche `task/066-xgb-save-json` créée depuis `Max6000i1`.
+- [x] Tests RED écrits avant implémentation.
+- [x] **Commit RED** : `[WS-XGB-5] #066 RED: tests save XGBoostRegModel` (fichiers de tests uniquement).
+- [x] Tests GREEN passants et reproductibles.
+- [x] Critères d'acceptation tous satisfaits.
+- [x] `ruff check ai_trading/ tests/` passe sans erreur.
+- [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
+- [x] **Commit GREEN** : `[WS-XGB-5] #066 GREEN: save JSON natif XGBoostRegModel`.
 - [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-XGB-5] #066 — Sauvegarde JSON native XGBoost`.
