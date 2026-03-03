@@ -251,7 +251,7 @@ def calibrate_threshold(
             )
             equity_array = equity_df["equity"].to_numpy(dtype=np.float64)
             final_equity = float(equity_array[-1])
-            net_pnl = final_equity - initial_equity
+            net_pnl = final_equity / initial_equity - 1.0
             mdd = compute_max_drawdown(equity_array)
             n_trades = len(enriched_trades)
 
