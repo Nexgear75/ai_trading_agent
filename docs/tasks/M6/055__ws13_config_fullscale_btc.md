@@ -64,4 +64,4 @@ Créer le fichier `configs/fullscale_btc.yaml` — configuration dédiée au tes
 - [x] `ruff check ai_trading/ tests/` passe sans erreur.
 - [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
 - [x] **Commit GREEN** : `[WS-13] #055 GREEN: config fullscale_btc.yaml`.
-- [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-13] #055 — Configuration full-scale BTCUSDT`.
+- [x] **Pull Request ouverte** vers `Max6000i1` : `[WS-13] #055 — Configuration full-scale BTCUSDT`.
