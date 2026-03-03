@@ -62,4 +62,4 @@ Ajouter dans `tests/test_fullscale_btc.py` un ou plusieurs tests marqués `@pyte
 - [x] `ruff check ai_trading/ tests/` passe sans erreur.
 - [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
 - [x] **Commit GREEN** : `[WS-13] #057 GREEN: validation métriques fullscale BTCUSDT`.
-- [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-13] #057 — Validation métriques fullscale BTCUSDT`.
+- [x] **Pull Request ouverte** vers `Max6000i1` : `[WS-13] #057 — Validation métriques fullscale BTCUSDT`.
