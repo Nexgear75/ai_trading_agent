@@ -94,4 +94,4 @@ GM1 → G-Features → G-Split → GM2 → G-Doc → GM3 → G-Backtest → GM4 
 - [x] `ruff check ai_trading/ tests/` passe sans erreur.
 - [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
 - [x] **Commit GREEN** : `[WS-12] #053 GREEN: Makefile`.
-- [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-12] #053 — Makefile (pilotage du pipeline)`.
+- [x] **Pull Request ouverte** vers `Max6000i1` : `[WS-12] #053 — Makefile (pilotage du pipeline)`.
