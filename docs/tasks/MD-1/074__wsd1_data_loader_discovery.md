@@ -57,4 +57,4 @@ Implémenter dans `data_loader.py` les fonctions de découverte des runs valides
 - [x] `ruff check ai_trading/ tests/` passe sans erreur.
 - [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
 - [x] **Commit GREEN** : `[WS-D-1] #074 GREEN: data loader découverte et validation runs`.
-- [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-D-1] #074 — Data loader découverte et validation runs`.
+- [x] **Pull Request ouverte** vers `Max6000i1` : `[WS-D-1] #074 — Data loader découverte et validation runs`.
