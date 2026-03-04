@@ -90,6 +90,7 @@ Les skills `.github/skills/*/SKILL.md` fournissent des workflows spécialisés i
 | `global-review` | « revue globale », « audit du code », « revue de la branche » | Revue complète de branche : cohérence inter-modules, conformité spec, qualité |
 | `test-adherence` | « vérifie l'adhérence des tests », « tests vs spec », « matrice couverture » | Audit croisé tests ↔ spec ↔ tâches : formules, critères, anti-patterns |
 | `plan-coherence` | « revue du plan », « cohérence du plan », « audit plan » | Orchestre 2 agents workers : Plan-Corrector (corrections), Plan-Analyzer (ré-analyse). Itère jusqu'à convergence. |
+| `spec-coherence` | « vérifie la cohérence de la spec », « audit de la spécification » | Audit de cohérence intrinsèque d'une spécification : terminologie, formules, références, paramètres, flux I/O, glossaire, addenda. Rapport structuré. |
 | `markdown-redaction` | « rédige un document Markdown » | Conventions GFM, mode Corporate FR, templates |
 
 ## Custom Agents (workers)
