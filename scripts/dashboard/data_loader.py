@@ -209,4 +209,5 @@ def discover_runs(runs_dir: Path) -> list[dict]:
 
         results.append(data)
 
+    results.sort(key=lambda d: d["run_id"])
     return results

@@ -428,9 +428,13 @@ class TestDRYWithCompareRuns:
         # Check that compare_runs.py imports from scripts.dashboard.data_loader
         imports_from_data_loader = False
         for node in ast.walk(tree):
-            if isinstance(node, ast.ImportFrom) and node.module and "data_loader" in node.module:
-                    imports_from_data_loader = True
-                    break
+            if (
+                isinstance(node, ast.ImportFrom)
+                and node.module
+                and "data_loader" in node.module
+            ):
+                imports_from_data_loader = True
+                break
             if isinstance(node, ast.Import):
                 for alias in node.names:
                     if "data_loader" in alias.name:
