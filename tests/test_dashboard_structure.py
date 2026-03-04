@@ -12,7 +12,7 @@ Verifies:
 
 from __future__ import annotations
 
-import configparser
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -103,10 +103,16 @@ class TestRequirementsDashboard:
         ]
 
         def parse_pkg_version(line: str) -> tuple[str, str]:
-            """Parse 'pkg>=X.Y' into (pkg_lower, version_spec)."""
+            """Parse 'pkg>=X.Y' into (pkg_lower, version_spec).
+
+            Handles compound constraints like 'pkg>=4.0,<5.0' by
+            keeping only the first constraint.
+            """
             for sep in [">=", "==", "<=", "~=", "!="]:
                 if sep in line:
                     name, ver = line.split(sep, 1)
+                    # Truncate compound constraints at first comma
+                    ver = ver.split(",")[0]
                     return name.strip().lower(), f"{sep}{ver.strip()}"
             return line.strip().lower(), ""
 
@@ -131,8 +137,9 @@ class TestRequirementsDashboard:
                 # Parse as tuples for comparison
                 main_parts = tuple(int(x) for x in main_min.split("."))
                 dash_parts = tuple(int(x) for x in dash_min.split("."))
-                assert dash_parts <= main_parts or main_parts <= dash_parts, (
-                    f"Version conflict for '{pkg}': main={main_spec}, dashboard={dash_spec}"
+                assert dash_parts <= main_parts, (
+                    f"Version conflict for '{pkg}': dashboard min {dash_spec} "
+                    f"is more restrictive than main {main_spec}"
                 )
 
 
@@ -228,61 +235,70 @@ class TestStreamlitConfig:
             f"Config file not found: {self.CONFIG_FILE}"
         )
 
-    def _read_config(self) -> configparser.ConfigParser:
-        """Read the TOML config using configparser (compatible with INI-style TOML)."""
-        config = configparser.ConfigParser()
-        config.read(self.CONFIG_FILE)
-        return config
+    def _read_config(self) -> dict:
+        """Read the TOML config using tomllib (preserves exact key casing)."""
+        with open(self.CONFIG_FILE, "rb") as f:
+            return tomllib.load(f)
 
     def test_server_headless(self) -> None:
         """#073 — [server] headless = true."""
         config = self._read_config()
-        assert config.get("server", "headless") == "true"
+        assert config["server"]["headless"] is True
 
     def test_server_port(self) -> None:
         """#073 — [server] port = 8501."""
         config = self._read_config()
-        assert config.get("server", "port") == "8501"
+        assert config["server"]["port"] == 8501
 
     def test_theme_primary_color(self) -> None:
         """#073 — [theme] primaryColor = '#3498db'."""
         config = self._read_config()
-        val = config.get("theme", "primaryColor").strip('"').strip("'")
-        assert val == "#3498db"
+        assert "primaryColor" in config["theme"], (
+            f"Key 'primaryColor' not found (keys: {list(config['theme'].keys())})"
+        )
+        assert config["theme"]["primaryColor"] == "#3498db"
 
     def test_theme_background_color(self) -> None:
         """#073 — [theme] backgroundColor = '#ffffff'."""
         config = self._read_config()
-        val = config.get("theme", "backgroundColor").strip('"').strip("'")
-        assert val == "#ffffff"
+        assert "backgroundColor" in config["theme"], (
+            f"Key 'backgroundColor' not found (keys: {list(config['theme'].keys())})"
+        )
+        assert config["theme"]["backgroundColor"] == "#ffffff"
 
     def test_theme_secondary_background_color(self) -> None:
         """#073 — [theme] secondaryBackgroundColor = '#f0f2f6'."""
         config = self._read_config()
-        val = config.get("theme", "secondaryBackgroundColor").strip('"').strip("'")
-        assert val == "#f0f2f6"
+        assert "secondaryBackgroundColor" in config["theme"], (
+            f"Key 'secondaryBackgroundColor' not found (keys: {list(config['theme'].keys())})"
+        )
+        assert config["theme"]["secondaryBackgroundColor"] == "#f0f2f6"
 
     def test_theme_text_color(self) -> None:
         """#073 — [theme] textColor = '#262730'."""
         config = self._read_config()
-        val = config.get("theme", "textColor").strip('"').strip("'")
-        assert val == "#262730"
+        assert "textColor" in config["theme"], (
+            f"Key 'textColor' not found (keys: {list(config['theme'].keys())})"
+        )
+        assert config["theme"]["textColor"] == "#262730"
 
     def test_theme_font(self) -> None:
         """#073 — [theme] font = 'sans serif'."""
         config = self._read_config()
-        val = config.get("theme", "font").strip('"').strip("'")
-        assert val == "sans serif"
+        assert config["theme"]["font"] == "sans serif"
 
     def test_browser_no_usage_stats(self) -> None:
         """#073 — [browser] gatherUsageStats = false."""
         config = self._read_config()
-        assert config.get("browser", "gatherUsageStats") == "false"
+        assert "gatherUsageStats" in config["browser"], (
+            f"Key 'gatherUsageStats' not found (keys: {list(config['browser'].keys())})"
+        )
+        assert config["browser"]["gatherUsageStats"] is False
 
     def test_all_sections_present(self) -> None:
         """#073 — Config must have exactly [server], [theme], [browser] sections."""
         config = self._read_config()
-        sections = set(config.sections())
+        sections = set(config.keys())
         expected = {"server", "theme", "browser"}
         assert sections == expected, (
             f"Expected sections {expected}, found {sections}"
