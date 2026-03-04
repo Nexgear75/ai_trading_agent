@@ -48,6 +48,8 @@ def chart_equity_curve(
 
     # Normalize equity to start at 1.0
     eq_start = df["equity"].iloc[0]
+    if eq_start == 0:
+        raise ValueError("equity[0] must be > 0 for normalization")
     norm_equity = df["equity"] / eq_start
 
     # Main equity line
@@ -257,7 +259,12 @@ def chart_equity_overlay(curves: dict[str, pd.DataFrame]) -> go.Figure:
 
     for label, curve_df in curves.items():
         eq = curve_df["equity"]
-        norm_eq = eq / eq.iloc[0]
+        eq_start = eq.iloc[0]
+        if eq_start == 0:
+            raise ValueError(
+                f"equity[0] must be > 0 for normalization (run '{label}')"
+            )
+        norm_eq = eq / eq_start
         fig.add_trace(
             go.Scatter(
                 y=norm_eq.values,
@@ -466,6 +473,8 @@ def chart_fold_equity(
 
     # Map timestamps to equity values for marker placement
     time_to_eq = dict(zip(df["time_utc"], df["equity"], strict=True))
+    if len(time_to_eq) != len(df):
+        raise ValueError("duplicate time_utc in equity DataFrame")
 
     # Entry markers ▲ green
     entry_times = trades_df["entry_time_utc"]

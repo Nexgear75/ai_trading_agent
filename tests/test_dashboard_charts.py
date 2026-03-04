@@ -312,6 +312,18 @@ class TestChartReturnsBoxplot:
         box_traces = [t for t in fig.data if isinstance(t, go.Box)]
         assert len(box_traces) == 1
 
+    def test_empty_trades(self):
+        """Empty trades DataFrame should produce a valid figure with no boxes."""
+        from scripts.dashboard.charts import chart_returns_boxplot
+
+        empty_df = pd.DataFrame(
+            {"net_return": pd.Series([], dtype=float), "fold": pd.Series([], dtype=int)}
+        )
+        fig = chart_returns_boxplot(empty_df)
+        assert isinstance(fig, go.Figure)
+        box_traces = [t for t in fig.data if isinstance(t, go.Box)]
+        assert len(box_traces) == 0
+
 
 # ---------------------------------------------------------------------------
 # Tests — chart_equity_overlay (§7.3)
@@ -412,6 +424,35 @@ class TestChartRadar:
         fig = chart_radar(data)
         assert isinstance(fig, go.Figure)
         assert len(fig.data) == 1
+
+    def test_equal_values_normalize_to_half(self):
+        """When all runs have identical metrics, all r values should be 0.5."""
+        from scripts.dashboard.charts import chart_radar
+
+        data = [
+            {
+                "label": "Run A",
+                "net_pnl": 200.0,
+                "sharpe": 1.0,
+                "max_drawdown": 0.15,
+                "hit_rate": 0.55,
+                "profit_factor": 1.2,
+            },
+            {
+                "label": "Run B",
+                "net_pnl": 200.0,
+                "sharpe": 1.0,
+                "max_drawdown": 0.15,
+                "hit_rate": 0.55,
+                "profit_factor": 1.2,
+            },
+        ]
+        fig = chart_radar(data)
+        assert isinstance(fig, go.Figure)
+        for trace in fig.data:
+            # 6 values: 5 axes + closing point, all should be 0.5
+            for v in trace.r:
+                assert v == pytest.approx(0.5)
 
 
 # ---------------------------------------------------------------------------

@@ -63,5 +63,5 @@ Implémenter dans `charts.py` les 8 fonctions de graphiques Plotly réutilisable
 - [x] Critères d'acceptation tous satisfaits.
 - [x] `ruff check ai_trading/ tests/` passe sans erreur.
 - [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
-- [ ] **Commit GREEN** : `[WS-D-1] #077 GREEN: bibliothèque graphiques Plotly`.
+- [x] **Commit GREEN** : `[WS-D-1] #077 GREEN: bibliothèque graphiques Plotly`.
 - [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-D-1] #077 — Bibliothèque graphiques Plotly`.
