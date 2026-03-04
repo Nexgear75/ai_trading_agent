@@ -12,7 +12,6 @@ import pandas as pd
 import plotly.graph_objects as go
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # Fixtures — synthetic data for chart tests
 # ---------------------------------------------------------------------------
