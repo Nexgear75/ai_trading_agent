@@ -346,6 +346,8 @@ def load_predictions(fold_dir: Path, split: str) -> pd.DataFrame | None:
     Returns ``None`` if the file does not exist.
     Raises ``ValueError`` if the file exists but required columns are missing.
     """
+    if split not in {"val", "test"}:
+        raise ValueError(f"split must be 'val' or 'test', got {split!r}")
     csv_path = fold_dir / f"preds_{split}.csv"
     if not csv_path.exists():
         return None

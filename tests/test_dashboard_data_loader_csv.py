@@ -167,7 +167,8 @@ class TestLoadEquityCurve:
         result = load_equity_curve(tmp_path)
         assert result is not None
         assert isinstance(result, pd.DataFrame)
-        assert list(result.columns) >= ["time_utc", "equity", "in_trade", "fold"]
+        for col in ["time_utc", "equity", "in_trade", "fold"]:
+            assert col in result.columns
         assert len(result) == 3
 
     def test_absent_file_returns_none(self, tmp_path: Path) -> None:
@@ -379,6 +380,13 @@ class TestLoadPredictions:
         )
         with pytest.raises(ValueError, match="missing required columns"):
             load_predictions(tmp_path, "val")
+
+    def test_invalid_split_raises(self, tmp_path: Path) -> None:
+        """#075 — Invalid split parameter raises ValueError."""
+        from scripts.dashboard.data_loader import load_predictions
+
+        with pytest.raises(ValueError, match="split must be 'val' or 'test'"):
+            load_predictions(tmp_path, "train")
 
 
 # ---------------------------------------------------------------------------
