@@ -62,6 +62,7 @@ def format_mean_std(
     fmt_type: str,
     n_contributing: int | None = None,
     n_total: int | None = None,
+    decimals: int = 2,
 ) -> str:
     """Format 'mean ± std' with optional fold count (§6.2).
 
@@ -75,10 +76,17 @@ def format_mean_std(
         'pct' for percentage format, 'float' for decimal format.
     n_contributing, n_total : int or None
         If both provided and n_contributing < n_total, appends '(n/N folds)'.
+    decimals : int
+        Number of decimal places (default 2). Use 1 for hit_rate (§9.3).
     """
+    if fmt_type not in ("pct", "float"):
+        raise ValueError(f"Unknown fmt_type: {fmt_type!r}")
     if mean is None:
         return _NULL_DISPLAY
-    result = f"{mean:.2%} ± {std:.2%}" if fmt_type == "pct" else f"{mean:.2f} ± {std:.2f}"
+    if fmt_type == "pct":
+        result = f"{mean:.{decimals}%} ± {std:.{decimals}%}"
+    else:
+        result = f"{mean:.{decimals}f} ± {std:.{decimals}f}"
     if (
         n_contributing is not None
         and n_total is not None

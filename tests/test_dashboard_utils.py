@@ -216,6 +216,27 @@ class TestFormatMeanStd:
         result = format_mean_std(0.0345, 0.012, "pct", n_contributing=3, n_total=5)
         assert result == "3.45% ± 1.20% (3/5 folds)"
 
+    def test_pct_one_decimal(self):
+        """§9.3 — hit_rate uses 1 decimal precision."""
+        from scripts.dashboard.utils import format_mean_std
+
+        result = format_mean_std(0.553, 0.021, "pct", decimals=1)
+        assert result == "55.3% ± 2.1%"
+
+    def test_float_one_decimal(self):
+        from scripts.dashboard.utils import format_mean_std
+
+        result = format_mean_std(1.234, 0.567, "float", decimals=1)
+        assert result == "1.2 ± 0.6"
+
+    def test_invalid_fmt_type_raises(self):
+        import pytest
+
+        from scripts.dashboard.utils import format_mean_std
+
+        with pytest.raises(ValueError, match="Unknown fmt_type"):
+            format_mean_std(0.05, 0.01, "percentage")
+
 
 # ---------------------------------------------------------------------------
 # pnl_color (§6.2)
@@ -446,3 +467,15 @@ class TestFormatSharpePerTrade:
         from scripts.dashboard.utils import format_sharpe_per_trade
 
         assert format_sharpe_per_trade(-0.5, n_trades=10) == "-0.50"
+
+    def test_no_warning_three_trades(self):
+        """Boundary: n_trades=3 is the first value above the ⚠️ threshold."""
+        from scripts.dashboard.utils import format_sharpe_per_trade
+
+        assert format_sharpe_per_trade(0.05, n_trades=3) == "0.05"
+
+    def test_warning_zero_trades(self):
+        """Edge case: 0 trades should also show ⚠️."""
+        from scripts.dashboard.utils import format_sharpe_per_trade
+
+        assert format_sharpe_per_trade(0.0, n_trades=0) == "0.00 ⚠️"
