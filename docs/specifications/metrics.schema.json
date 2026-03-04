@@ -19,7 +19,8 @@
       "additionalProperties": false,
       "required": [
         "strategy_type",
-        "name"
+        "name",
+        "output_type"
       ],
       "properties": {
         "strategy_type": {
@@ -31,6 +32,14 @@
         },
         "name": {
           "type": "string"
+        },
+        "output_type": {
+          "type": "string",
+          "enum": [
+            "regression",
+            "signal"
+          ],
+          "description": "Model output type: regression (continuous predictions) or signal (binary Go/No-Go)."
         }
       }
     },
@@ -70,7 +79,9 @@
                 "enum": [
                   "quantile_grid",
                   "fixed_value",
-                  "none"
+                  "none",
+                  "fallback_relax_min_trades",
+                  "fallback_no_trade"
                 ]
               },
               "theta": {

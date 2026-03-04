@@ -153,6 +153,7 @@ def build_manifest(
         "strategy_type": strategy_info["strategy_type"],
         "name": strategy_name,
         "framework": framework,
+        "output_type": strategy_info["output_type"],
     }
     if "hyperparams" in strategy_info:
         strategy_section["hyperparams"] = strategy_info["hyperparams"]

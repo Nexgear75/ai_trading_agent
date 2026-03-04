@@ -1,0 +1,201 @@
+# ============================================================================
+# AI Trading Pipeline — Configuration full-scale BTCUSDT XGBoost
+# Base     : configs/fullscale_btc.yaml (identique sauf strategy.name = xgboost_reg)
+# ============================================================================
+
+# --- Logging -----------------------------------------------------------------
+logging:
+  level: INFO
+  format: text
+  file: "pipeline.log"
+
+# --- Dataset -----------------------------------------------------------------
+dataset:
+  exchange: binance
+  symbols:
+    - BTCUSDT
+  timeframe: "1h"
+  start: "2017-08-17"
+  end: "2026-01-01"
+  timezone: UTC
+  raw_dir: data/raw
+  ingestion:
+    page_limit: 1000
+    max_retries: 3
+    base_backoff_s: 1.0
+
+# --- QA (contrôles qualité) --------------------------------------------------
+qa:
+  zero_volume_min_streak: 2
+
+# --- Label (cible y_t) ------------------------------------------------------
+label:
+  horizon_H_bars: 4
+  target_type: log_return_trade
+
+# --- Window (entrée modèle) -------------------------------------------------
+window:
+  L: 128
+  min_warmup: 200
+
+# --- Features ----------------------------------------------------------------
+features:
+  feature_version: mvp_v1
+  feature_list:
+    - logret_1
+    - logret_2
+    - logret_4
+    - vol_24
+    - vol_72
+    - logvol
+    - dlogvol
+    - rsi_14
+    - ema_ratio_12_26
+  params:
+    rsi_period: 14
+    rsi_epsilon: 1.0e-12
+    ema_fast: 12
+    ema_slow: 26
+    vol_windows:
+      - 24
+      - 72
+    logvol_epsilon: 1.0e-8
+    volatility_ddof: 0
+
+# --- Splits (walk-forward) --------------------------------------------------
+splits:
+  scheme: walk_forward_rolling
+  train_days: 180
+  test_days: 30
+  step_days: 30
+  val_frac_in_train: 0.2
+  embargo_bars: 4
+  min_samples_train: 100
+  min_samples_test: 1
+
+# --- Scaling / normalisation -------------------------------------------------
+scaling:
+  method: standard
+  epsilon: 1.0e-12
+  robust_quantile_low: 0.005
+  robust_quantile_high: 0.995
+  rolling_window: 720
+
+# --- Strategy ----------------------------------------------------------------
+strategy:
+  strategy_type: model
+  name: xgboost_reg
+
+# --- Thresholding (calibration θ) -------------------------------------------
+thresholding:
+  method: quantile_grid
+  q_grid:
+    - 0.5
+    - 0.6
+    - 0.7
+    - 0.8
+    - 0.9
+    - 0.95
+  objective: max_net_pnl_with_mdd_cap
+  mdd_cap: 0.25
+  min_trades: 20
+
+# --- Costs (backtest) -------------------------------------------------------
+costs:
+  cost_model: per_side_multiplicative
+  fee_rate_per_side: 0.0005
+  slippage_rate_per_side: 0.00025
+
+# --- Backtest ----------------------------------------------------------------
+backtest:
+  mode: one_at_a_time
+  direction: long_only
+  initial_equity: 1.0
+  position_fraction: 1.0
+
+# --- Baselines ---------------------------------------------------------------
+baselines:
+  sma:
+    fast: 20
+    slow: 50
+
+# --- Training (modèles ML/DL) -----------------------------------------------
+training:
+  loss: mse
+  optimizer: adam
+  learning_rate: 1.0e-3
+  batch_size: 64
+  max_epochs: 100
+  early_stopping_patience: 10
+
+# --- Hyperparamètres par modèle ----------------------------------------------
+models:
+  xgboost:
+    max_depth: 5
+    n_estimators: 500
+    learning_rate: 0.05
+    subsample: 0.8
+    colsample_bytree: 0.8
+    reg_alpha: 0.0
+    reg_lambda: 1.0
+
+  cnn1d:
+    n_conv_layers: 2
+    filters: 64
+    kernel_size: 3
+    dropout: 0.2
+    pool: global_avg
+
+  gru:
+    hidden_size: 64
+    num_layers: 1
+    bidirectional: false
+    dropout: 0.2
+
+  lstm:
+    hidden_size: 64
+    num_layers: 1
+    bidirectional: false
+    dropout: 0.2
+
+  patchtst:
+    patch_size: 16
+    stride: 8
+    d_model: 64
+    n_heads: 4
+    n_layers: 2
+    ff_dim: 128
+    dropout: 0.2
+
+  rl_ppo:
+    hidden_sizes:
+      - 64
+      - 64
+    clip_epsilon: 0.2
+    gamma: 0.99
+    gae_lambda: 0.95
+    n_epochs_ppo: 4
+    max_episodes: 200
+    rollout_steps: 512
+    value_loss_coeff: 0.5
+    entropy_coeff: 0.01
+    learning_rate: 3.0e-4
+    deterministic_eval: true
+
+# --- Metrics -----------------------------------------------------------------
+metrics:
+  sharpe_annualized: false
+  sharpe_epsilon: 1.0e-12
+
+# --- Reproducibility ---------------------------------------------------------
+reproducibility:
+  global_seed: 42
+  deterministic_torch: true
+
+# --- Artifacts ---------------------------------------------------------------
+artifacts:
+  output_dir: runs
+  save_model: true
+  save_equity_curve: true
+  save_predictions: true
+  save_trades: true

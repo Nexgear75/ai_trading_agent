@@ -889,6 +889,7 @@ runs/<run_id>/
 ├── manifest.json
 ├── metrics.json
 ├── config_snapshot.yaml
+├── pipeline.log
 ├── folds/
 │   ├── fold_00/
 │   │   ├── preds_val.csv

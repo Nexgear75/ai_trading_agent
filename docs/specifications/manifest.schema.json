@@ -248,7 +248,8 @@
       "required": [
         "strategy_type",
         "name",
-        "framework"
+        "framework",
+        "output_type"
       ],
       "properties": {
         "strategy_type": {
@@ -264,6 +265,14 @@
         },
         "framework": {
           "type": "string"
+        },
+        "output_type": {
+          "type": "string",
+          "enum": [
+            "regression",
+            "signal"
+          ],
+          "description": "Model output type: regression (continuous predictions) or signal (binary Go/No-Go)."
         },
         "hyperparams": {
           "type": "object"

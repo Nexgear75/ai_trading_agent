@@ -1,16 +1,17 @@
-"""Full-scale integration test — make run-all on real BTCUSDT data.
+"""Full-scale end-to-end test — make run-all on real BTCUSDT data with XGBoost.
 
-Task #056 — WS-13: Test full-scale make run-all BTCUSDT.
+Equivalent to test_fullscale_btc.py but with strategy.name='xgboost_reg'.
+Executes the entire pipeline via ``make run-all`` with the fullscale XGBoost
+configuration, then validates that all expected artefacts are produced and
+that XGBoost-specific outputs (model files, prediction metrics) are present.
 
-This test executes the entire pipeline via ``make run-all`` with the fullscale
-BTC configuration, then validates that all expected artefacts are produced.
-
-**Policy M6**: NO data fixtures, NO mocks, NO synthetic data.  Only real paths
-(``configs/fullscale_btc.yaml``, ``data/raw/``, ``runs/``) and real network
-access are used.
+**Policy M6**: NO data fixtures, NO mocks, NO synthetic data. Only real paths
+(``configs/fullscale_btc_xgboost.yaml``, ``data/raw/``, ``runs/``) and real
+network access are used.
 
 Marked ``@pytest.mark.fullscale`` — excluded from default pytest runs.
-Run explicitly with: ``pytest -m fullscale tests/test_fullscale_btc.py -v --timeout=600``
+Run explicitly with:
+  pytest -m fullscale tests/test_fullscale_btc_xgboost.py -v --timeout=1800
 """
 
 import json
@@ -27,7 +28,7 @@ from ai_trading.artifacts.validation import validate_manifest, validate_metrics
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
-FULLSCALE_CONFIG = PROJECT_ROOT / "configs" / "fullscale_btc.yaml"
+FULLSCALE_CONFIG = PROJECT_ROOT / "configs" / "fullscale_btc_xgboost.yaml"
 PARQUET_PATH = PROJECT_ROOT / "data" / "raw" / "BTCUSDT_1h.parquet"
 RUNS_DIR = PROJECT_ROOT / "runs"
 
@@ -57,21 +58,18 @@ def _get_run_dir() -> Path:
 
 
 @pytest.mark.fullscale
-class TestFullscaleRunAll:
-    """Execute ``make run-all`` on real BTCUSDT data and validate artefacts."""
+class TestFullscaleXGBoostRunAll:
+    """Execute ``make run-all`` on real BTCUSDT data with XGBoost model."""
 
     # ------------------------------------------------------------------
     # 1. Execute make run-all
     # ------------------------------------------------------------------
 
     def test_make_run_all_succeeds(self):
-        """AC: make run-all CONFIG=configs/fullscale_btc.yaml exits with 0."""
+        """AC: make run-all CONFIG=configs/fullscale_btc_xgboost.yaml exits 0."""
         global _run_dir  # noqa: PLW0603
 
-        # Ensure runs/ directory exists (it is gitignored and absent on fresh clones).
         RUNS_DIR.mkdir(parents=True, exist_ok=True)
-
-        # Snapshot existing run dirs before execution.
         dirs_before = set(d for d in RUNS_DIR.iterdir() if d.is_dir())
 
         config_rel = FULLSCALE_CONFIG.relative_to(PROJECT_ROOT)
@@ -87,16 +85,15 @@ class TestFullscaleRunAll:
             cwd=str(PROJECT_ROOT),
             capture_output=True,
             text=True,
-            timeout=600,
+            timeout=1800,
             env=env,
         )
         assert result.returncode == 0, (
             f"make run-all failed (rc={result.returncode}).\n"
-            f"--- stdout ---\n{result.stdout[-2000:]}\n"
-            f"--- stderr ---\n{result.stderr[-2000:]}"
+            f"--- stdout ---\n{result.stdout[-3000:]}\n"
+            f"--- stderr ---\n{result.stderr[-3000:]}"
         )
 
-        # Identify the newly created run directory.
         dirs_after = set(d for d in RUNS_DIR.iterdir() if d.is_dir())
         new_dirs = dirs_after - dirs_before
         assert len(new_dirs) == 1, (
@@ -135,7 +132,7 @@ class TestFullscaleRunAll:
         )
 
     # ------------------------------------------------------------------
-    # 5. JSON Schema validation (reuses ai_trading.artifacts.validation)
+    # 5. JSON Schema validation
     # ------------------------------------------------------------------
 
     def test_manifest_json_valid_schema(self):
@@ -217,18 +214,63 @@ class TestFullscaleRunAll:
             )
 
     # ------------------------------------------------------------------
-    # 10. Metrics coherence — Task #057
+    # 10. XGBoost-specific: strategy in manifest
+    # ------------------------------------------------------------------
+
+    def test_manifest_strategy_is_xgboost(self):
+        """AC: manifest.json strategy.name == 'xgboost_reg'."""
+        run_dir = _get_run_dir()
+        manifest = _load_json(run_dir / "manifest.json")
+        assert manifest["strategy"]["name"] == "xgboost_reg"
+        assert manifest["strategy"]["framework"] == "xgboost"
+
+    # ------------------------------------------------------------------
+    # 11. XGBoost-specific: model file in each fold
+    # ------------------------------------------------------------------
+
+    def test_each_fold_has_xgboost_model(self):
+        """AC: XGBoost model file present in model_artifacts of each fold."""
+        run_dir = _get_run_dir()
+        folds_dir = run_dir / "folds"
+        assert folds_dir.is_dir()
+        fold_dirs = sorted(d for d in folds_dir.iterdir() if d.is_dir())
+        assert len(fold_dirs) >= 1
+        for fold_dir in fold_dirs:
+            model_file = fold_dir / "model_artifacts" / "model"
+            assert model_file.is_file(), (
+                f"XGBoost model file missing in {fold_dir.name}"
+            )
+
+    # ------------------------------------------------------------------
+    # 12. XGBoost-specific: prediction metrics non-null
+    # ------------------------------------------------------------------
+
+    def test_prediction_metrics_non_null(self):
+        """AC: Prediction metrics MAE > 0, RMSE > 0, DA in [0,1] per fold."""
+        run_dir = _get_run_dir()
+        metrics = _load_json(run_dir / "metrics.json")
+        assert len(metrics["folds"]) >= 1
+        for fold in metrics["folds"]:
+            pred = fold["prediction"]
+            assert pred["mae"] > 0, f"MAE must be > 0, got {pred['mae']}"
+            assert pred["rmse"] > 0, f"RMSE must be > 0, got {pred['rmse']}"
+            assert 0.0 <= pred["directional_accuracy"] <= 1.0, (
+                f"DA must be in [0,1], got {pred['directional_accuracy']}"
+            )
+
+    # ------------------------------------------------------------------
+    # 13. Metrics coherence (adapted from test_fullscale_btc.py)
     # ------------------------------------------------------------------
 
     def test_fullscale_metrics_coherence(self):
-        """#057 — Validate numerical coherence of metrics from fullscale run.
+        """Validate numerical coherence of metrics from fullscale XGBoost run.
 
         For each fold:
         - net_pnl is a finite float
-        - max_drawdown ∈ [0, 1]
+        - max_drawdown in [0, 1]
         - n_trades >= 0
         - sharpe is a finite float (if not null)
-        - hit_rate ∈ [0, 1] if n_trades > 0 (if not null)
+        - hit_rate in [0, 1] if n_trades > 0 (if not null)
 
         Aggregate:
         - mean and std present for each trading metric
@@ -254,7 +296,7 @@ class TestFullscaleRunAll:
                 f"fold {fold_id}: net_pnl is not finite: {net_pnl}"
             )
 
-            # max_drawdown ∈ [0, 1]
+            # max_drawdown in [0, 1]
             mdd = trading["max_drawdown"]
             assert isinstance(mdd, (int, float)), (
                 f"fold {fold_id}: max_drawdown is not numeric: {mdd!r}"
@@ -282,7 +324,7 @@ class TestFullscaleRunAll:
                     f"fold {fold_id}: sharpe is not finite: {sharpe}"
                 )
 
-            # hit_rate ∈ [0, 1] if n_trades > 0 and not null
+            # hit_rate in [0, 1] if n_trades > 0 and not null
             hit_rate = trading["hit_rate"]
             if hit_rate is not None and n_trades > 0:
                 assert isinstance(hit_rate, (int, float)), (
@@ -292,6 +334,17 @@ class TestFullscaleRunAll:
                     f"fold {fold_id}: hit_rate out of [0, 1]: {hit_rate}"
                 )
 
+            # XGBoost-specific: prediction metrics must be present and finite
+            pred = fold["prediction"]
+            for key in ("mae", "rmse", "directional_accuracy"):
+                val = pred[key]
+                assert isinstance(val, (int, float)), (
+                    f"fold {fold_id}: prediction.{key} is not numeric: {val!r}"
+                )
+                assert math.isfinite(val), (
+                    f"fold {fold_id}: prediction.{key} is not finite: {val}"
+                )
+
         # --- Aggregate validation ---
         aggregate = metrics["aggregate"]
         agg_trading = aggregate["trading"]
@@ -299,14 +352,12 @@ class TestFullscaleRunAll:
         assert "mean" in agg_trading, "aggregate.trading missing 'mean'"
         assert "std" in agg_trading, "aggregate.trading missing 'std'"
 
-        # Every key in mean must also be in std
         mean_keys = set(agg_trading["mean"].keys())
         std_keys = set(agg_trading["std"].keys())
         assert mean_keys == std_keys, (
             f"aggregate mean/std key mismatch: mean={mean_keys}, std={std_keys}"
         )
 
-        # All mean values: finite floats
         for key, val in agg_trading["mean"].items():
             if val is not None:
                 assert isinstance(val, (int, float)), (
@@ -316,7 +367,6 @@ class TestFullscaleRunAll:
                     f"aggregate.trading.mean.{key} is not finite: {val}"
                 )
 
-        # All std values: finite floats
         for key, val in agg_trading["std"].items():
             if val is not None:
                 assert isinstance(val, (int, float)), (
@@ -324,4 +374,18 @@ class TestFullscaleRunAll:
                 )
                 assert math.isfinite(val), (
                     f"aggregate.trading.std.{key} is not finite: {val}"
+                )
+
+        # --- Aggregate prediction (XGBoost-specific) ---
+        agg_pred = aggregate["prediction"]
+        assert "mean" in agg_pred, "aggregate.prediction missing 'mean'"
+        assert "std" in agg_pred, "aggregate.prediction missing 'std'"
+
+        for key, val in agg_pred["mean"].items():
+            if val is not None:
+                assert isinstance(val, (int, float)), (
+                    f"aggregate.prediction.mean.{key} is not numeric: {val!r}"
+                )
+                assert math.isfinite(val), (
+                    f"aggregate.prediction.mean.{key} is not finite: {val}"
                 )

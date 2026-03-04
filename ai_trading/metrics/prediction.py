@@ -182,9 +182,16 @@ def compute_prediction_metrics(
             "spearman_ic": None,
         }
     # output_type == "regression"
+    # Spearman IC is undefined when y_true or y_hat is constant (zero
+    # variance).  This can happen legitimately in folds where the model
+    # converges to a single value.  Return None instead of crashing.
+    try:
+        spearman_ic: float | None = compute_spearman_ic(y_true, y_hat)
+    except ValueError:
+        spearman_ic = None
     return {
         "mae": compute_mae(y_true, y_hat),
         "rmse": compute_rmse(y_true, y_hat),
         "directional_accuracy": compute_directional_accuracy(y_true, y_hat),
-        "spearman_ic": compute_spearman_ic(y_true, y_hat),
+        "spearman_ic": spearman_ic,
     }

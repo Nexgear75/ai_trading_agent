@@ -184,6 +184,7 @@ def build_metrics(
     # Validate strategy_info required keys
     _ = strategy_info["strategy_type"]
     _ = strategy_info["name"]
+    _ = strategy_info["output_type"]
 
     # Validate aggregate_data required keys
     _ = aggregate_data["prediction"]
@@ -219,6 +220,7 @@ def build_metrics(
         "strategy": {
             "strategy_type": strategy_info["strategy_type"],
             "name": strategy_info["name"],
+            "output_type": strategy_info["output_type"],
         },
         "folds": normalized_folds,
         "aggregate": aggregate,

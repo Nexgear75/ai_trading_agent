@@ -114,6 +114,7 @@ def _minimal_strategy_info() -> dict:
     return {
         "strategy_type": "model",
         "name": "xgboost_reg",
+        "output_type": "regression",
         "hyperparams": {"max_depth": 5, "n_estimators": 500},
         "thresholding": {
             "method": "quantile_grid",

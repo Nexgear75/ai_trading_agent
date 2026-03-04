@@ -281,6 +281,7 @@ def run_pipeline(config: PipelineConfig) -> Path:
 
     # --- 13. Resolve model class and instantiate ---
     model_cls = get_model_class(strategy_name)
+    model_output_type: str = model_cls.output_type  # type: ignore[attr-defined]
 
     # --- 14. Per-fold loop ---
     trainer = FoldTrainer(config)
@@ -356,10 +357,11 @@ def run_pipeline(config: PipelineConfig) -> Path:
             )
 
         # Calibrate on validation OHLCV (or bypass for signal models)
-        val_start = ts_val[0]
-        val_end = ts_val[-1]
-        ohlcv_val_mask = (ohlcv.index >= val_start) & (ohlcv.index <= val_end)
-        ohlcv_val = ohlcv.loc[ohlcv_val_mask]
+        # Use ts_val (sample decision timestamps) to slice OHLCV so that
+        # ohlcv_val length matches y_hat_val.  A range-based mask would
+        # include OHLCV bars that have no corresponding sample (e.g. bars
+        # near missing-candle gaps whose sliding window is invalid).
+        ohlcv_val = ohlcv.loc[ts_val]
 
         cal_result: dict = calibrate_threshold(
             y_hat_val=y_hat_val,
@@ -483,7 +485,7 @@ def run_pipeline(config: PipelineConfig) -> Path:
 
         # Normalize method for schema compliance: fallback_no_trade → none
         raw_method = cal_result["method"]
-        schema_method = "none" if raw_method == "fallback_no_trade" else raw_method
+        schema_method = raw_method
 
         threshold_info = {
             "method": schema_method,
@@ -554,6 +556,7 @@ def run_pipeline(config: PipelineConfig) -> Path:
     strategy_info = {
         "strategy_type": config.strategy.strategy_type,
         "name": strategy_name,
+        "output_type": model_output_type,
     }
     run_id = run_dir.name
 
@@ -667,6 +670,7 @@ def run_pipeline(config: PipelineConfig) -> Path:
             "strategy_type": config.strategy.strategy_type,
             "name": strategy_name,
             "framework": framework,
+            "output_type": model_output_type,
         },
         costs_info={
             "cost_model": config.costs.cost_model,

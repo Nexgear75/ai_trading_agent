@@ -45,6 +45,7 @@ def _minimal_strategy_info() -> dict:
     return {
         "strategy_type": "model",
         "name": "xgboost_reg",
+        "output_type": "regression",
     }
 
 
@@ -211,7 +212,7 @@ class TestSchemaValidation:
 
     def test_baseline_strategy_validates(self, metrics_schema):
         """Baseline strategy validates against schema."""
-        strategy = {"strategy_type": "baseline", "name": "buy_hold"}
+        strategy = {"strategy_type": "baseline", "name": "buy_hold", "output_type": "signal"}
         result = build_metrics(
             run_id="20260227_120000_buy_hold",
             strategy_info=strategy,

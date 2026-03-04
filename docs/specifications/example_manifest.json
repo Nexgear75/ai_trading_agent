@@ -92,6 +92,7 @@
     "strategy_type": "model",
     "name": "xgboost_reg",
     "framework": "xgboost",
+    "output_type": "regression",
     "hyperparams": {
       "max_depth": 5,
       "n_estimators": 500,
