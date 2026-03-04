@@ -22,12 +22,12 @@ from pathlib import Path
 
 import pandas as pd
 
-# ---------------------------------------------------------------------------
-# Required keys in metrics.json (from metrics.schema.json)
-# ---------------------------------------------------------------------------
+# Ensure project root is on sys.path for standalone script execution
+_PROJECT_ROOT = str(Path(__file__).resolve().parent.parent)
+if _PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, _PROJECT_ROOT)
 
-_REQUIRED_TOP_KEYS = frozenset({"run_id", "strategy", "aggregate"})
-_REQUIRED_STRATEGY_KEYS = frozenset({"strategy_type", "name"})
+from scripts.dashboard.data_loader import REQUIRED_STRATEGY_KEYS, REQUIRED_TOP_KEYS  # noqa: E402
 
 # Strategies classified as "contextual" rather than "go_nogo"
 _CONTEXTUAL_STRATEGY_NAMES = frozenset({"buy_hold"})
@@ -81,7 +81,7 @@ def load_metrics(paths: list[Path]) -> list[dict]:
                 f"File {p}: expected a JSON object, got {type(data).__name__}"
             )
 
-        missing = _REQUIRED_TOP_KEYS - data.keys()
+        missing = REQUIRED_TOP_KEYS - data.keys()
         if missing:
             raise ValueError(
                 f"File {p}: missing required top-level keys: {sorted(missing)}"
@@ -92,7 +92,7 @@ def load_metrics(paths: list[Path]) -> list[dict]:
             raise ValueError(
                 f"File {p}: 'strategy' must be an object, got {type(strategy).__name__}"
             )
-        missing_strat = _REQUIRED_STRATEGY_KEYS - strategy.keys()
+        missing_strat = REQUIRED_STRATEGY_KEYS - strategy.keys()
         if missing_strat:
             raise ValueError(
                 f"File {p}: missing required strategy keys: {sorted(missing_strat)}"
