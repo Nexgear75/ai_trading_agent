@@ -4,9 +4,7 @@ Task #076 — WS-D-1: Utilitaires de formatage et palette de couleurs.
 Spec refs: §9.2 palette, §9.3 display conventions, §6.2 color thresholds, §6.4 Sharpe/trade.
 """
 
-from datetime import datetime, timezone
-
-import pytest
+from datetime import UTC, datetime
 
 
 # ---------------------------------------------------------------------------
@@ -156,7 +154,7 @@ class TestFormatTimestamp:
     def test_normal_datetime(self):
         from scripts.dashboard.utils import format_timestamp
 
-        ts = datetime(2025, 6, 15, 14, 0, tzinfo=timezone.utc)
+        ts = datetime(2025, 6, 15, 14, 0, tzinfo=UTC)
         assert format_timestamp(ts) == "2025-06-15 14:00"
 
     def test_none_returns_dash(self):
@@ -173,7 +171,7 @@ class TestFormatTimestamp:
     def test_midnight(self):
         from scripts.dashboard.utils import format_timestamp
 
-        ts = datetime(2025, 12, 31, 0, 0, tzinfo=timezone.utc)
+        ts = datetime(2025, 12, 31, 0, 0, tzinfo=UTC)
         assert format_timestamp(ts) == "2025-12-31 00:00"
 
 
