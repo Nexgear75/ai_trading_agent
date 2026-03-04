@@ -72,6 +72,12 @@ def load_run_metrics(run_dir: Path) -> dict:
             f"File {metrics_path}: missing required top-level keys: {sorted(missing)}"
         )
 
+    if not isinstance(data["strategy"], dict):
+        raise ValueError(
+            f"File {metrics_path}: 'strategy' must be a JSON object, "
+            f"got {type(data['strategy']).__name__}"
+        )
+
     return data
 
 
@@ -197,8 +203,8 @@ def discover_runs(runs_dir: Path) -> list[dict]:
             continue
 
         # Exclude dummy strategy (spec §4.3)
-        strategy = data.get("strategy", {})
-        if isinstance(strategy, dict) and strategy.get("name") == "dummy":
+        strategy = data["strategy"]
+        if strategy.get("name") == "dummy":
             continue
 
         results.append(data)

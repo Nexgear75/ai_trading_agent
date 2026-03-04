@@ -210,6 +210,26 @@ class TestDiscoverRuns:
         result = discover_runs(tmp_path)
         assert len(result) == 1
 
+    def test_non_dict_strategy_excluded_and_logged(
+        self, tmp_path: Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """#074 — Run with non-dict strategy is excluded and logged."""
+        from scripts.dashboard.data_loader import discover_runs
+
+        bad_dir = tmp_path / "run_bad_strategy"
+        bad_dir.mkdir()
+        bad_metrics = {"run_id": "run_bad_strategy", "strategy": "xgboost", "aggregate": {}}
+        (bad_dir / "metrics.json").write_text(json.dumps(bad_metrics), encoding="utf-8")
+
+        _write_run(tmp_path, "run_valid")
+
+        with caplog.at_level(logging.WARNING):
+            result = discover_runs(tmp_path)
+
+        assert len(result) == 1
+        assert result[0]["run_id"] == "run_valid"
+        assert any("run_bad_strategy" in msg for msg in caplog.messages)
+
 
 # ---------------------------------------------------------------------------
 # §2 — load_run_metrics
@@ -295,6 +315,19 @@ class TestLoadRunMetrics:
         run_dir.mkdir()
         (run_dir / "metrics.json").write_text("[1, 2, 3]", encoding="utf-8")
         with pytest.raises(ValueError, match="JSON object"):
+            load_run_metrics(run_dir)
+
+    def test_strategy_not_dict_raises(self, tmp_path: Path) -> None:
+        """#074 — strategy value that is not a dict raises ValueError."""
+        from scripts.dashboard.data_loader import load_run_metrics
+
+        run_dir = tmp_path / "run_bad"
+        run_dir.mkdir()
+        bad_metrics = {"run_id": "x", "strategy": "xgboost", "aggregate": {}}
+        (run_dir / "metrics.json").write_text(
+            json.dumps(bad_metrics), encoding="utf-8"
+        )
+        with pytest.raises(ValueError, match="'strategy' must be a JSON object"):
             load_run_metrics(run_dir)
 
 
@@ -409,17 +442,29 @@ class TestDRYWithCompareRuns:
         )
 
     def test_no_duplicate_required_keys_constant(self) -> None:
-        """#074 — _REQUIRED_TOP_KEYS must not be duplicated in compare_runs.py."""
+        """#074 — REQUIRED_TOP_KEYS must not be re-assigned in compare_runs.py."""
+        import ast
         from pathlib import Path
 
         compare_runs_path = (
             Path(__file__).resolve().parent.parent / "scripts" / "compare_runs.py"
         )
         source = compare_runs_path.read_text(encoding="utf-8")
+        tree = ast.parse(source)
 
-        # The constant should NOT be defined in compare_runs.py anymore
-        assert "_REQUIRED_TOP_KEYS" not in source or "import" in source.split(
-            "_REQUIRED_TOP_KEYS"
-        )[0].split("\n")[-1], (
-            "_REQUIRED_TOP_KEYS should be imported, not re-defined in compare_runs.py"
-        )
+        # Verify REQUIRED_TOP_KEYS is not re-assigned in compare_runs.py
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Assign):
+                for target in node.targets:
+                    if isinstance(target, ast.Name) and target.id == "REQUIRED_TOP_KEYS":
+                        pytest.fail(
+                            "REQUIRED_TOP_KEYS redefined in compare_runs.py — "
+                            "should be imported from data_loader"
+                        )
+            if isinstance(node, ast.Assign):
+                for target in node.targets:
+                    if isinstance(target, ast.Name) and target.id == "REQUIRED_STRATEGY_KEYS":
+                        pytest.fail(
+                            "REQUIRED_STRATEGY_KEYS redefined in compare_runs.py — "
+                            "should be imported from data_loader"
+                        )
