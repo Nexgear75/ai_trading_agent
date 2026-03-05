@@ -64,5 +64,5 @@ Implémenter la page `1_overview.py` avec le tableau des runs, filtres par type 
 - [x] Critères d'acceptation tous satisfaits.
 - [x] `ruff check ai_trading/ tests/` passe sans erreur.
 - [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
-- [ ] **Commit GREEN** : `[WS-D-2] #079 GREEN: page overview tableau récapitulatif et filtres`.
+- [x] **Commit GREEN** : `[WS-D-2] #079 GREEN: page overview tableau récapitulatif et filtres`.
 - [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-D-2] #079 — Page 1 : tableau récapitulatif et filtres`.

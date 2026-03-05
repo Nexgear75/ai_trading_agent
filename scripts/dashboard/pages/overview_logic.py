@@ -21,11 +21,11 @@ _COLUMNS = [
     "Stratégie",
     "Type",
     "Folds",
-    "Net PnL moy",
-    "Sharpe moy",
-    "MDD moy",
-    "Win Rate moy",
-    "Trades moy",
+    "Net PnL (moy)",
+    "Sharpe (moy)",
+    "MDD (moy)",
+    "Win Rate (moy)",
+    "Trades (moy)",
 ]
 
 # Type filter mapping (§5.3)
@@ -65,11 +65,11 @@ def build_overview_dataframe(runs: list[dict]) -> pd.DataFrame:
             "Stratégie": m["strategy"]["name"],
             "Type": m["strategy"]["strategy_type"],
             "Folds": len(m["folds"]),
-            "Net PnL moy": trading_mean.get("net_pnl"),
-            "Sharpe moy": trading_mean.get("sharpe"),
-            "MDD moy": trading_mean.get("max_drawdown"),
-            "Win Rate moy": trading_mean.get("hit_rate"),
-            "Trades moy": trading_mean.get("n_trades"),
+            "Net PnL (moy)": trading_mean.get("net_pnl"),
+            "Sharpe (moy)": trading_mean.get("sharpe"),
+            "MDD (moy)": trading_mean.get("max_drawdown"),
+            "Win Rate (moy)": trading_mean.get("hit_rate"),
+            "Trades (moy)": trading_mean.get("n_trades"),
         })
 
     df = pd.DataFrame(rows, columns=_COLUMNS)
@@ -171,7 +171,7 @@ def has_warnings(metrics: dict) -> bool:
     bool
         True if ``aggregate.notes`` is present and non-empty.
     """
-    notes = metrics.get("aggregate", {}).get("notes")
+    notes = metrics["aggregate"].get("notes")
     if notes is None:
         return False
     return bool(notes)
@@ -219,19 +219,19 @@ def format_overview_dataframe(df: pd.DataFrame) -> pd.DataFrame:
         Copy with string-formatted values for display.
     """
     out = df.copy()
-    out["Net PnL moy"] = out["Net PnL moy"].apply(
+    out["Net PnL (moy)"] = out["Net PnL (moy)"].apply(
         lambda v: format_pct(_nan_to_none(v), decimals=2)
     )
-    out["Sharpe moy"] = out["Sharpe moy"].apply(
+    out["Sharpe (moy)"] = out["Sharpe (moy)"].apply(
         lambda v: format_float(_nan_to_none(v), decimals=2)
     )
-    out["MDD moy"] = out["MDD moy"].apply(
+    out["MDD (moy)"] = out["MDD (moy)"].apply(
         lambda v: format_pct(_nan_to_none(v), decimals=2)
     )
-    out["Win Rate moy"] = out["Win Rate moy"].apply(
+    out["Win Rate (moy)"] = out["Win Rate (moy)"].apply(
         lambda v: format_pct(_nan_to_none(v), decimals=1)
     )
-    out["Trades moy"] = out["Trades moy"].apply(_format_trades)
+    out["Trades (moy)"] = out["Trades (moy)"].apply(_format_trades)
     return out
 
 

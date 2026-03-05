@@ -83,11 +83,11 @@ class TestBuildOverviewDataframe:
             "Stratégie",
             "Type",
             "Folds",
-            "Net PnL moy",
-            "Sharpe moy",
-            "MDD moy",
-            "Win Rate moy",
-            "Trades moy",
+            "Net PnL (moy)",
+            "Sharpe (moy)",
+            "MDD (moy)",
+            "Win Rate (moy)",
+            "Trades (moy)",
         }
         assert set(df.columns) == expected_cols
 
@@ -115,11 +115,11 @@ class TestBuildOverviewDataframe:
         assert row["Stratégie"] == "xgboost_reg"
         assert row["Type"] == "model"
         assert row["Folds"] == 5
-        assert row["Net PnL moy"] == pytest.approx(0.0345)
-        assert row["Sharpe moy"] == pytest.approx(1.23)
-        assert row["MDD moy"] == pytest.approx(-0.05)
-        assert row["Win Rate moy"] == pytest.approx(0.552)
-        assert row["Trades moy"] == pytest.approx(42.0)
+        assert row["Net PnL (moy)"] == pytest.approx(0.0345)
+        assert row["Sharpe (moy)"] == pytest.approx(1.23)
+        assert row["MDD (moy)"] == pytest.approx(-0.05)
+        assert row["Win Rate (moy)"] == pytest.approx(0.552)
+        assert row["Trades (moy)"] == pytest.approx(42.0)
 
     def test_multiple_runs(self) -> None:
         """#079 — Multiple runs produce multiple rows."""
@@ -139,9 +139,9 @@ class TestBuildOverviewDataframe:
 
         runs = [_make_metrics(net_pnl=None, sharpe=None, hit_rate=None)]
         df = build_overview_dataframe(runs)
-        assert pd.isna(df.iloc[0]["Net PnL moy"])
-        assert pd.isna(df.iloc[0]["Sharpe moy"])
-        assert pd.isna(df.iloc[0]["Win Rate moy"])
+        assert pd.isna(df.iloc[0]["Net PnL (moy)"])
+        assert pd.isna(df.iloc[0]["Sharpe (moy)"])
+        assert pd.isna(df.iloc[0]["Win Rate (moy)"])
 
     def test_zero_folds(self) -> None:
         """#079 — A run with 0 folds shows Folds=0."""
@@ -162,11 +162,11 @@ class TestBuildOverviewDataframe:
             "Stratégie",
             "Type",
             "Folds",
-            "Net PnL moy",
-            "Sharpe moy",
-            "MDD moy",
-            "Win Rate moy",
-            "Trades moy",
+            "Net PnL (moy)",
+            "Sharpe (moy)",
+            "MDD (moy)",
+            "Win Rate (moy)",
+            "Trades (moy)",
         }
         assert set(df.columns) == expected_cols
 
@@ -393,7 +393,7 @@ class TestFormatOverviewDataframe:
         runs = [_make_metrics(net_pnl=0.0345)]
         df = build_overview_dataframe(runs)
         formatted = format_overview_dataframe(df)
-        assert formatted.iloc[0]["Net PnL moy"] == "3.45%"
+        assert formatted.iloc[0]["Net PnL (moy)"] == "3.45%"
 
     def test_sharpe_formatted_as_float(self) -> None:
         """#079 — Sharpe formatted as :.2f ."""
@@ -405,7 +405,7 @@ class TestFormatOverviewDataframe:
         runs = [_make_metrics(sharpe=1.234)]
         df = build_overview_dataframe(runs)
         formatted = format_overview_dataframe(df)
-        assert formatted.iloc[0]["Sharpe moy"] == "1.23"
+        assert formatted.iloc[0]["Sharpe (moy)"] == "1.23"
 
     def test_mdd_formatted_as_pct(self) -> None:
         """#079 — MDD formatted as :.2% ."""
@@ -417,7 +417,7 @@ class TestFormatOverviewDataframe:
         runs = [_make_metrics(max_drawdown=-0.05)]
         df = build_overview_dataframe(runs)
         formatted = format_overview_dataframe(df)
-        assert formatted.iloc[0]["MDD moy"] == "-5.00%"
+        assert formatted.iloc[0]["MDD (moy)"] == "-5.00%"
 
     def test_win_rate_formatted_as_pct_1_decimal(self) -> None:
         """#079 — Win Rate formatted as :.1% (§9.3 special for hit_rate)."""
@@ -429,7 +429,7 @@ class TestFormatOverviewDataframe:
         runs = [_make_metrics(hit_rate=0.552)]
         df = build_overview_dataframe(runs)
         formatted = format_overview_dataframe(df)
-        assert formatted.iloc[0]["Win Rate moy"] == "55.2%"
+        assert formatted.iloc[0]["Win Rate (moy)"] == "55.2%"
 
     def test_trades_formatted_as_int(self) -> None:
         """#079 — Trades formatted as integer."""
@@ -441,7 +441,7 @@ class TestFormatOverviewDataframe:
         runs = [_make_metrics(n_trades=42.0)]
         df = build_overview_dataframe(runs)
         formatted = format_overview_dataframe(df)
-        assert formatted.iloc[0]["Trades moy"] == "42"
+        assert formatted.iloc[0]["Trades (moy)"] == "42"
 
     def test_folds_unchanged(self) -> None:
         """#079 — Folds stays as integer (no special formatting)."""
@@ -465,9 +465,9 @@ class TestFormatOverviewDataframe:
         runs = [_make_metrics(net_pnl=None, sharpe=None, hit_rate=None)]
         df = build_overview_dataframe(runs)
         formatted = format_overview_dataframe(df)
-        assert formatted.iloc[0]["Net PnL moy"] == "—"
-        assert formatted.iloc[0]["Sharpe moy"] == "—"
-        assert formatted.iloc[0]["Win Rate moy"] == "—"
+        assert formatted.iloc[0]["Net PnL (moy)"] == "—"
+        assert formatted.iloc[0]["Sharpe (moy)"] == "—"
+        assert formatted.iloc[0]["Win Rate (moy)"] == "—"
 
 
 # ---------------------------------------------------------------------------
