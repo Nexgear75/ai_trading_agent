@@ -58,4 +58,4 @@ Implémenter `app.py` comme point d'entrée multi-pages Streamlit avec configura
 - [x] `ruff check ai_trading/ tests/` passe sans erreur.
 - [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
 - [x] **Commit GREEN** : `[WS-D-2] #078 GREEN: app entry point et navigation multi-pages`.
-- [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-D-2] #078 — Point d'entrée Streamlit et navigation multi-pages`.
+- [x] **Pull Request ouverte** vers `Max6000i1` : `[WS-D-2] #078 — Point d'entrée Streamlit et navigation multi-pages`.
