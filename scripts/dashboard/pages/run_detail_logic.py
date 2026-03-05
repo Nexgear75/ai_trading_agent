@@ -1,8 +1,9 @@
-"""Pure business logic for the run detail page (Page 2) — header and KPI cards.
+"""Pure business logic for the run detail page (Page 2).
 
 Extracts testable logic from the Streamlit rendering code.
 
-Ref: §6.1 en-tête du run, §6.2 métriques agrégées, §9.3 conventions.
+Ref: §6.1 en-tête du run, §6.2 métriques agrégées,
+     §6.3 equity curve, §6.4 métriques par fold, §9.3 conventions.
 """
 
 from __future__ import annotations
@@ -10,10 +11,15 @@ from __future__ import annotations
 from collections.abc import Callable
 from datetime import datetime
 
+import pandas as pd
+
 from scripts.dashboard.utils import (
     _NULL_DISPLAY,
+    format_float,
     format_int,
     format_mean_std,
+    format_pct,
+    format_sharpe_per_trade,
     hit_rate_color,
     mdd_color,
     pnl_color,
@@ -254,3 +260,137 @@ def _add_card(
         "value": value,
         "color": color_fn(mean_val),
     })
+
+
+# ---------------------------------------------------------------------------
+# §6.3 — Equity curve normalization
+# ---------------------------------------------------------------------------
+
+
+def normalize_equity(equity: pd.Series) -> pd.Series:
+    """Normalize an equity series to start at 1.0.
+
+    Parameters
+    ----------
+    equity:
+        Raw equity series (e.g. from ``equity_curve.csv``).
+
+    Returns
+    -------
+    pd.Series
+        Equity divided by its first value.
+
+    Raises
+    ------
+    ValueError
+        If ``equity.iloc[0] <= 0`` (normalization impossible).
+    """
+    first = equity.iloc[0]
+    if first <= 0:
+        raise ValueError(
+            f"equity[0] is {first} (<= 0): cannot normalize."
+        )
+    return equity / first
+
+
+# ---------------------------------------------------------------------------
+# §6.4 — Fold metrics table
+# ---------------------------------------------------------------------------
+
+
+def _fmt_theta(threshold: dict) -> str:
+    """Format θ value, returning '—' for method='none' or null theta."""
+    method = threshold.get("method")
+    theta = threshold.get("theta")
+    if method == "none" or theta is None:
+        return _NULL_DISPLAY
+    return format_float(theta, decimals=4)
+
+
+def _fmt_quantile(threshold: dict) -> str:
+    """Format selected_quantile, returning '—' for null."""
+    q = threshold.get("selected_quantile")
+    if q is None:
+        return _NULL_DISPLAY
+    return format_float(q, decimals=2)
+
+
+def build_fold_metrics_table(metrics: dict) -> pd.DataFrame:
+    """Build a formatted fold metrics DataFrame (§6.4).
+
+    Parameters
+    ----------
+    metrics:
+        Parsed ``metrics.json`` dict with ``folds`` list.
+
+    Returns
+    -------
+    pd.DataFrame
+        One row per fold, columns per §6.4 spec.
+    """
+    columns = [
+        "Fold", "θ", "Method", "Quantile",
+        "Net PnL", "Sharpe", "MDD", "Win Rate",
+        "N Trades", "MAE", "RMSE", "DA", "IC", "Sharpe/Trade",
+    ]
+
+    folds = metrics["folds"]
+    if not folds:
+        return pd.DataFrame(columns=columns)
+
+    rows: list[dict] = []
+    for fold in folds:
+        threshold = fold["threshold"]
+        trading = fold.get("trading", {})
+        prediction = fold.get("prediction", {})
+
+        n_trades = trading.get("n_trades")
+        sharpe_pt = trading.get("sharpe_per_trade")
+
+        row = {
+            "Fold": fold["fold_id"],
+            "θ": _fmt_theta(threshold),
+            "Method": threshold.get("method", _NULL_DISPLAY),
+            "Quantile": _fmt_quantile(threshold),
+            "Net PnL": format_pct(trading.get("net_pnl")),
+            "Sharpe": format_float(trading.get("sharpe")),
+            "MDD": format_pct(trading.get("max_drawdown")),
+            "Win Rate": format_pct(trading.get("hit_rate")),
+            "N Trades": (
+                str(n_trades) if n_trades is not None else _NULL_DISPLAY
+            ),
+            "MAE": format_float(prediction.get("mae"), decimals=4),
+            "RMSE": format_float(prediction.get("rmse"), decimals=4),
+            "DA": format_pct(prediction.get("directional_accuracy")),
+            "IC": format_float(prediction.get("spearman_ic"), decimals=4),
+            "Sharpe/Trade": format_sharpe_per_trade(
+                sharpe_pt, n_trades if n_trades is not None else 0,
+            ),
+        }
+        rows.append(row)
+
+    return pd.DataFrame(rows, columns=columns)
+
+
+def build_pnl_bar_data(metrics: dict) -> list[dict]:
+    """Extract fold/net_pnl pairs for the PnL bar chart (§6.4).
+
+    Parameters
+    ----------
+    metrics:
+        Parsed ``metrics.json`` dict.
+
+    Returns
+    -------
+    list[dict]
+        Each dict has ``fold`` (int) and ``net_pnl`` (float) keys.
+    """
+    result: list[dict] = []
+    for fold in metrics["folds"]:
+        trading = fold.get("trading", {})
+        pnl = trading.get("net_pnl")
+        result.append({
+            "fold": fold["fold_id"],
+            "net_pnl": pnl if pnl is not None else 0.0,
+        })
+    return result
