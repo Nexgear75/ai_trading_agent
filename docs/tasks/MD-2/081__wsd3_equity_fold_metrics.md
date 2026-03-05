@@ -65,5 +65,5 @@ Implémenter dans `pages/2_run_detail.py` la section equity curve et le tableau 
 - [x] Critères d'acceptation tous satisfaits.
 - [x] `ruff check ai_trading/ tests/` passe sans erreur.
 - [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
-- [ ] **Commit GREEN** : `[WS-D-3] #081 GREEN: equity curve stitchée et métriques par fold`.
+- [x] **Commit GREEN** : `[WS-D-3] #081 GREEN: equity curve stitchée et métriques par fold`.
 - [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-D-3] #081 — Page 2 : equity curve et métriques par fold`.

@@ -4,7 +4,6 @@ Task #081 — WS-D-3: Page 2 — equity curve stitchée et métriques par fold.
 Spec refs: §6.3 equity curve, §6.4 métriques par fold, §9.3 conventions.
 
 Tests cover:
-- normalize_equity: normalization to 1.0, equity[0]==0 error, empty series
 - build_fold_metrics_table: table construction from metrics.json folds
 - Threshold object access (method, theta, selected_quantile)
 - method="none" → theta displayed as "—"
@@ -92,66 +91,6 @@ def _make_metrics_with_folds(folds: list[dict]) -> dict:
         "folds": folds,
         "aggregate": {"trading": {"mean": {}, "std": {}}},
     }
-
-
-# ---------------------------------------------------------------------------
-# §6.3 — normalize_equity
-# ---------------------------------------------------------------------------
-
-
-class TestNormalizeEquity:
-    """#081 — Equity curve normalization to 1.0 (§6.3)."""
-
-    def test_nominal_starts_at_one(self) -> None:
-        """#081 — Normalized equity starts at 1.0."""
-        from scripts.dashboard.pages.run_detail_logic import normalize_equity
-
-        df = _make_equity_df(start_equity=1000.0, step=10.0, n_rows=5)
-        result = normalize_equity(df["equity"])
-        assert result.iloc[0] == pytest.approx(1.0)
-
-    def test_preserves_ratios(self) -> None:
-        """#081 — Normalization preserves relative ratios."""
-        from scripts.dashboard.pages.run_detail_logic import normalize_equity
-
-        df = _make_equity_df(start_equity=500.0, step=50.0, n_rows=4)
-        result = normalize_equity(df["equity"])
-        # equity = [500, 550, 600, 650] → normalized = [1.0, 1.1, 1.2, 1.3]
-        assert result.iloc[1] == pytest.approx(1.1)
-        assert result.iloc[2] == pytest.approx(1.2)
-        assert result.iloc[3] == pytest.approx(1.3)
-
-    def test_equity_zero_raises(self) -> None:
-        """#081 — equity[0] == 0 raises ValueError (§6.3 strict)."""
-        from scripts.dashboard.pages.run_detail_logic import normalize_equity
-
-        series = pd.Series([0.0, 100.0, 200.0])
-        with pytest.raises(ValueError, match="equity\\[0\\].*<= 0"):
-            normalize_equity(series)
-
-    def test_equity_negative_raises(self) -> None:
-        """#081 — equity[0] < 0 raises ValueError."""
-        from scripts.dashboard.pages.run_detail_logic import normalize_equity
-
-        series = pd.Series([-100.0, 100.0, 200.0])
-        with pytest.raises(ValueError, match="equity\\[0\\].*<= 0"):
-            normalize_equity(series)
-
-    def test_single_value(self) -> None:
-        """#081 — Single-element equity normalizes to 1.0."""
-        from scripts.dashboard.pages.run_detail_logic import normalize_equity
-
-        series = pd.Series([42.0])
-        result = normalize_equity(series)
-        assert result.iloc[0] == pytest.approx(1.0)
-
-    def test_returns_series(self) -> None:
-        """#081 — Returns a pandas Series."""
-        from scripts.dashboard.pages.run_detail_logic import normalize_equity
-
-        series = pd.Series([100.0, 110.0])
-        result = normalize_equity(series)
-        assert isinstance(result, pd.Series)
 
 
 # ---------------------------------------------------------------------------

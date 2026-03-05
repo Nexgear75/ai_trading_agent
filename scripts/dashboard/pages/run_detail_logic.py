@@ -263,37 +263,6 @@ def _add_card(
 
 
 # ---------------------------------------------------------------------------
-# §6.3 — Equity curve normalization
-# ---------------------------------------------------------------------------
-
-
-def normalize_equity(equity: pd.Series) -> pd.Series:
-    """Normalize an equity series to start at 1.0.
-
-    Parameters
-    ----------
-    equity:
-        Raw equity series (e.g. from ``equity_curve.csv``).
-
-    Returns
-    -------
-    pd.Series
-        Equity divided by its first value.
-
-    Raises
-    ------
-    ValueError
-        If ``equity.iloc[0] <= 0`` (normalization impossible).
-    """
-    first = equity.iloc[0]
-    if first <= 0:
-        raise ValueError(
-            f"equity[0] is {first} (<= 0): cannot normalize."
-        )
-    return equity / first
-
-
-# ---------------------------------------------------------------------------
 # §6.4 — Fold metrics table
 # ---------------------------------------------------------------------------
 
@@ -341,8 +310,8 @@ def build_fold_metrics_table(metrics: dict) -> pd.DataFrame:
     rows: list[dict] = []
     for fold in folds:
         threshold = fold["threshold"]
-        trading = fold.get("trading", {})
-        prediction = fold.get("prediction", {})
+        trading = fold["trading"]
+        prediction = fold["prediction"]
 
         n_trades = trading.get("n_trades")
         sharpe_pt = trading.get("sharpe_per_trade")
@@ -350,7 +319,7 @@ def build_fold_metrics_table(metrics: dict) -> pd.DataFrame:
         row = {
             "Fold": fold["fold_id"],
             "θ": _fmt_theta(threshold),
-            "Method": threshold.get("method", _NULL_DISPLAY),
+            "Method": threshold["method"],
             "Quantile": _fmt_quantile(threshold),
             "Net PnL": format_pct(trading.get("net_pnl")),
             "Sharpe": format_float(trading.get("sharpe")),
@@ -387,7 +356,7 @@ def build_pnl_bar_data(metrics: dict) -> list[dict]:
     """
     result: list[dict] = []
     for fold in metrics["folds"]:
-        trading = fold.get("trading", {})
+        trading = fold["trading"]
         pnl = trading.get("net_pnl")
         result.append({
             "fold": fold["fold_id"],
