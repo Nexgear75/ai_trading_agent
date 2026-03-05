@@ -454,6 +454,14 @@ class TestChartRadar:
             for v in trace.r:
                 assert v == pytest.approx(0.5)
 
+    def test_empty_runs(self):
+        """Empty runs_data should return a valid figure with no traces."""
+        from scripts.dashboard.charts import chart_radar
+
+        fig = chart_radar([])
+        assert isinstance(fig, go.Figure)
+        assert len(fig.data) == 0
+
 
 # ---------------------------------------------------------------------------
 # Tests — chart_scatter_predictions (§8.3)
@@ -512,6 +520,32 @@ class TestChartScatterPredictions:
         fig = chart_scatter_predictions(preds_df, theta=0.005, threshold_method="quantile")
         assert fig.layout.xaxis.title.text == "ŷ"
         assert fig.layout.yaxis.title.text == "y_true"
+
+    def test_go_mask_unilateral(self):
+        """Go/No-Go coloring must be unilateral (y_hat > theta), not bilateral.
+
+        Negative y_hat values should never be colored as 'Go' (green),
+        consistent with apply_threshold in ai_trading/calibration/threshold.py.
+        """
+        from scripts.dashboard.charts import chart_scatter_predictions
+        from scripts.dashboard.utils import COLOR_FOLD_BORDER, COLOR_PROFIT
+
+        # y_hat with values on both sides of theta=0.01:
+        #   +0.02 → Go (above theta)
+        #   -0.02 → No-Go (below theta, even though abs(-0.02) >= 0.01)
+        #   +0.005 → No-Go (below theta)
+        df = pd.DataFrame({
+            "y_true": [0.01, -0.01, 0.005],
+            "y_hat": [0.02, -0.02, 0.005],
+        })
+        fig = chart_scatter_predictions(df, theta=0.01, threshold_method="quantile")
+        scatter = [t for t in fig.data if isinstance(t, go.Scatter)]
+        assert len(scatter) == 1
+        colors = list(scatter[0].marker.color)
+        # Only first point (y_hat=0.02 > 0.01) should be Go (green)
+        assert colors[0] == COLOR_PROFIT
+        assert colors[1] == COLOR_FOLD_BORDER  # -0.02 is NOT > 0.01
+        assert colors[2] == COLOR_FOLD_BORDER  # 0.005 is NOT > 0.01
 
 
 # ---------------------------------------------------------------------------

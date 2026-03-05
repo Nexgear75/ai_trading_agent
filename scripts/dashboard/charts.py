@@ -8,7 +8,6 @@ Ref: §10.2 — charts.py
 
 from __future__ import annotations
 
-import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 
@@ -48,7 +47,7 @@ def chart_equity_curve(
 
     # Normalize equity to start at 1.0
     eq_start = df["equity"].iloc[0]
-    if eq_start == 0:
+    if eq_start <= 0:
         raise ValueError("equity[0] must be > 0 for normalization")
     norm_equity = df["equity"] / eq_start
 
@@ -260,7 +259,7 @@ def chart_equity_overlay(curves: dict[str, pd.DataFrame]) -> go.Figure:
     for label, curve_df in curves.items():
         eq = curve_df["equity"]
         eq_start = eq.iloc[0]
-        if eq_start == 0:
+        if eq_start <= 0:
             raise ValueError(
                 f"equity[0] must be > 0 for normalization (run '{label}')"
             )
@@ -302,6 +301,10 @@ def chart_radar(runs_data: list[dict]) -> go.Figure:
         ``hit_rate``, ``profit_factor``.
     """
     fig = go.Figure()
+
+    if not runs_data:
+        fig.update_layout(title="Radar", polar={"radialaxis": {"visible": True}})
+        return fig
 
     # Extract raw values per axis
     raw = {
@@ -394,8 +397,8 @@ def chart_scatter_predictions(
     y_true = preds_df["y_true"]
     y_hat = preds_df["y_hat"]
 
-    # Go/No-Go coloring based on theta
-    go_mask = np.abs(y_hat) >= theta
+    # Go/No-Go coloring based on theta (unilateral, consistent with apply_threshold)
+    go_mask = y_hat > theta
     colors = [COLOR_PROFIT if g else COLOR_FOLD_BORDER for g in go_mask]
 
     fig.add_trace(
@@ -442,6 +445,9 @@ def chart_fold_equity(
     trades_df: pd.DataFrame,
 ) -> go.Figure:
     """Equity curve for a fold with entry/exit trade markers.
+
+    Drawdown shading is handled separately by ``chart_equity_curve`` (§6.3)
+    and is not duplicated here by design.
 
     Parameters
     ----------
