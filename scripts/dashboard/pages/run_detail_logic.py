@@ -11,6 +11,7 @@ from collections.abc import Callable
 from datetime import datetime
 
 from scripts.dashboard.utils import (
+    _NULL_DISPLAY,
     format_int,
     format_mean_std,
     hit_rate_color,
@@ -19,10 +20,6 @@ from scripts.dashboard.utils import (
     profit_factor_color,
     sharpe_color,
 )
-
-# Em dash for null display (§9.3)
-_NULL_DISPLAY: str = "—"
-
 
 # ---------------------------------------------------------------------------
 # §6.1 — Header info
@@ -55,8 +52,8 @@ def build_header_info(manifest: dict, n_folds: int) -> dict:
     strategy_name = strategy_block["name"]
     framework = strategy_block.get("framework")
 
-    # Dataset info from top-level manifest or config_snapshot
-    dataset = manifest.get("dataset", manifest["config_snapshot"]["dataset"])
+    # Dataset info from top-level manifest (§6.1)
+    dataset = manifest["dataset"]
     symbols = dataset["symbols"]
     symbol_str = ", ".join(symbols)
     timeframe = dataset["timeframe"]
@@ -132,9 +129,7 @@ def build_kpi_cards(metrics: dict, config_snapshot: dict) -> list[dict]:
     std = agg["std"]
 
     # Sharpe label conditional (§6.2)
-    sharpe_annualized = (
-        config_snapshot.get("metrics", {}).get("sharpe_annualized", False)
-    )
+    sharpe_annualized = config_snapshot["metrics"]["sharpe_annualized"]
     sharpe_label = (
         "Sharpe Ratio (annualisé)" if sharpe_annualized else "Sharpe Ratio"
     )
@@ -238,6 +233,12 @@ def _add_card(
 ) -> None:
     """Add a formatted KPI card dict to *cards*."""
     n_contributing = count_non_null_folds(folds, metric_key)
+
+    if mean_val is not None and std_val is None:
+        raise ValueError(
+            f"Metric '{metric_key}': mean is not None but std is None. "
+            "Aggregate data is inconsistent."
+        )
 
     value = format_mean_std(
         mean=mean_val,

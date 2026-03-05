@@ -49,7 +49,7 @@ metrics = load_run_metrics(run_dir)
 config_snapshot = load_config_snapshot(run_dir)
 
 # Count folds from metrics.json
-n_folds = len(metrics.get("folds", []))
+n_folds = len(metrics["folds"])
 
 # ---------------------------------------------------------------------------
 # §6.1 — Header

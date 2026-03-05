@@ -363,6 +363,41 @@ class TestBuildKpiCards:
         # Check 1-decimal pct format (54.0%)
         assert "54.0%" in hr_card["value"]
 
+    def test_std_none_with_mean_raises(self) -> None:
+        """#080 — ValueError if mean is not None but std is None (§R1)."""
+        import pytest
+
+        from scripts.dashboard.pages.run_detail_logic import build_kpi_cards
+
+        metrics = _make_metrics()
+        metrics["aggregate"]["trading"]["mean"]["net_pnl"] = 0.05
+        metrics["aggregate"]["trading"]["std"]["net_pnl"] = None
+        config = _make_config_snapshot()
+        with pytest.raises(ValueError, match="mean is not None but std is None"):
+            build_kpi_cards(metrics, config)
+
+    def test_config_missing_metrics_key_raises(self) -> None:
+        """#080 — KeyError if config_snapshot lacks 'metrics' key (§R1)."""
+        import pytest
+
+        from scripts.dashboard.pages.run_detail_logic import build_kpi_cards
+
+        metrics = _make_metrics()
+        config_bad: dict = {}
+        with pytest.raises(KeyError):
+            build_kpi_cards(metrics, config_bad)
+
+    def test_config_missing_sharpe_annualized_raises(self) -> None:
+        """#080 — KeyError if config_snapshot['metrics'] lacks 'sharpe_annualized' (§R1)."""
+        import pytest
+
+        from scripts.dashboard.pages.run_detail_logic import build_kpi_cards
+
+        metrics = _make_metrics()
+        config_bad = {"metrics": {}}
+        with pytest.raises(KeyError):
+            build_kpi_cards(metrics, config_bad)
+
 
 # ---------------------------------------------------------------------------
 # §6.2 — count_non_null_folds
