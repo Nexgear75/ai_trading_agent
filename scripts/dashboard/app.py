@@ -74,6 +74,13 @@ def resolve_runs_dir(
     if raw_path is None:
         raw_path = default
 
+    # Reject empty strings — explicit error, no silent cwd() resolution
+    if not raw_path:
+        raise ValueError(
+            "Runs directory path is empty. Provide a non-empty --runs-dir, "
+            "AI_TRADING_RUNS_DIR, or default."
+        )
+
     # Resolve for security (spec §11.1 — no traversal)
     resolved = Path(raw_path).resolve()
 

@@ -11,6 +11,7 @@ Tests cover:
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 import pytest
@@ -167,6 +168,28 @@ class TestResolveRunsDir:
         result = resolve_runs_dir(cli_args=[], env=None, default=str(runs))
         assert isinstance(result, Path)
 
+    def test_empty_cli_arg_raises_value_error(self, tmp_path: Path) -> None:
+        """Empty --runs-dir= value raises ValueError, not silent cwd() resolution."""
+        from scripts.dashboard.app import resolve_runs_dir
+
+        with pytest.raises(ValueError, match="empty"):
+            resolve_runs_dir(
+                cli_args=["--runs-dir="],
+                env=None,
+                default=str(tmp_path),
+            )
+
+    def test_empty_env_var_raises_value_error(self, tmp_path: Path) -> None:
+        """Empty AI_TRADING_RUNS_DIR raises ValueError."""
+        from scripts.dashboard.app import resolve_runs_dir
+
+        with pytest.raises(ValueError, match="empty"):
+            resolve_runs_dir(
+                cli_args=[],
+                env="",
+                default=str(tmp_path),
+            )
+
 
 # ---------------------------------------------------------------------------
 # Page definitions tests
@@ -205,3 +228,129 @@ class TestPageDefinitions:
         for page_def in PAGE_DEFINITIONS:
             page_path = Path(page_def["path"])
             assert page_path.exists(), f"Page file does not exist: {page_path}"
+
+
+# ---------------------------------------------------------------------------
+# main() integration tests — mock Streamlit
+# ---------------------------------------------------------------------------
+
+
+class _FakeSessionState(dict):
+    """Dict subclass that supports attribute-style access like Streamlit session_state."""
+
+    def __getattr__(self, key: str) -> object:
+        try:
+            return self[key]
+        except KeyError as exc:
+            raise AttributeError(key) from exc
+
+    def __setattr__(self, key: str, value: object) -> None:
+        self[key] = value
+
+
+class TestMain:
+    """Test main() with mocked Streamlit components."""
+
+    def test_set_page_config_called(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """main() calls st.set_page_config with correct parameters."""
+        from unittest.mock import MagicMock
+
+        runs_dir = tmp_path / "runs"
+        runs_dir.mkdir()
+
+        mock_st = MagicMock()
+        mock_st.session_state = _FakeSessionState()
+        mock_nav = MagicMock()
+        mock_st.navigation.return_value = mock_nav
+
+        monkeypatch.setitem(sys.modules, "streamlit", mock_st)
+        monkeypatch.setattr("sys.argv", ["app.py", "--runs-dir", str(runs_dir)])
+        monkeypatch.delenv("AI_TRADING_RUNS_DIR", raising=False)
+
+        mock_discover = MagicMock(return_value=[])
+        mock_data_loader = MagicMock()
+        mock_data_loader.discover_runs = mock_discover
+        monkeypatch.setitem(sys.modules, "scripts.dashboard.data_loader", mock_data_loader)
+        monkeypatch.setitem(sys.modules, "scripts", MagicMock())
+        monkeypatch.setitem(sys.modules, "scripts.dashboard", MagicMock())
+
+        from scripts.dashboard.app import main
+
+        main()
+
+        mock_st.set_page_config.assert_called_once_with(
+            layout="wide", page_title="AI Trading Dashboard",
+        )
+
+    def test_discover_runs_stored_in_session_state(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """main() calls discover_runs and stores result in st.session_state."""
+        from unittest.mock import MagicMock
+
+        runs_dir = tmp_path / "runs"
+        runs_dir.mkdir()
+
+        session_state = _FakeSessionState()
+        mock_st = MagicMock()
+        mock_st.session_state = session_state
+        mock_nav = MagicMock()
+        mock_st.navigation.return_value = mock_nav
+
+        monkeypatch.setitem(sys.modules, "streamlit", mock_st)
+        monkeypatch.setattr("sys.argv", ["app.py", "--runs-dir", str(runs_dir)])
+        monkeypatch.delenv("AI_TRADING_RUNS_DIR", raising=False)
+
+        fake_runs = [{"name": "run1"}, {"name": "run2"}]
+        mock_discover = MagicMock(return_value=fake_runs)
+        mock_data_loader = MagicMock()
+        mock_data_loader.discover_runs = mock_discover
+        monkeypatch.setitem(sys.modules, "scripts.dashboard.data_loader", mock_data_loader)
+        monkeypatch.setitem(sys.modules, "scripts", MagicMock())
+        monkeypatch.setitem(sys.modules, "scripts.dashboard", MagicMock())
+
+        from scripts.dashboard.app import main
+
+        main()
+
+        mock_discover.assert_called_once_with(runs_dir.resolve())
+        assert session_state["runs"] == fake_runs
+        assert session_state["runs_dir"] == runs_dir.resolve()
+
+    def test_navigation_called_with_all_pages(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """main() creates st.Page for each PAGE_DEFINITION and calls st.navigation."""
+        from unittest.mock import MagicMock, call
+
+        runs_dir = tmp_path / "runs"
+        runs_dir.mkdir()
+
+        mock_st = MagicMock()
+        mock_st.session_state = _FakeSessionState()
+        mock_nav = MagicMock()
+        mock_st.navigation.return_value = mock_nav
+
+        monkeypatch.setitem(sys.modules, "streamlit", mock_st)
+        monkeypatch.setattr("sys.argv", ["app.py", "--runs-dir", str(runs_dir)])
+        monkeypatch.delenv("AI_TRADING_RUNS_DIR", raising=False)
+
+        mock_discover = MagicMock(return_value=[])
+        mock_data_loader = MagicMock()
+        mock_data_loader.discover_runs = mock_discover
+        monkeypatch.setitem(sys.modules, "scripts.dashboard.data_loader", mock_data_loader)
+        monkeypatch.setitem(sys.modules, "scripts", MagicMock())
+        monkeypatch.setitem(sys.modules, "scripts.dashboard", MagicMock())
+
+        from scripts.dashboard.app import PAGE_DEFINITIONS, main
+
+        main()
+
+        # st.Page called once per page definition
+        assert mock_st.Page.call_count == len(PAGE_DEFINITIONS)
+        for page_def, page_call in zip(PAGE_DEFINITIONS, mock_st.Page.call_args_list, strict=True):
+            assert page_call == call(page_def["path"], title=page_def["title"])
+
+        # st.navigation called with the page list, and nav.run() called
+        mock_st.navigation.assert_called_once()
+        mock_nav.run.assert_called_once()
