@@ -61,4 +61,4 @@ Implémenter l'en-tête du run (bandeau d'information §6.1) et les KPI cards de
 - [x] `ruff check ai_trading/ tests/` passe sans erreur.
 - [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
 - [x] **Commit GREEN** : `[WS-D-3] #080 GREEN: en-tête run et KPI cards métriques agrégées`.
-- [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-D-3] #080 — Page 2 : en-tête du run et KPI cards`.
+- [x] **Pull Request ouverte** vers `Max6000i1` : `[WS-D-3] #080 — Page 2 : en-tête du run et KPI cards`.
