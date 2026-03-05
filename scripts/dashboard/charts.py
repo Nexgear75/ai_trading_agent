@@ -400,8 +400,8 @@ def chart_scatter_predictions(
 
     fig.add_trace(
         go.Scatter(
-            x=y_true,
-            y=y_hat,
+            x=y_hat,
+            y=y_true,
             mode="markers",
             marker={"color": colors, "size": 5},
             name="Predictions",
@@ -415,8 +415,8 @@ def chart_scatter_predictions(
 
     fig.update_layout(
         title="Predictions Scatter",
-        xaxis_title="y_true",
-        yaxis_title="y_hat",
+        xaxis_title="ŷ",
+        yaxis_title="y_true",
         shapes=[
             {
                 "type": "line",

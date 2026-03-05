@@ -505,6 +505,14 @@ class TestChartScatterPredictions:
         scatter_traces = [t for t in fig.data if isinstance(t, go.Scatter)]
         assert len(scatter_traces) == 0
 
+    def test_axes_labels_per_spec(self, preds_df):
+        """§8.3: ŷ on X-axis, y_true on Y-axis."""
+        from scripts.dashboard.charts import chart_scatter_predictions
+
+        fig = chart_scatter_predictions(preds_df, theta=0.005, threshold_method="quantile")
+        assert fig.layout.xaxis.title.text == "ŷ"
+        assert fig.layout.yaxis.title.text == "y_true"
+
 
 # ---------------------------------------------------------------------------
 # Tests — chart_fold_equity (§8.2)
