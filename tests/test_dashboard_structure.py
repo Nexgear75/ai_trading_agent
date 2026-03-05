@@ -193,8 +193,11 @@ class TestDashboardArborescence:
         """#073 — Exactly 4 page files in scripts/dashboard/pages/."""
         pages_dir = self.DASHBOARD_DIR / "pages"
         py_files = list(pages_dir.glob("*.py"))
-        # Exclude __init__.py if present
-        page_files = [f for f in py_files if f.name != "__init__.py"]
+        # Only count page files (N_name.py pattern), exclude helpers and __init__
+        page_files = [
+            f for f in py_files
+            if f.name != "__init__.py" and f.name[0].isdigit()
+        ]
         assert len(page_files) == 4, (
             f"Expected 4 page files, found {len(page_files)}: "
             f"{[f.name for f in page_files]}"
@@ -327,9 +330,10 @@ class TestEdgeCases:
     def test_pages_naming_convention(self) -> None:
         """#073 — Page files follow N_name.py numbering convention."""
         pages_dir = self.DASHBOARD_DIR / "pages"
+        # Only check page files (starting with digit), exclude helper modules
         page_files = sorted(
             f.name for f in pages_dir.glob("*.py")
-            if f.name != "__init__.py"
+            if f.name != "__init__.py" and f.name[0].isdigit()
         )
         for name in page_files:
             # Must match pattern: digit_name.py

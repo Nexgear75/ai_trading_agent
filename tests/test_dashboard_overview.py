@@ -18,7 +18,6 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # Helpers — synthetic metrics dicts
 # ---------------------------------------------------------------------------
