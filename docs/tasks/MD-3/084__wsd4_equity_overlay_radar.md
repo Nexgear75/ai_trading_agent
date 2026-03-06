@@ -57,4 +57,4 @@ Compléter `pages/3_comparison.py` avec la superposition des courbes d'équité 
 - [x] `ruff check ai_trading/ tests/ scripts/` passe sans erreur.
 - [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
 - [x] **Commit GREEN** : `[WS-D-4] #084 GREEN: page comparaison — overlay equity et radar`.
-- [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-D-4] #084 — Page 3 : overlay equity et radar chart`.
+- [x] **Pull Request ouverte** vers `Max6000i1` : `[WS-D-4] #084 — Page 3 : overlay equity et radar chart`.
