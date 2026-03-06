@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # Helpers — synthetic metrics dicts
 # ---------------------------------------------------------------------------
@@ -170,6 +169,8 @@ class TestHighlightBestWorst:
             highlight_best_worst,
         )
 
+        # Note: build_comparison_dataframe sorts by Run ID descending.
+        # run_B > run_A alphabetically → idx 0=run_B, idx 1=run_A.
         runs = [
             _make_metrics(
                 run_id="run_A",
@@ -191,26 +192,28 @@ class TestHighlightBestWorst:
         df = build_comparison_dataframe(runs)
         result = highlight_best_worst(df)
 
-        # Net PnL: higher is better → best=run_A(idx 0), worst=run_B(idx 1)
-        assert result["Net PnL (moy)"]["best"] == 0
-        assert result["Net PnL (moy)"]["worst"] == 1
+        # After sort descending: idx 0=run_B, idx 1=run_A
+        # Net PnL: higher is better → best=run_A(idx 1), worst=run_B(idx 0)
+        assert result["Net PnL (moy)"]["best"] == 1
+        assert result["Net PnL (moy)"]["worst"] == 0
 
         # Sharpe: higher is better
-        assert result["Sharpe (moy)"]["best"] == 0
-        assert result["Sharpe (moy)"]["worst"] == 1
+        assert result["Sharpe (moy)"]["best"] == 1
+        assert result["Sharpe (moy)"]["worst"] == 0
 
-        # MDD: closer to 0 is better (higher value = less drawdown)
-        # -0.02 > -0.10, so idx 0 is best
-        assert result["MDD (moy)"]["best"] == 0
-        assert result["MDD (moy)"]["worst"] == 1
+        # MDD: lower abs value is better.
+        # run_A: -0.02, run_B: -0.10. Lower value = worse (more drawdown).
+        # idx 1=run_A(-0.02) is best (less drawdown), idx 0=run_B(-0.10) worst.
+        assert result["MDD (moy)"]["best"] == 1
+        assert result["MDD (moy)"]["worst"] == 0
 
         # Win Rate: higher is better
-        assert result["Win Rate (moy)"]["best"] == 0
-        assert result["Win Rate (moy)"]["worst"] == 1
+        assert result["Win Rate (moy)"]["best"] == 1
+        assert result["Win Rate (moy)"]["worst"] == 0
 
         # Trades: higher is better
-        assert result["Trades (moy)"]["best"] == 0
-        assert result["Trades (moy)"]["worst"] == 1
+        assert result["Trades (moy)"]["best"] == 1
+        assert result["Trades (moy)"]["worst"] == 0
 
     def test_three_runs_best_worst(self) -> None:
         """#083 — With 3 runs, best/worst correctly identified."""
@@ -219,6 +222,7 @@ class TestHighlightBestWorst:
             highlight_best_worst,
         )
 
+        # Sorted descending: r3(idx 0), r2(idx 1), r1(idx 2)
         runs = [
             _make_metrics(run_id="r1", net_pnl=0.05),
             _make_metrics(run_id="r2", net_pnl=0.10),
@@ -227,9 +231,9 @@ class TestHighlightBestWorst:
         df = build_comparison_dataframe(runs)
         result = highlight_best_worst(df)
 
-        # net_pnl: best=r2(0.10), worst=r3(-0.02)
+        # net_pnl: best=r2(0.10) at idx 1, worst=r3(-0.02) at idx 0
         assert result["Net PnL (moy)"]["best"] == 1  # r2
-        assert result["Net PnL (moy)"]["worst"] == 2  # r3
+        assert result["Net PnL (moy)"]["worst"] == 0  # r3
 
     def test_only_numeric_columns_in_result(self) -> None:
         """#083 — Result only contains numeric columns, not Run ID/Stratégie/Type."""
@@ -258,6 +262,7 @@ class TestHighlightBestWorst:
             highlight_best_worst,
         )
 
+        # Sorted descending: r2(idx 0), r1(idx 1)
         runs = [
             _make_metrics(run_id="r1", net_pnl=0.05),
             _make_metrics(run_id="r2", net_pnl=None),
@@ -265,9 +270,9 @@ class TestHighlightBestWorst:
         df = build_comparison_dataframe(runs)
         result = highlight_best_worst(df)
 
-        # Only one valid value → best and worst are the same index
-        assert result["Net PnL (moy)"]["best"] == 0
-        assert result["Net PnL (moy)"]["worst"] == 0
+        # Only one valid value (r1 at idx 1) → best and worst are both idx 1
+        assert result["Net PnL (moy)"]["best"] == 1
+        assert result["Net PnL (moy)"]["worst"] == 1
 
     def test_single_run_best_equals_worst(self) -> None:
         """#083 — With a single run, best == worst for all columns."""
