@@ -1,9 +1,11 @@
 """Page 3 — Comparaison de runs (Comparison).
 
 Comparaison côte à côte de plusieurs runs : tableau comparatif de métriques
-avec surbrillance meilleur/pire, critères pipeline §14.4, warnings.
+avec surbrillance meilleur/pire, overlay d'equity curves normalisées,
+radar chart 5 axes, critères pipeline §14.4, warnings.
 
-Ref: §7.1 multiselect, §7.2 tableau comparatif, §10.2 — pages/3_comparison.py
+Ref: §7.1 multiselect, §7.2 tableau comparatif, §7.3 equity overlay,
+§7.4 radar chart, §14.4 critères pipeline, §10.2 — pages/3_comparison.py
 """
 
 from __future__ import annotations
