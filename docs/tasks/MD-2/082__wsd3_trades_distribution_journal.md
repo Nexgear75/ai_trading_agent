@@ -67,4 +67,4 @@ Implémenter dans `pages/2_run_detail.py` la section distribution des trades et 
 - [x] `ruff check ai_trading/ tests/` passe sans erreur.
 - [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
 - [x] **Commit GREEN** : `[WS-D-3] #082 GREEN: distribution des trades et journal paginé`.
-- [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-D-3] #082 — Page 2 : distribution des trades et journal`.
+- [x] **Pull Request ouverte** vers `Max6000i1` : `[WS-D-3] #082 — Page 2 : distribution des trades et journal`.
