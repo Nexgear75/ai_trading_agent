@@ -3,13 +3,17 @@
 Extracts testable logic from the Streamlit rendering code.
 Reuses overview_logic's build_overview_dataframe for DRY (§5.2 columns).
 
-Ref: §7.1 multiselect, §7.2 tableau comparatif, §14.4 critères pipeline.
+Ref: §7.1 multiselect, §7.2 tableau comparatif, §7.3 equity overlay,
+§7.4 radar chart, §14.4 critères pipeline.
 """
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pandas as pd
 
+from scripts.dashboard.data_loader import load_equity_curve
 from scripts.dashboard.pages.overview_logic import build_overview_dataframe
 
 # Numeric columns eligible for best/worst highlighting (§7.2)
@@ -258,3 +262,90 @@ def format_run_label(metrics: dict) -> str:
     run_id = metrics["run_id"]
     strategy_name = metrics["strategy"]["name"]
     return f"{run_id} — {strategy_name}"
+
+
+# ---------------------------------------------------------------------------
+# §7.4 — Radar data extraction
+# ---------------------------------------------------------------------------
+
+_RADAR_METRIC_KEYS = ("net_pnl", "sharpe", "max_drawdown", "hit_rate", "profit_factor")
+
+
+def build_radar_data(selected_metrics: list[dict]) -> list[dict]:
+    """Extract radar chart data from selected runs metrics.
+
+    Parameters
+    ----------
+    selected_metrics:
+        List of validated metrics dicts (from ``discover_runs``).
+
+    Returns
+    -------
+    list[dict]
+        Each dict has keys: ``label``, ``net_pnl``, ``sharpe``,
+        ``max_drawdown``, ``hit_rate``, ``profit_factor``.
+
+    Raises
+    ------
+    ValueError
+        If any required metric value is None for a run.
+    """
+    result: list[dict] = []
+    for m in selected_metrics:
+        trading_mean = m["aggregate"]["trading"]["mean"]
+        label = format_run_label(m)
+
+        entry: dict = {"label": label}
+        for key in _RADAR_METRIC_KEYS:
+            value = trading_mean.get(key)
+            if value is None:
+                raise ValueError(
+                    f"Run '{m['run_id']}': metric '{key}' is None, "
+                    f"cannot build radar chart"
+                )
+            entry[key] = value
+
+        result.append(entry)
+
+    return result
+
+
+# ---------------------------------------------------------------------------
+# §7.3 — Load equity curves for comparison overlay
+# ---------------------------------------------------------------------------
+
+
+def load_comparison_equity_curves(
+    selected_metrics: list[dict],
+    runs_dir: Path,
+) -> tuple[dict[str, pd.DataFrame], list[str]]:
+    """Load stitched equity curves for selected runs.
+
+    Parameters
+    ----------
+    selected_metrics:
+        List of validated metrics dicts.
+    runs_dir:
+        Root directory containing run subdirectories.
+
+    Returns
+    -------
+    tuple[dict[str, pd.DataFrame], list[str]]
+        - Dict mapping run label → equity curve DataFrame.
+        - List of run labels for which equity curves are missing.
+    """
+    curves: dict[str, pd.DataFrame] = {}
+    missing: list[str] = []
+
+    for m in selected_metrics:
+        run_id = m["run_id"]
+        label = format_run_label(m)
+        run_dir = runs_dir / run_id
+
+        df = load_equity_curve(run_dir)
+        if df is None:
+            missing.append(label)
+        else:
+            curves[label] = df
+
+    return curves, missing

@@ -12,14 +12,17 @@ from pathlib import Path
 
 import streamlit as st
 
+from scripts.dashboard.charts import chart_equity_overlay, chart_radar
 from scripts.dashboard.data_loader import load_config_snapshot
 from scripts.dashboard.pages.comparison_logic import (
     apply_highlight_styles,
     build_comparison_dataframe,
+    build_radar_data,
     check_pipeline_criteria,
     format_run_label,
     get_aggregate_notes,
     highlight_best_worst,
+    load_comparison_equity_curves,
 )
 from scripts.dashboard.pages.overview_logic import format_overview_dataframe
 
@@ -132,3 +135,38 @@ for m in selected_runs:
     notes = get_aggregate_notes(m)
     if notes:
         st.warning(f"⚠️ {run_id}: {notes}")
+
+# ---------------------------------------------------------------------------
+# §7.3 — Equity curves overlay
+# ---------------------------------------------------------------------------
+
+st.subheader("Courbes d'équité superposées (§7.3)")
+
+if runs_dir is not None:
+    curves, missing_labels = load_comparison_equity_curves(
+        selected_runs, Path(runs_dir)
+    )
+
+    if missing_labels:
+        st.info(
+            "Equity curves absentes pour : "
+            + ", ".join(missing_labels)
+        )
+
+    if curves:
+        fig_overlay = chart_equity_overlay(curves)
+        st.plotly_chart(fig_overlay, use_container_width=True)
+    else:
+        st.info("Aucune equity curve disponible pour les runs sélectionnés.")
+else:
+    st.warning("Répertoire de runs non configuré.")
+
+# ---------------------------------------------------------------------------
+# §7.4 — Radar chart
+# ---------------------------------------------------------------------------
+
+st.subheader("Radar comparatif (§7.4)")
+
+radar_data = build_radar_data(selected_runs)
+fig_radar = chart_radar(radar_data)
+st.plotly_chart(fig_radar, use_container_width=True)
