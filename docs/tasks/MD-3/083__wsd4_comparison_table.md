@@ -62,4 +62,4 @@ Implémenter dans `pages/3_comparison.py` le multiselect de runs et le tableau c
 - [x] `ruff check ai_trading/ tests/ scripts/` passe sans erreur.
 - [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
 - [x] **Commit GREEN** : `[WS-D-4] #083 GREEN: page comparaison — sélection et tableau`.
-- [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-D-4] #083 — Page 3 : sélection et tableau comparatif`.
+- [x] **Pull Request ouverte** vers `Max6000i1` : `[WS-D-4] #083 — Page 3 : sélection et tableau comparatif`.
