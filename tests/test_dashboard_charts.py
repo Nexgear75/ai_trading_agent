@@ -616,3 +616,17 @@ class TestChartFoldEquity:
         assert isinstance(fig, go.Figure)
         # Still has the equity line
         assert len(fig.data) >= 1
+
+    def test_drawdown_shading(self, equity_df, trades_df):
+        """§8.2 — Drawdown zone ombrée present in fold equity chart."""
+        from scripts.dashboard.charts import chart_fold_equity
+        from scripts.dashboard.utils import COLOR_DRAWDOWN
+
+        fig = chart_fold_equity(equity_df, trades_df)
+        dd_traces = [
+            t for t in fig.data
+            if isinstance(t, go.Scatter)
+            and getattr(t, "fill", None) == "tonexty"
+            and getattr(t, "fillcolor", None) == COLOR_DRAWDOWN
+        ]
+        assert len(dd_traces) == 1, "Expected exactly one drawdown shading trace"
