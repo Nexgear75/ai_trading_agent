@@ -3,15 +3,19 @@
 Extracts testable logic from the Streamlit rendering code.
 
 Ref: §6.1 en-tête du run, §6.2 métriques agrégées,
-     §6.3 equity curve, §6.4 métriques par fold, §9.3 conventions.
+     §6.3 equity curve, §6.4 métriques par fold, §9.3 conventions,
+     §6.5 distribution des trades, §6.6 journal des trades.
 """
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable
 from datetime import datetime
 
+import numpy as np
 import pandas as pd
+from scipy.stats import skew
 
 from scripts.dashboard.utils import (
     _NULL_DISPLAY,
@@ -363,3 +367,263 @@ def build_pnl_bar_data(metrics: dict) -> list[dict]:
             "net_pnl": pnl if pnl is not None else 0.0,
         })
     return result
+
+
+# ---------------------------------------------------------------------------
+# §6.5 — Trade distribution statistics
+# ---------------------------------------------------------------------------
+
+
+def compute_trade_stats(trades_df: pd.DataFrame) -> dict:
+    """Compute trade distribution statistics (§6.5).
+
+    Parameters
+    ----------
+    trades_df:
+        Trades DataFrame with ``net_return`` column.
+
+    Returns
+    -------
+    dict
+        Keys: mean, median, std, skewness, best_trade, worst_trade.
+
+    Raises
+    ------
+    ValueError
+        If trades_df is empty.
+    """
+    if trades_df.empty:
+        raise ValueError("trades_df is empty: cannot compute trade stats")
+
+    net = trades_df["net_return"]
+    return {
+        "mean": float(net.mean()),
+        "median": float(net.median()),
+        "std": float(net.std()),
+        "skewness": float(skew(net.values, bias=False)),
+        "best_trade": float(net.max()),
+        "worst_trade": float(net.min()),
+    }
+
+
+# ---------------------------------------------------------------------------
+# §6.6 — Equity after jointure
+# ---------------------------------------------------------------------------
+
+_FOLD_NUM_RE = re.compile(r"fold_(\d+)")
+
+
+def _fold_str_to_int(fold_str: str) -> int:
+    """Convert fold string like 'fold_00' to integer 0."""
+    m = _FOLD_NUM_RE.search(fold_str)
+    if m is None:
+        raise ValueError(f"Cannot parse fold number from '{fold_str}'")
+    return int(m.group(1))
+
+
+def join_equity_after(
+    trades_df: pd.DataFrame,
+    equity_df: pd.DataFrame | None,
+) -> pd.Series | None:
+    """Join equity values to trades via merge_asof per fold (§6.6).
+
+    Parameters
+    ----------
+    trades_df:
+        Trades DataFrame with ``exit_time_utc`` and ``fold`` columns.
+    equity_df:
+        Stitched equity curve with ``time_utc``, ``equity``, ``fold`` columns.
+        If None, returns None.
+
+    Returns
+    -------
+    pd.Series or None
+        Series of equity values aligned with trades_df.
+        NaN where no backward match is found.
+    """
+    if equity_df is None:
+        return None
+
+    # Parse timestamps
+    trades_time = pd.to_datetime(trades_df["exit_time_utc"])
+    equity_time = pd.to_datetime(equity_df["time_utc"])
+
+    # Build a working copy for the merge
+    trades_work = pd.DataFrame({
+        "exit_ts": trades_time,
+        "fold_int": trades_df["fold"].map(_fold_str_to_int),
+        "_orig_idx": range(len(trades_df)),
+    })
+    equity_work = pd.DataFrame({
+        "exit_ts": equity_time,
+        "fold_int": equity_df["fold"].astype(int),
+        "equity": equity_df["equity"].values,
+    }).sort_values("exit_ts")
+
+    # Merge asof per fold
+    result = np.full(len(trades_df), np.nan, dtype=np.float64)
+
+    for fold_val in trades_work["fold_int"].unique():
+        t_mask = trades_work["fold_int"] == fold_val
+        e_mask = equity_work["fold_int"] == fold_val
+
+        t_sub = trades_work.loc[t_mask].sort_values("exit_ts")
+        e_sub = equity_work.loc[e_mask].sort_values("exit_ts")
+
+        if e_sub.empty:
+            continue
+
+        merged = pd.merge_asof(
+            t_sub[["exit_ts", "_orig_idx"]],
+            e_sub[["exit_ts", "equity"]],
+            on="exit_ts",
+            direction="backward",
+        )
+
+        for _, row in merged.iterrows():
+            result[int(row["_orig_idx"])] = row["equity"]
+
+    return pd.Series(result, index=trades_df.index)
+
+
+# ---------------------------------------------------------------------------
+# §6.6 — Trade journal construction
+# ---------------------------------------------------------------------------
+
+
+def build_trade_journal(
+    trades_df: pd.DataFrame,
+    equity_df: pd.DataFrame | None,
+) -> pd.DataFrame:
+    """Build the formatted trade journal DataFrame (§6.6).
+
+    Parameters
+    ----------
+    trades_df:
+        Trades DataFrame from ``load_trades()``.
+    equity_df:
+        Stitched equity curve from ``load_equity_curve()``, or None.
+
+    Returns
+    -------
+    pd.DataFrame
+        Journal with columns per §6.6 spec.
+    """
+    if trades_df.empty:
+        cols = [
+            "Fold", "Entry time", "Exit time", "Entry price", "Exit price",
+            "Gross return", "Costs", "Net return",
+        ]
+        if equity_df is not None:
+            cols.append("Equity after")
+        return pd.DataFrame(columns=cols)
+
+    journal = pd.DataFrame({
+        "Fold": trades_df["fold"].values,
+        "Entry time": trades_df["entry_time_utc"].values,
+        "Exit time": trades_df["exit_time_utc"].values,
+        "Entry price": trades_df["entry_price"].values,
+        "Exit price": trades_df["exit_price"].values,
+        "Gross return": trades_df["gross_return"].values,
+        "Costs": trades_df["costs"].values,
+        "Net return": trades_df["net_return"].values,
+    })
+
+    # Add Equity after column only if equity data is available
+    equity_after = join_equity_after(trades_df, equity_df)
+    if equity_after is not None:
+        journal["Equity after"] = equity_after.apply(
+            lambda v: _NULL_DISPLAY if pd.isna(v) else v
+        )
+
+    return journal
+
+
+# ---------------------------------------------------------------------------
+# §11.2 — Pagination
+# ---------------------------------------------------------------------------
+
+
+def paginate_dataframe(
+    df: pd.DataFrame,
+    page: int,
+    page_size: int = 50,
+) -> pd.DataFrame:
+    """Return a page slice of the DataFrame (§11.2).
+
+    Parameters
+    ----------
+    df:
+        Input DataFrame.
+    page:
+        1-based page number.
+    page_size:
+        Rows per page (default 50 per §11.2).
+
+    Returns
+    -------
+    pd.DataFrame
+        Slice for the requested page.
+
+    Raises
+    ------
+    ValueError
+        If page < 1.
+    """
+    if page < 1:
+        raise ValueError(f"page must be >= 1, got {page}")
+
+    start = (page - 1) * page_size
+    end = start + page_size
+    return df.iloc[start:end]
+
+
+# ---------------------------------------------------------------------------
+# §6.6 — Trade filters
+# ---------------------------------------------------------------------------
+
+
+def filter_trades(
+    trades_df: pd.DataFrame,
+    *,
+    fold: str | None = None,
+    sign: str | None = None,
+    date_start: pd.Timestamp | None = None,
+    date_end: pd.Timestamp | None = None,
+) -> pd.DataFrame:
+    """Filter trades DataFrame by fold, sign, and date range (§6.6).
+
+    Parameters
+    ----------
+    trades_df:
+        Trades DataFrame with ``fold``, ``net_return``, ``entry_time_utc``.
+    fold:
+        Fold name to filter on (e.g. 'fold_00'). None = all folds.
+    sign:
+        'winning' (net_return > 0) or 'losing' (net_return <= 0). None = all.
+    date_start, date_end:
+        Date range filter on entry_time_utc. None = no filter.
+
+    Returns
+    -------
+    pd.DataFrame
+        Filtered trades.
+    """
+    mask = pd.Series(True, index=trades_df.index)
+
+    if fold is not None:
+        mask = mask & (trades_df["fold"] == fold)
+
+    if sign == "winning":
+        mask = mask & (trades_df["net_return"] > 0)
+    elif sign == "losing":
+        mask = mask & (trades_df["net_return"] <= 0)
+
+    if date_start is not None or date_end is not None:
+        entry_times = pd.to_datetime(trades_df["entry_time_utc"])
+        if date_start is not None:
+            mask = mask & (entry_times >= date_start)
+        if date_end is not None:
+            mask = mask & (entry_times <= date_end)
+
+    return trades_df.loc[mask]
