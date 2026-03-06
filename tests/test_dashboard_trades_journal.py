@@ -533,3 +533,39 @@ class TestFilterTrades:
         df = _make_trades_df(n=10)
         filtered = filter_trades(df)
         assert len(filtered) == len(df)
+
+    def test_filter_invalid_sign_raises(self) -> None:
+        """#082 — Invalid sign value raises ValueError."""
+        from scripts.dashboard.pages.run_detail_logic import filter_trades
+
+        df = _make_trades_df(n=10)
+        with pytest.raises(ValueError, match="sign must be"):
+            filter_trades(df, sign="foo")
+
+    def test_filter_invalid_sign_empty_string_raises(self) -> None:
+        """#082 — Empty string sign raises ValueError."""
+        from scripts.dashboard.pages.run_detail_logic import filter_trades
+
+        df = _make_trades_df(n=10)
+        with pytest.raises(ValueError, match="sign must be"):
+            filter_trades(df, sign="")
+
+
+class TestPaginatePageSizeValidation:
+    """#082 — page_size validation edge cases."""
+
+    def test_page_size_zero_raises(self) -> None:
+        """#082 — page_size=0 raises ValueError."""
+        from scripts.dashboard.pages.run_detail_logic import paginate_dataframe
+
+        df = pd.DataFrame({"x": range(10)})
+        with pytest.raises(ValueError, match="page_size must be >= 1"):
+            paginate_dataframe(df, page=1, page_size=0)
+
+    def test_page_size_negative_raises(self) -> None:
+        """#082 — Negative page_size raises ValueError."""
+        from scripts.dashboard.pages.run_detail_logic import paginate_dataframe
+
+        df = pd.DataFrame({"x": range(10)})
+        with pytest.raises(ValueError, match="page_size must be >= 1"):
+            paginate_dataframe(df, page=1, page_size=-5)

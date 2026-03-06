@@ -480,8 +480,10 @@ def join_equity_after(
             direction="backward",
         )
 
-        for _, row in merged.iterrows():
-            result[int(row["_orig_idx"])] = row["equity"]
+        valid = merged.dropna(subset=["equity"])
+        if not valid.empty:
+            idxs = valid["_orig_idx"].astype(int).values
+            result[idxs] = valid["equity"].values
 
     return pd.Series(result, index=trades_df.index)
 
@@ -572,6 +574,8 @@ def paginate_dataframe(
     """
     if page < 1:
         raise ValueError(f"page must be >= 1, got {page}")
+    if page_size < 1:
+        raise ValueError(f"page_size must be >= 1, got {page_size}")
 
     start = (page - 1) * page_size
     end = start + page_size
@@ -609,6 +613,11 @@ def filter_trades(
     pd.DataFrame
         Filtered trades.
     """
+    if sign is not None and sign not in ("winning", "losing"):
+        raise ValueError(
+            f"sign must be 'winning', 'losing', or None, got {sign!r}"
+        )
+
     mask = pd.Series(True, index=trades_df.index)
 
     if fold is not None:
