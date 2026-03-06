@@ -14,6 +14,7 @@ import streamlit as st
 
 from scripts.dashboard.data_loader import load_config_snapshot
 from scripts.dashboard.pages.comparison_logic import (
+    apply_highlight_styles,
     build_comparison_dataframe,
     check_pipeline_criteria,
     format_run_label,
@@ -43,10 +44,12 @@ if not runs:
 # §7.1 — Multiselect: 2-10 runs with strategy name
 # ---------------------------------------------------------------------------
 
-# Build label → metrics mapping
+# Build label → metrics mapping (§R6: guard against duplicate keys)
 label_to_metrics: dict[str, dict] = {}
 for m in runs:
     label = format_run_label(m)
+    if label in label_to_metrics:
+        raise ValueError(f"Duplicate run label: {label}")
     label_to_metrics[label] = m
 
 selected_labels = st.sidebar.multiselect(
@@ -72,26 +75,21 @@ highlights = highlight_best_worst(df_raw)
 # Format for display (§9.3) — reuses overview formatting (DRY)
 df_formatted = format_overview_dataframe(df_raw)
 
-# Apply highlighting via Streamlit HTML
-# Build styled DataFrame using pandas Styler
+# §7.2 — Apply bold green / italic red highlighting via pandas Styler
 st.subheader("Tableau comparatif")
+styled = df_formatted.style.apply(
+    lambda frame: apply_highlight_styles(frame, highlights),
+    axis=None,
+)
 st.dataframe(
-    df_formatted,
+    styled,
     use_container_width=True,
     hide_index=True,
 )
-
-# Display best/worst legend
-st.caption("🟢 = meilleure valeur · 🔴 = pire valeur par colonne")
-
-# Show best/worst indicators below the table
-for col, indices in highlights.items():
-    best_idx = indices["best"]
-    worst_idx = indices["worst"]
-    if best_idx != worst_idx:
-        best_run = df_raw.iloc[best_idx]["Run ID"]
-        worst_run = df_raw.iloc[worst_idx]["Run ID"]
-        st.text(f"{col}: 🟢 {best_run} · 🔴 {worst_run}")
+st.caption(
+    "Meilleure valeur par colonne en **gras vert**, "
+    "pire en *italique rouge* (§7.2)."
+)
 
 # ---------------------------------------------------------------------------
 # §14.4 — Pipeline criteria check (✅/❌)

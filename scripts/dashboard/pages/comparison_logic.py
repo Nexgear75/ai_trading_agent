@@ -165,6 +165,53 @@ def check_pipeline_criteria(
 
 
 # ---------------------------------------------------------------------------
+# Pandas Styler for best/worst highlighting (§7.2)
+# ---------------------------------------------------------------------------
+
+
+def apply_highlight_styles(
+    df: pd.DataFrame,
+    highlights: dict[str, dict[str, int]],
+) -> pd.DataFrame:
+    """Build a CSS-style DataFrame for best/worst cell highlighting (§7.2).
+
+    Returns a same-shape DataFrame of CSS strings suitable for
+    ``DataFrame.style.apply(fn, axis=None)``.
+
+    - Best value: **bold green** (``font-weight: bold; color: green``)
+    - Worst value: *italic red* (``font-style: italic; color: red``)
+    - When best == worst (single run / tied), no styling is applied.
+
+    Parameters
+    ----------
+    df:
+        The (formatted) comparison DataFrame.
+    highlights:
+        Output of :func:`highlight_best_worst`.
+
+    Returns
+    -------
+    pd.DataFrame
+        CSS strings, same shape as *df*.
+    """
+    styles = pd.DataFrame("", index=df.index, columns=df.columns)
+    for col, indices in highlights.items():
+        if col not in df.columns:
+            continue
+        best_idx = indices["best"]
+        worst_idx = indices["worst"]
+        if best_idx != worst_idx:
+            col_pos = list(styles.columns).index(col)
+            styles.iloc[best_idx, col_pos] = (
+                "font-weight: bold; color: green"
+            )
+            styles.iloc[worst_idx, col_pos] = (
+                "font-style: italic; color: red"
+            )
+    return styles
+
+
+# ---------------------------------------------------------------------------
 # Notes extraction (§7.2)
 # ---------------------------------------------------------------------------
 

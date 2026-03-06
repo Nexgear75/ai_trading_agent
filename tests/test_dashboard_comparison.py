@@ -452,6 +452,21 @@ class TestCheckPipelineCriteria:
         result = check_pipeline_criteria(metrics, config_snapshot)
         assert result["pf_ok"] is False
 
+    def test_mdd_none_with_config_present(self) -> None:
+        """#083 — max_drawdown=None with valid config_snapshot → mdd_ok is False."""
+        from scripts.dashboard.pages.comparison_logic import (
+            check_pipeline_criteria,
+        )
+
+        metrics = _make_metrics(
+            net_pnl=0.05, profit_factor=1.5, max_drawdown=None
+        )
+        config_snapshot = {"thresholding": {"mdd_cap": 0.10}}
+
+        result = check_pipeline_criteria(metrics, config_snapshot)
+        assert result["mdd_ok"] is False
+        assert result["icon"] == "❌"
+
 
 # ---------------------------------------------------------------------------
 # §7.2 — get_aggregate_notes
@@ -502,3 +517,87 @@ class TestFormatRunLabel:
         label = format_run_label(metrics)
         assert "20260301_120000_xgb" in label
         assert "xgboost_reg" in label
+
+
+# ---------------------------------------------------------------------------
+# §7.2 — apply_highlight_styles (pandas Styler)
+# ---------------------------------------------------------------------------
+
+
+class TestApplyHighlightStyles:
+    """#083 — Pandas Styler CSS for best (bold green) / worst (italic red)."""
+
+    def test_basic_two_runs_styling(self) -> None:
+        """#083 — Best cell gets bold green, worst gets italic red."""
+        from scripts.dashboard.pages.comparison_logic import (
+            apply_highlight_styles,
+            build_comparison_dataframe,
+            highlight_best_worst,
+        )
+        from scripts.dashboard.pages.overview_logic import (
+            format_overview_dataframe,
+        )
+
+        # Sorted desc: run_B(idx 0), run_A(idx 1)
+        runs = [
+            _make_metrics(run_id="run_A", net_pnl=0.10, sharpe=2.0),
+            _make_metrics(run_id="run_B", net_pnl=0.02, sharpe=0.5),
+        ]
+        df_raw = build_comparison_dataframe(runs)
+        highlights = highlight_best_worst(df_raw)
+        df_fmt = format_overview_dataframe(df_raw)
+
+        styles = apply_highlight_styles(df_fmt, highlights)
+
+        # After sort desc: idx 0=run_B, idx 1=run_A
+        # Net PnL: best=run_A(idx 1), worst=run_B(idx 0)
+        col = "Net PnL (moy)"
+        assert "bold" in styles.loc[1, col]
+        assert "green" in styles.loc[1, col]
+        assert "italic" in styles.loc[0, col]
+        assert "red" in styles.loc[0, col]
+
+    def test_single_run_no_styling(self) -> None:
+        """#083 — Single run: best == worst → no CSS applied."""
+        from scripts.dashboard.pages.comparison_logic import (
+            apply_highlight_styles,
+            build_comparison_dataframe,
+            highlight_best_worst,
+        )
+        from scripts.dashboard.pages.overview_logic import (
+            format_overview_dataframe,
+        )
+
+        runs = [_make_metrics(run_id="r1")]
+        df_raw = build_comparison_dataframe(runs)
+        highlights = highlight_best_worst(df_raw)
+        df_fmt = format_overview_dataframe(df_raw)
+
+        styles = apply_highlight_styles(df_fmt, highlights)
+
+        # All cells should be empty (no styling when best == worst)
+        assert (styles == "").all().all()
+
+    def test_non_numeric_columns_not_styled(self) -> None:
+        """#083 — Non-numeric columns (Run ID, Stratégie) are never styled."""
+        from scripts.dashboard.pages.comparison_logic import (
+            apply_highlight_styles,
+            build_comparison_dataframe,
+            highlight_best_worst,
+        )
+        from scripts.dashboard.pages.overview_logic import (
+            format_overview_dataframe,
+        )
+
+        runs = [
+            _make_metrics(run_id="r1", net_pnl=0.10),
+            _make_metrics(run_id="r2", net_pnl=0.02),
+        ]
+        df_raw = build_comparison_dataframe(runs)
+        highlights = highlight_best_worst(df_raw)
+        df_fmt = format_overview_dataframe(df_raw)
+
+        styles = apply_highlight_styles(df_fmt, highlights)
+
+        for col in ["Run ID", "Stratégie", "Type", "Folds"]:
+            assert (styles[col] == "").all()
