@@ -1,7 +1,9 @@
 """Tests for scripts/dashboard/pages/comparison_logic.py — comparison table.
 
-Task #083 — WS-D-4: Page 3 — sélection runs et tableau comparatif.
-Spec refs: §7.1 multiselect, §7.2 tableau comparatif, §14.4 critères pipeline.
+Task #083, #084 — WS-D-4: Page 3 — sélection runs, tableau comparatif,
+overlay equity et radar chart.
+Spec refs: §7.1 multiselect, §7.2 tableau comparatif, §7.3 equity overlay,
+§7.4 radar chart, §14.4 critères pipeline.
 
 Tests cover:
 - build_comparison_dataframe: construction from multiple runs
@@ -9,10 +11,14 @@ Tests cover:
 - check_pipeline_criteria: ✅/❌ with all pass, some fail, config absent
 - get_aggregate_notes: extraction of notes from metrics
 - format_run_label: strategy name alongside run ID
+- build_radar_data: extract radar data from metrics
+- load_comparison_equity_curves: load equity curves for comparison
 - edge cases: empty, single run, None values
 """
 
 from __future__ import annotations
+
+from pathlib import Path
 
 import pytest
 
@@ -601,3 +607,241 @@ class TestApplyHighlightStyles:
 
         for col in ["Run ID", "Stratégie", "Type", "Folds"]:
             assert (styles[col] == "").all()
+
+
+# ===========================================================================
+# Task #084 — §7.3 Equity overlay & §7.4 Radar chart
+# ===========================================================================
+
+
+# ---------------------------------------------------------------------------
+# §7.4 — build_radar_data
+# ---------------------------------------------------------------------------
+
+
+class TestBuildRadarData:
+    """#084 — Extract radar data from selected metrics (§7.4)."""
+
+    def test_basic_two_runs(self) -> None:
+        """#084 — Two runs produce two dicts with expected keys."""
+        from scripts.dashboard.pages.comparison_logic import build_radar_data
+
+        runs = [
+            _make_metrics(
+                run_id="run_A",
+                strategy_name="xgboost_reg",
+                net_pnl=0.05,
+                sharpe=1.5,
+                max_drawdown=-0.03,
+                hit_rate=0.6,
+                profit_factor=1.8,
+            ),
+            _make_metrics(
+                run_id="run_B",
+                strategy_name="sma_rule",
+                net_pnl=0.02,
+                sharpe=0.8,
+                max_drawdown=-0.08,
+                hit_rate=0.45,
+                profit_factor=1.1,
+            ),
+        ]
+        result = build_radar_data(runs)
+
+        assert len(result) == 2
+        expected_keys = {"label", "net_pnl", "sharpe", "max_drawdown", "hit_rate", "profit_factor"}
+        for entry in result:
+            assert set(entry.keys()) == expected_keys
+
+    def test_values_extracted(self) -> None:
+        """#084 — Values match the input metrics."""
+        from scripts.dashboard.pages.comparison_logic import build_radar_data
+
+        runs = [
+            _make_metrics(
+                run_id="run_A",
+                strategy_name="xgboost_reg",
+                net_pnl=0.05,
+                sharpe=1.5,
+                max_drawdown=-0.03,
+                hit_rate=0.6,
+                profit_factor=1.8,
+            ),
+        ]
+        result = build_radar_data(runs)
+
+        assert len(result) == 1
+        r = result[0]
+        assert r["net_pnl"] == pytest.approx(0.05)
+        assert r["sharpe"] == pytest.approx(1.5)
+        assert r["max_drawdown"] == pytest.approx(-0.03)
+        assert r["hit_rate"] == pytest.approx(0.6)
+        assert r["profit_factor"] == pytest.approx(1.8)
+
+    def test_label_contains_run_id_and_strategy(self) -> None:
+        """#084 — Label includes both run_id and strategy name."""
+        from scripts.dashboard.pages.comparison_logic import build_radar_data
+
+        runs = [
+            _make_metrics(
+                run_id="20260301_120000_xgb",
+                strategy_name="xgboost_reg",
+            ),
+        ]
+        result = build_radar_data(runs)
+        label = result[0]["label"]
+        assert "20260301_120000_xgb" in label
+        assert "xgboost_reg" in label
+
+    def test_empty_runs(self) -> None:
+        """#084 — Empty list returns empty list."""
+        from scripts.dashboard.pages.comparison_logic import build_radar_data
+
+        assert build_radar_data([]) == []
+
+    def test_none_metric_value_raises(self) -> None:
+        """#084 — None value for a radar metric raises ValueError (strict code)."""
+        from scripts.dashboard.pages.comparison_logic import build_radar_data
+
+        runs = [
+            _make_metrics(
+                run_id="run_A",
+                net_pnl=None,
+                sharpe=1.0,
+                max_drawdown=-0.01,
+                hit_rate=0.5,
+                profit_factor=1.2,
+            ),
+        ]
+        with pytest.raises(ValueError, match="net_pnl"):
+            build_radar_data(runs)
+
+
+# ---------------------------------------------------------------------------
+# §7.3 — load_comparison_equity_curves
+# ---------------------------------------------------------------------------
+
+
+class TestLoadComparisonEquityCurves:
+    """#084 — Load equity curves from selected runs (§7.3)."""
+
+    def test_all_runs_have_equity(self, tmp_path: Path) -> None:
+        """#084 — All runs with equity curves: all loaded, no missing."""
+        import pandas as pd
+
+        from scripts.dashboard.pages.comparison_logic import (
+            load_comparison_equity_curves,
+        )
+
+        # Create two run dirs with equity_curve.csv
+        for run_id in ["run_A", "run_B"]:
+            run_dir = tmp_path / run_id
+            run_dir.mkdir()
+            df = pd.DataFrame({
+                "time_utc": ["2025-01-01", "2025-01-02", "2025-01-03"],
+                "equity": [1.0, 1.05, 1.10],
+                "in_trade": [False, True, False],
+                "fold": [0, 0, 0],
+            })
+            df.to_csv(run_dir / "equity_curve.csv", index=False)
+
+        runs = [
+            _make_metrics(run_id="run_A", strategy_name="xgb"),
+            _make_metrics(run_id="run_B", strategy_name="sma"),
+        ]
+        curves, missing = load_comparison_equity_curves(runs, tmp_path)
+
+        assert len(curves) == 2
+        assert len(missing) == 0
+        # Keys should be labels
+        for key in curves:
+            assert isinstance(curves[key], pd.DataFrame)
+            assert "equity" in curves[key].columns
+
+    def test_some_runs_missing_equity(self, tmp_path: Path) -> None:
+        """#084 — Partial equity: returns loaded curves + missing list."""
+        import pandas as pd
+
+        from scripts.dashboard.pages.comparison_logic import (
+            load_comparison_equity_curves,
+        )
+
+        # Only run_A has equity
+        run_a = tmp_path / "run_A"
+        run_a.mkdir()
+        df = pd.DataFrame({
+            "time_utc": ["2025-01-01", "2025-01-02"],
+            "equity": [1.0, 1.05],
+            "in_trade": [False, True],
+            "fold": [0, 0],
+        })
+        df.to_csv(run_a / "equity_curve.csv", index=False)
+
+        # run_B has no equity curve (dir exists but no CSV)
+        run_b = tmp_path / "run_B"
+        run_b.mkdir()
+
+        runs = [
+            _make_metrics(run_id="run_A", strategy_name="xgb"),
+            _make_metrics(run_id="run_B", strategy_name="sma"),
+        ]
+        curves, missing = load_comparison_equity_curves(runs, tmp_path)
+
+        assert len(curves) == 1
+        assert len(missing) == 1
+        assert "run_B" in missing[0]
+
+    def test_all_runs_missing_equity(self, tmp_path: Path) -> None:
+        """#084 — All curves missing: empty dict + all in missing list."""
+        from scripts.dashboard.pages.comparison_logic import (
+            load_comparison_equity_curves,
+        )
+
+        # No equity CSVs
+        (tmp_path / "run_A").mkdir()
+        (tmp_path / "run_B").mkdir()
+
+        runs = [
+            _make_metrics(run_id="run_A", strategy_name="xgb"),
+            _make_metrics(run_id="run_B", strategy_name="sma"),
+        ]
+        curves, missing = load_comparison_equity_curves(runs, tmp_path)
+
+        assert len(curves) == 0
+        assert len(missing) == 2
+
+    def test_empty_runs_list(self, tmp_path: Path) -> None:
+        """#084 — Empty selected runs: empty dict, empty missing."""
+        from scripts.dashboard.pages.comparison_logic import (
+            load_comparison_equity_curves,
+        )
+
+        curves, missing = load_comparison_equity_curves([], tmp_path)
+        assert curves == {}
+        assert missing == []
+
+    def test_curve_keys_are_labels(self, tmp_path: Path) -> None:
+        """#084 — Dict keys use format_run_label, not raw run_id."""
+        import pandas as pd
+
+        from scripts.dashboard.pages.comparison_logic import (
+            format_run_label,
+            load_comparison_equity_curves,
+        )
+
+        run_dir = tmp_path / "run_A"
+        run_dir.mkdir()
+        df = pd.DataFrame({
+            "time_utc": ["2025-01-01"],
+            "equity": [1.0],
+            "in_trade": [False],
+            "fold": [0],
+        })
+        df.to_csv(run_dir / "equity_curve.csv", index=False)
+
+        metrics = _make_metrics(run_id="run_A", strategy_name="xgboost_reg")
+        runs = [metrics]
+        curves, _ = load_comparison_equity_curves(runs, tmp_path)
+
+        expected_label = format_run_label(metrics)
+        assert expected_label in curves
