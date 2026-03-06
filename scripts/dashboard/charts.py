@@ -444,10 +444,7 @@ def chart_fold_equity(
     df: pd.DataFrame,
     trades_df: pd.DataFrame,
 ) -> go.Figure:
-    """Equity curve for a fold with entry/exit trade markers.
-
-    Drawdown shading is handled separately by ``chart_equity_curve`` (§6.3)
-    and is not duplicated here by design.
+    """Equity curve for a fold with entry/exit trade markers and drawdown shading.
 
     Parameters
     ----------
@@ -466,6 +463,32 @@ def chart_fold_equity(
             mode="lines",
             name="Equity",
             line={"color": COLOR_NEUTRAL},
+        )
+    )
+
+    # §8.2 — Drawdown shaded area
+    running_max = df["equity"].cummax()
+    dd = running_max - df["equity"]
+    fig.add_trace(
+        go.Scatter(
+            x=df["time_utc"],
+            y=running_max,
+            mode="lines",
+            line={"width": 0},
+            showlegend=False,
+            hoverinfo="skip",
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=df["time_utc"],
+            y=df["equity"],
+            mode="lines",
+            fill="tonexty",
+            fillcolor=COLOR_DRAWDOWN,
+            line={"width": 0},
+            name="Drawdown",
+            hovertext=[f"DD: {d:.4f}" for d in dd],
         )
     )
 

@@ -61,5 +61,5 @@ Implémenter dans `pages/4_fold_analysis.py` la navigation run/fold et l'afficha
 - [x] Critères d'acceptation tous satisfaits.
 - [x] `ruff check ai_trading/ tests/ scripts/` passe sans erreur.
 - [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
-- [ ] **Commit GREEN** : `[WS-D-5] #085 GREEN: page analyse fold — navigation et equity`.
+- [x] **Commit GREEN** : `[WS-D-5] #085 GREEN: page analyse fold — navigation et equity`.
 - [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-D-5] #085 — Page 4 : navigation fold et equity curve`.

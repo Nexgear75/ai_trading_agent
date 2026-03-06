@@ -69,7 +69,7 @@ with col_slider:
         "Navigation rapide",
         min_value=0,
         max_value=len(fold_names) - 1,
-        value=fold_names.index(selected_fold) if selected_fold else 0,
+        value=fold_names.index(selected_fold),
     )
 
 # Sync: slider overrides dropdown if different
