@@ -3,7 +3,8 @@
 Visualisation détaillée d'un run sélectionné : equity curve,
 trade journal, métriques par fold, configuration utilisée.
 
-Ref: §10.2 — pages/2_run_detail.py, §6.1 en-tête, §6.2 KPI cards.
+Ref: §10.2 — pages/2_run_detail.py, §6.1 en-tête, §6.2 KPI cards,
+     §6.3 equity curve, §6.4 métriques par fold.
 """
 
 from __future__ import annotations
@@ -12,14 +13,18 @@ from pathlib import Path
 
 import streamlit as st
 
+from scripts.dashboard.charts import chart_equity_curve, chart_pnl_bar
 from scripts.dashboard.data_loader import (
     load_config_snapshot,
+    load_equity_curve,
     load_run_manifest,
     load_run_metrics,
 )
 from scripts.dashboard.pages.run_detail_logic import (
+    build_fold_metrics_table,
     build_header_info,
     build_kpi_cards,
+    build_pnl_bar_data,
 )
 
 # ---------------------------------------------------------------------------
@@ -93,3 +98,49 @@ for col, card in zip(kpi_cols, cards, strict=True):
         else:
             st.markdown(f"<h4>{card['value']}</h4>", unsafe_allow_html=True)
         st.caption(card["label"])
+
+st.divider()
+
+# ---------------------------------------------------------------------------
+# §6.3 — Equity curve stitchée
+# ---------------------------------------------------------------------------
+
+equity_df = load_equity_curve(run_dir)
+
+if equity_df is None:
+    st.info("Equity curve non disponible pour ce run (equity_curve.csv absent).")
+else:
+    first_equity = equity_df["equity"].iloc[0]
+    if first_equity <= 0:
+        st.error(
+            f"Equity curve invalide : equity[0] = {first_equity} (≤ 0). "
+            "Normalisation impossible."
+        )
+    else:
+        fig_eq = chart_equity_curve(
+            equity_df,
+            fold_boundaries=True,
+            drawdown=True,
+            in_trade_zones=True,
+        )
+        st.plotly_chart(fig_eq, use_container_width=True)
+
+st.divider()
+
+# ---------------------------------------------------------------------------
+# §6.4 — Métriques par fold
+# ---------------------------------------------------------------------------
+
+st.subheader("Métriques par fold")
+
+fold_table = build_fold_metrics_table(metrics)
+
+if not fold_table.empty:
+    st.dataframe(fold_table, use_container_width=True, hide_index=True)
+
+    pnl_bar_data = build_pnl_bar_data(metrics)
+    if pnl_bar_data:
+        fig_pnl = chart_pnl_bar(pnl_bar_data)
+        st.plotly_chart(fig_pnl, use_container_width=True)
+else:
+    st.info("Aucune donnée de fold disponible.")
