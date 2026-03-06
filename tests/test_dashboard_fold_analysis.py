@@ -9,12 +9,7 @@ Tests cover:
 - get_run_dir: path construction
 """
 
-from __future__ import annotations
-
 from pathlib import Path
-
-import pytest
-
 
 # ---------------------------------------------------------------------------
 # discover_folds
