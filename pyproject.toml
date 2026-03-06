@@ -1,0 +1,71 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ai_trading"
+dynamic = ["version"]
+description = "AI Trading Pipeline — Comparaison rigoureuse de modèles ML/DL et baselines sur données OHLCV"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+
+dependencies = [
+    "numpy>=1.24",
+    "pandas>=2.0",
+    "pyarrow>=12.0",
+    "ccxt>=4.0,<5.0",
+    "PyYAML>=6.0",
+    "pydantic>=2.0",
+    "jsonschema>=4.17",
+    "xgboost>=2.0",
+    "torch>=2.0",
+    "scikit-learn>=1.3",
+    "scipy>=1.11",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "pytest-timeout>=2.0",
+    "ruff>=0.1",
+    "mypy>=1.0",
+]
+
+[project.scripts]
+ai-trading = "ai_trading.__main__:main"
+
+[tool.setuptools.dynamic]
+version = {attr = "ai_trading.__version__"}
+
+[tool.setuptools.packages.find]
+include = ["ai_trading*"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "SIM"]
+
+[tool.ruff.lint.per-file-ignores]
+"ai_trading/models/base.py" = ["N803"]
+"ai_trading/models/dummy.py" = ["N803"]
+"ai_trading/training/trainer.py" = ["N803"]
+"tests/test_base_model.py" = ["N803"]
+"tests/test_dummy_model.py" = ["N803", "N806"]
+"tests/test_fold_trainer.py" = ["N803", "N806"]
+
+[tool.mypy]
+python_version = "3.11"
+disallow_untyped_defs = true
+warn_return_any = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-v --tb=short -m \"not fullscale\""
+markers = [
+    "fullscale: full-scale integration tests requiring network access",
+]

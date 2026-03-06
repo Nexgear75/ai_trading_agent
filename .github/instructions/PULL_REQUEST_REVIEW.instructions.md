@@ -15,6 +15,7 @@ applyTo: "**"
 
 - **Spécification** : `docs/specifications/Specification_Pipeline_Commun_AI_Trading_v1.0.md`
 - **Plan** : `docs/plan/implementation.md` (WS-1..WS-12, M1..M5)
+- **Tâches** : `docs/tasks/<milestone>/NNN__slug.md`
 - **Tâches** : `docs/tasks/NNN__slug.md`
 - **Code source** : `ai_trading/`
 - **Tests** : `tests/` (pytest)
@@ -30,6 +31,7 @@ applyTo: "**"
 - [ ] Pas de commits parasites entre RED et GREEN.
 
 ### Tâche associée
+- [ ] `docs/tasks/<milestone>/NNN__slug.md` : statut DONE.
 - [ ] `docs/tasks/NNN__slug.md` : statut DONE.
 - [ ] Critères d'acceptation cochés `[x]`.
 - [ ] Checklist cochée `[x]`.

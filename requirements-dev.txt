@@ -1,0 +1,13 @@
+# === AI Trading Pipeline — Dev / test dependencies ===
+-r requirements.txt
+
+# Testing
+pytest>=7.0
+pytest-cov>=4.0
+pytest-timeout>=2.0
+
+# Linting
+ruff>=0.1
+
+# Type checking
+mypy>=1.0

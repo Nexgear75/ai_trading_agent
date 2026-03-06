@@ -1,4 +1,34 @@
+# === Python ===
 .venv/
-.idea/
-AGENTS.md
 __pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# === IDE ===
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# === Artefacts de run (générés par le pipeline) ===
+runs/
+output/
+reports/
+
+# === Données brutes (volumineuses) ===
+data/raw/
+
+# === OS ===
+.DS_Store
+Thumbs.db
+
+# === Word / Office temp files ===
+~$*
+*.docx
+
+
+# === Logs ===
+*.log
