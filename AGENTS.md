@@ -83,6 +83,7 @@ Les skills `.github/skills/*/SKILL.md` fournissent des workflows spécialisés i
 | Skill | Déclencheur | Description |
 |---|---|---|
 | `implementing-task` | « implémente la tâche #NNN » | Orchestre 4 agents workers : TDD-Implementer (RED→GREEN), TDD-Reviewer (revue), TDD-Fixer (corrections), PR-Review-Fixer (corrections post-review GitHub). Boucle B+C jusqu'à 5× max, puis Post-PR en passe unique. |
+| `implementing-milestone` | « implémente le milestone M1 », « travaille sur MX-2 », « lance le milestone MD-1 » | Implémente toutes les tâches d'un milestone (M1..M6, MX-*, MD-*) de bout en bout via implementing-task, revue globale itérative, PR et merge |
 | `implementing-request-change` | « implémente les request changes 0001 », « corrige les bloquants » | Corrections issues d'un rapport request_changes, par sévérité |
 | `pr-reviewer` | « review la PR », « vérifie avant merge » | Revue systématique de PR |
 | `task-creator` | « crée les tâches pour WS-X » | Génération de tâches structurées depuis spec/plan |
