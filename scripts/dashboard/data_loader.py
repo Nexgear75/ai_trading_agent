@@ -11,11 +11,31 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
+from typing import Any
 
 import pandas as pd
 import yaml
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Conditional @st.cache_data — available when Streamlit is installed.
+# In test context (no Streamlit), falls back to a no-op decorator.
+# ---------------------------------------------------------------------------
+
+try:
+    import streamlit as st
+
+    _cache_data = st.cache_data
+except Exception:  # noqa: BLE001
+    def _cache_data(func: Any = None, **kwargs: Any) -> Any:  # type: ignore[misc]
+        """No-op fallback when Streamlit is not available."""
+        if func is not None:
+            return func
+        return lambda f: f
+
+# Maximum number of folds before a warning is emitted (§11.2)
+_MAX_FOLDS_THRESHOLD = 200
 
 # ---------------------------------------------------------------------------
 # Required keys in metrics.json (shared with scripts/compare_runs.py — DRY)
@@ -30,6 +50,7 @@ REQUIRED_STRATEGY_KEYS = frozenset({"strategy_type", "name"})
 # ---------------------------------------------------------------------------
 
 
+@_cache_data
 def load_run_metrics(run_dir: Path) -> dict:
     """Load and validate ``metrics.json`` from a run directory.
 
@@ -50,6 +71,7 @@ def load_run_metrics(run_dir: Path) -> dict:
     ValueError
         If JSON is invalid or required keys are missing.
     """
+    run_dir = Path(run_dir).resolve()
     metrics_path = run_dir / "metrics.json"
     if not metrics_path.exists():
         raise FileNotFoundError(f"metrics.json not found in {run_dir}")
@@ -82,6 +104,7 @@ def load_run_metrics(run_dir: Path) -> dict:
     return data
 
 
+@_cache_data
 def load_run_manifest(run_dir: Path) -> dict:
     """Load ``manifest.json`` from a run directory.
 
@@ -102,6 +125,7 @@ def load_run_manifest(run_dir: Path) -> dict:
     ValueError
         If JSON is invalid.
     """
+    run_dir = Path(run_dir).resolve()
     manifest_path = run_dir / "manifest.json"
     if not manifest_path.exists():
         raise FileNotFoundError(f"manifest.json not found in {run_dir}")
@@ -122,6 +146,7 @@ def load_run_manifest(run_dir: Path) -> dict:
     return data
 
 
+@_cache_data
 def load_config_snapshot(run_dir: Path) -> dict:
     """Load ``config_snapshot.yaml`` from a run directory.
 
@@ -142,6 +167,7 @@ def load_config_snapshot(run_dir: Path) -> dict:
     ValueError
         If YAML is invalid.
     """
+    run_dir = Path(run_dir).resolve()
     config_path = run_dir / "config_snapshot.yaml"
     if not config_path.exists():
         raise FileNotFoundError(f"config_snapshot.yaml not found in {run_dir}")
@@ -184,6 +210,7 @@ def discover_runs(runs_dir: Path) -> list[dict]:
     list[dict]
         List of validated metrics dicts for each valid run, sorted by run_id.
     """
+    runs_dir = Path(runs_dir).resolve()
     if not runs_dir.is_dir():
         return []
 
@@ -211,6 +238,19 @@ def discover_runs(runs_dir: Path) -> list[dict]:
         results.append(data)
 
     results.sort(key=lambda d: d["run_id"])
+
+    # §11.2 — warn if any run has more than 200 folds
+    for run_data in results:
+        folds = run_data.get("folds", [])
+        if len(folds) > _MAX_FOLDS_THRESHOLD:
+            logger.warning(
+                "Run %s has %d folds (> %d threshold). "
+                "Performance may be impacted.",
+                run_data["run_id"],
+                len(folds),
+                _MAX_FOLDS_THRESHOLD,
+            )
+
     return results
 
 
@@ -255,12 +295,14 @@ def _validate_columns(
 # ---------------------------------------------------------------------------
 
 
+@_cache_data
 def load_equity_curve(run_dir: Path) -> pd.DataFrame | None:
     """Load the stitched ``equity_curve.csv`` from a run directory.
 
     Returns ``None`` if the file does not exist.
     Raises ``ValueError`` if the file exists but required columns are missing.
     """
+    run_dir = Path(run_dir).resolve()
     csv_path = run_dir / "equity_curve.csv"
     if not csv_path.exists():
         return None
@@ -270,12 +312,14 @@ def load_equity_curve(run_dir: Path) -> pd.DataFrame | None:
     return df
 
 
+@_cache_data
 def load_fold_equity_curve(fold_dir: Path) -> pd.DataFrame | None:
     """Load ``equity_curve.csv`` from a single fold directory.
 
     Returns ``None`` if the file does not exist.
     Raises ``ValueError`` if the file exists but required columns are missing.
     """
+    fold_dir = Path(fold_dir).resolve()
     csv_path = fold_dir / "equity_curve.csv"
     if not csv_path.exists():
         return None
@@ -285,6 +329,7 @@ def load_fold_equity_curve(fold_dir: Path) -> pd.DataFrame | None:
     return df
 
 
+@_cache_data
 def load_trades(run_dir: Path) -> pd.DataFrame | None:
     """Concatenate ``trades.csv`` from all folds under *run_dir*.
 
@@ -294,6 +339,7 @@ def load_trades(run_dir: Path) -> pd.DataFrame | None:
     Returns ``None`` if no ``trades.csv`` files are found.
     Raises ``ValueError`` if a file exists but required columns are missing.
     """
+    run_dir = Path(run_dir).resolve()
     folds_dir = run_dir / "folds"
     if not folds_dir.is_dir():
         return None
@@ -318,12 +364,14 @@ def load_trades(run_dir: Path) -> pd.DataFrame | None:
     return result
 
 
+@_cache_data
 def load_fold_trades(fold_dir: Path) -> pd.DataFrame | None:
     """Load ``trades.csv`` from a single fold directory.
 
     Returns ``None`` if the file does not exist.
     Raises ``ValueError`` if the file exists but required columns are missing.
     """
+    fold_dir = Path(fold_dir).resolve()
     trades_path = fold_dir / "trades.csv"
     if not trades_path.exists():
         return None
@@ -333,6 +381,7 @@ def load_fold_trades(fold_dir: Path) -> pd.DataFrame | None:
     return df
 
 
+@_cache_data
 def load_predictions(fold_dir: Path, split: str) -> pd.DataFrame | None:
     """Load ``preds_val.csv`` or ``preds_test.csv`` from a fold directory.
 
@@ -348,6 +397,7 @@ def load_predictions(fold_dir: Path, split: str) -> pd.DataFrame | None:
     """
     if split not in {"val", "test"}:
         raise ValueError(f"split must be 'val' or 'test', got {split!r}")
+    fold_dir = Path(fold_dir).resolve()
     csv_path = fold_dir / f"preds_{split}.csv"
     if not csv_path.exists():
         return None
@@ -357,12 +407,14 @@ def load_predictions(fold_dir: Path, split: str) -> pd.DataFrame | None:
     return df
 
 
+@_cache_data
 def load_fold_metrics(fold_dir: Path) -> dict | None:
     """Load ``metrics_fold.json`` from a fold directory.
 
     Returns ``None`` if the file does not exist.
     Raises ``ValueError`` if the JSON is invalid or not a dict.
     """
+    fold_dir = Path(fold_dir).resolve()
     json_path = fold_dir / "metrics_fold.json"
     if not json_path.exists():
         return None
