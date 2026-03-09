@@ -455,3 +455,90 @@ class TestGateM6:
                 found = True
                 break
         assert found, "gate-m6 should be declared .PHONY"
+
+
+class TestDashboardTargets:
+    """Verify dashboard-related Makefile targets. #088"""
+
+    def test_runs_dir_variable_defined(self, makefile_content: str) -> None:
+        """#088 — RUNS_DIR variable is defined with ?= (overridable)."""
+        lines = makefile_content.splitlines()
+        runs_dir_lines = [ln for ln in lines if ln.startswith("RUNS_DIR")]
+        assert len(runs_dir_lines) >= 1, "RUNS_DIR variable not defined"
+        assert any("?=" in ln for ln in runs_dir_lines), (
+            "RUNS_DIR should use ?= for overridability"
+        )
+
+    def test_runs_dir_default_value(self, makefile_content: str) -> None:
+        """#088 — RUNS_DIR defaults to runs/."""
+        lines = makefile_content.splitlines()
+        for ln in lines:
+            if ln.startswith("RUNS_DIR") and "?=" in ln:
+                assert "runs/" in ln, "RUNS_DIR should default to runs/"
+                return
+        pytest.fail("RUNS_DIR ?= not found")
+
+    def test_dashboard_target_dry_run(self) -> None:
+        """#088 — make dashboard runs streamlit with --runs-dir."""
+        result = _run_make("dashboard")
+        assert result.returncode == 0
+        assert "streamlit run" in result.stdout
+        assert "scripts/dashboard/app.py" in result.stdout
+        assert "--runs-dir" in result.stdout
+
+    def test_dashboard_target_runs_dir_override(self) -> None:
+        """#088 — make dashboard RUNS_DIR=/custom passes correct path."""
+        result = _run_make_with_vars("dashboard", {"RUNS_DIR": "/custom/runs"})
+        assert result.returncode == 0
+        assert "/custom/runs" in result.stdout
+
+    def test_install_dashboard_target(self) -> None:
+        """#088 — make install-dashboard installs requirements-dashboard.txt."""
+        result = _run_make("install-dashboard")
+        assert result.returncode == 0
+        assert "pip install -r requirements-dashboard.txt" in result.stdout
+
+    def test_dashboard_is_phony(self, makefile_content: str) -> None:
+        """#088 — dashboard is declared .PHONY."""
+        found = False
+        for line in makefile_content.splitlines():
+            if line.startswith(".PHONY") and "dashboard" in line:
+                found = True
+                break
+        assert found, "dashboard should be declared .PHONY"
+
+    def test_install_dashboard_is_phony(self, makefile_content: str) -> None:
+        """#088 — install-dashboard is declared .PHONY."""
+        found = False
+        for line in makefile_content.splitlines():
+            if line.startswith(".PHONY") and "install-dashboard" in line:
+                found = True
+                break
+        assert found, "install-dashboard should be declared .PHONY"
+
+    def test_help_lists_dashboard_targets(self) -> None:
+        """#088 — make help lists dashboard and install-dashboard."""
+        result = _run_make("help", dry_run=False)
+        output = result.stdout
+        assert "dashboard" in output, "dashboard target missing from help"
+        assert "install-dashboard" in output, (
+            "install-dashboard target missing from help"
+        )
+
+    def test_dashboard_has_help_comment(self, makefile_content: str) -> None:
+        """#088 — dashboard target has ## help comment."""
+        found = False
+        for line in makefile_content.splitlines():
+            if line.startswith("dashboard:") and "##" in line:
+                found = True
+                break
+        assert found, "dashboard target missing ## help comment"
+
+    def test_install_dashboard_has_help_comment(self, makefile_content: str) -> None:
+        """#088 — install-dashboard target has ## help comment."""
+        found = False
+        for line in makefile_content.splitlines():
+            if line.startswith("install-dashboard:") and "##" in line:
+                found = True
+                break
+        assert found, "install-dashboard target missing ## help comment"
