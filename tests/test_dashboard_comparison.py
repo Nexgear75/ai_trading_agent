@@ -14,8 +14,8 @@ Tests cover:
 
 from __future__ import annotations
 
+import pandas as pd
 import pytest
-
 
 # ---------------------------------------------------------------------------
 # Helpers — synthetic metrics dicts
@@ -116,7 +116,6 @@ class TestBuildComparisonDataframe:
 
         runs = [_make_metrics(net_pnl=None, sharpe=None)]
         df = build_comparison_dataframe(runs)
-        import pandas as pd
 
         assert pd.isna(df.iloc[0]["Net PnL (moy)"])
         assert pd.isna(df.iloc[0]["Sharpe (moy)"])
@@ -147,6 +146,7 @@ class TestHighlightBestWorst:
             highlight_best_worst,
         )
 
+        # build_overview_dataframe sorts by Run ID descending → C(0), B(1), A(2)
         runs = [
             _make_metrics(run_id="A", net_pnl=0.10, sharpe=2.0, max_drawdown=-0.02),
             _make_metrics(run_id="B", net_pnl=0.05, sharpe=1.0, max_drawdown=-0.08),
@@ -155,18 +155,19 @@ class TestHighlightBestWorst:
         df = build_comparison_dataframe(runs)
         result = highlight_best_worst(df)
 
-        # Net PnL: higher is better → best=A(idx 0), worst=C(idx 2)
-        assert result["Net PnL (moy)"]["best"] == 0
-        assert result["Net PnL (moy)"]["worst"] == 2
+        # After descending sort: idx0=C, idx1=B, idx2=A
+        # Net PnL: higher is better → best=A(idx 2), worst=C(idx 0)
+        assert result["Net PnL (moy)"]["best"] == 2
+        assert result["Net PnL (moy)"]["worst"] == 0
 
-        # Sharpe: higher is better
-        assert result["Sharpe (moy)"]["best"] == 0
-        assert result["Sharpe (moy)"]["worst"] == 2
+        # Sharpe: higher is better → best=A(idx 2), worst=C(idx 0)
+        assert result["Sharpe (moy)"]["best"] == 2
+        assert result["Sharpe (moy)"]["worst"] == 0
 
-        # MDD: lower absolute value is better (closer to 0)
-        # -0.02 > -0.08 > -0.15, so best MDD = index 0 (-0.02), worst = index 2 (-0.15)
-        assert result["MDD (moy)"]["best"] == 0
-        assert result["MDD (moy)"]["worst"] == 2
+        # MDD: higher value = better (closer to 0)
+        # A=-0.02(idx2), B=-0.08(idx1), C=-0.15(idx0) → best=idx2, worst=idx0
+        assert result["MDD (moy)"]["best"] == 2
+        assert result["MDD (moy)"]["worst"] == 0
 
     def test_ties(self) -> None:
         """#083 — Ties return first occurrence index."""

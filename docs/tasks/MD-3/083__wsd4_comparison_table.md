@@ -1,6 +1,6 @@
 # Tâche — Page 3 : sélection des runs et tableau comparatif
 
-Statut : TODO
+Statut : DONE
 Ordre : 083
 Workstream : WS-D-4
 Milestone : MD-3
@@ -37,27 +37,27 @@ Implémenter dans `pages/3_comparison.py` le multiselect de runs et le tableau c
 - Gestion du cas < 2 runs sélectionnés : message informatif.
 
 ## Critères d'acceptation
-- [ ] Multiselect 2-10 runs avec identification par stratégie (nom + run ID).
-- [ ] Tableau comparatif avec colonnes conformes à §5.2 et formatage §9.3.
-- [ ] Surbrillance meilleur (gras vert) / pire (italique rouge) par colonne.
-- [ ] Icône ✅/❌ basée sur critères §14.4 avec seuil MDD lu depuis `config_snapshot.yaml`.
-- [ ] Notes/warnings du pipeline affichés si `aggregate.notes` présent.
-- [ ] Message informatif si moins de 2 runs sélectionnés.
-- [ ] Tests couvrent les scénarios nominaux + erreurs + bords.
-- [ ] Suite de tests verte après implémentation.
-- [ ] `ruff check` passe sans erreur.
+- [x] Multiselect 2-10 runs avec identification par stratégie (nom + run ID).
+- [x] Tableau comparatif avec colonnes conformes à §5.2 et formatage §9.3.
+- [x] Surbrillance meilleur (gras vert) / pire (italique rouge) par colonne.
+- [x] Icône ✅/❌ basée sur critères §14.4 avec seuil MDD lu depuis `config_snapshot.yaml`.
+- [x] Notes/warnings du pipeline affichés si `aggregate.notes` présent.
+- [x] Message informatif si moins de 2 runs sélectionnés.
+- [x] Tests couvrent les scénarios nominaux + erreurs + bords.
+- [x] Suite de tests verte après implémentation.
+- [x] `ruff check` passe sans erreur.
 
 ## Pré-condition de démarrage
 - **Tous les tests existants sont GREEN** avant de commencer.
 - **Créer une branche dédiée** `task/083-wsd4-comparison-table` depuis `Max6000i1`.
 
 ## Checklist de fin de tâche
-- [ ] Branche `task/083-wsd4-comparison-table` créée depuis `Max6000i1`.
-- [ ] Tests RED écrits avant implémentation.
-- [ ] **Commit RED** : `[WS-D-4] #083 RED: tests sélection runs et tableau comparatif`.
-- [ ] Tests GREEN passants et reproductibles.
-- [ ] Critères d'acceptation tous satisfaits.
-- [ ] `ruff check ai_trading/ tests/` passe sans erreur.
-- [ ] Fichier de tâche mis à jour (statut DONE, critères cochés).
+- [x] Branche `task/083-wsd4-comparison-table` créée depuis `Max6000i1`.
+- [x] Tests RED écrits avant implémentation.
+- [x] **Commit RED** : `[WS-D-4] #083 RED: tests sélection runs et tableau comparatif`.
+- [x] Tests GREEN passants et reproductibles.
+- [x] Critères d'acceptation tous satisfaits.
+- [x] `ruff check ai_trading/ tests/` passe sans erreur.
+- [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
 - [ ] **Commit GREEN** : `[WS-D-4] #083 GREEN: sélection runs et tableau comparatif`.
 - [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-D-4] #083 — Page 3 : sélection des runs et tableau comparatif`.
