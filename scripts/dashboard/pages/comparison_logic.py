@@ -133,7 +133,7 @@ def check_criterion_14_4(
         return False
     if profit_factor <= 1.0:
         return False
-    return not max_drawdown <= mdd_cap
+    return max_drawdown > mdd_cap
 
 
 # ---------------------------------------------------------------------------
