@@ -15,7 +15,6 @@ from pathlib import Path
 
 import pandas as pd
 import plotly.graph_objects as go
-import pytest
 
 from scripts.dashboard.pages.fold_analysis_logic import (
     add_drawdown_to_figure,
@@ -23,7 +22,6 @@ from scripts.dashboard.pages.fold_analysis_logic import (
     get_fold_dir,
     list_fold_dirs,
 )
-
 
 # ---------------------------------------------------------------------------
 # list_fold_dirs
