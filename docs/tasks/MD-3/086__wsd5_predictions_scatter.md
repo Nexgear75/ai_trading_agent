@@ -1,6 +1,6 @@
 # Tâche — Page 4 : scatter plot prédictions vs réalisés (Go/No-Go)
 
-Statut : TODO
+Statut : DONE
 Ordre : 086
 Workstream : WS-D-5
 Milestone : MD-3
@@ -39,27 +39,27 @@ Implémenter dans `pages/4_fold_analysis.py` le scatter plot prédictions vs ré
 - Dégradation si `preds_test.csv` absent : message informatif.
 
 ## Critères d'acceptation
-- [ ] Scatter plot avec coloration Go/No-Go correcte pour `output_type == "regression"`.
-- [ ] Détection du type signal via `strategy.output_type` (ou fallback `method == "none"`), message informatif affiché.
-- [ ] Diagonale de prédiction parfaite visible sur le scatter plot.
-- [ ] Métriques en encart : MAE, RMSE, DA, IC, θ conformes à §8.3.
-- [ ] θ affiché comme `—` si `null`.
-- [ ] Dégradation gracieuse si prédictions absentes (message informatif).
-- [ ] Tests couvrent : θ positif, θ négatif, θ = 0, θ null, `method == "none"` (signal), prédictions absentes.
-- [ ] Suite de tests verte après implémentation.
-- [ ] `ruff check` passe sans erreur.
+- [x] Scatter plot avec coloration Go/No-Go correcte pour `output_type == "regression"`.
+- [x] Détection du type signal via `strategy.output_type` (ou fallback `method == "none"`), message informatif affiché.
+- [x] Diagonale de prédiction parfaite visible sur le scatter plot.
+- [x] Métriques en encart : MAE, RMSE, DA, IC, θ conformes à §8.3.
+- [x] θ affiché comme `—` si `null`.
+- [x] Dégradation gracieuse si prédictions absentes (message informatif).
+- [x] Tests couvrent : θ positif, θ négatif, θ = 0, θ null, `method == "none"` (signal), prédictions absentes.
+- [x] Suite de tests verte après implémentation.
+- [x] `ruff check` passe sans erreur.
 
 ## Pré-condition de démarrage
 - **Tous les tests existants sont GREEN** avant de commencer.
 - **Créer une branche dédiée** `task/086-wsd5-predictions-scatter` depuis `Max6000i1`.
 
 ## Checklist de fin de tâche
-- [ ] Branche `task/086-wsd5-predictions-scatter` créée depuis `Max6000i1`.
-- [ ] Tests RED écrits avant implémentation.
-- [ ] **Commit RED** : `[WS-D-5] #086 RED: tests scatter prédictions Go/No-Go`.
-- [ ] Tests GREEN passants et reproductibles.
-- [ ] Critères d'acceptation tous satisfaits.
-- [ ] `ruff check ai_trading/ tests/` passe sans erreur.
-- [ ] Fichier de tâche mis à jour (statut DONE, critères cochés).
+- [x] Branche `task/086-wsd5-predictions-scatter` créée depuis `Max6000i1`.
+- [x] Tests RED écrits avant implémentation.
+- [x] **Commit RED** : `[WS-D-5] #086 RED: tests scatter prédictions Go/No-Go`.
+- [x] Tests GREEN passants et reproductibles.
+- [x] Critères d'acceptation tous satisfaits.
+- [x] `ruff check ai_trading/ tests/` passe sans erreur.
+- [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
 - [ ] **Commit GREEN** : `[WS-D-5] #086 GREEN: scatter prédictions Go/No-Go`.
 - [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-D-5] #086 — Page 4 : scatter plot prédictions vs réalisés`.

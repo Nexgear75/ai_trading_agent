@@ -1,9 +1,10 @@
 """Page 4 — Analyse par fold (Fold Analysis).
 
 Navigation fold par fold : sélection d'un run puis d'un fold,
-equity curve du fold avec marqueurs entry/exit et drawdown.
+equity curve du fold avec marqueurs entry/exit et drawdown,
+scatter plot prédictions vs réalisés avec coloration Go/No-Go.
 
-Ref: §10.2 — pages/4_fold_analysis.py, §8.1 sélection, §8.2 equity.
+Ref: §10.2 — pages/4_fold_analysis.py, §8.1 sélection, §8.2 equity, §8.3 scatter.
 """
 
 from __future__ import annotations
@@ -13,17 +14,23 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-from scripts.dashboard.charts import chart_fold_equity
+from scripts.dashboard.charts import chart_fold_equity, chart_scatter_predictions
 from scripts.dashboard.data_loader import (
     load_fold_equity_curve,
     load_fold_trades,
+    load_predictions,
     load_run_metrics,
 )
 from scripts.dashboard.pages.fold_analysis_logic import (
     add_drawdown_to_figure,
     build_fold_selector_options,
+    build_prediction_metrics,
+    format_theta,
     get_fold_dir,
+    get_fold_threshold,
+    get_output_type,
 )
+from scripts.dashboard.utils import format_float, format_pct
 
 # ---------------------------------------------------------------------------
 # Page rendering
@@ -94,3 +101,42 @@ else:
     fig = chart_fold_equity(equity_df, trades_for_chart)
     fig = add_drawdown_to_figure(fig, equity_df)
     st.plotly_chart(fig, use_container_width=True)
+
+st.divider()
+
+# ---------------------------------------------------------------------------
+# §8.3 — Scatter predictions
+# ---------------------------------------------------------------------------
+
+st.subheader("Prédictions vs Réalisés")
+
+preds_df = load_predictions(fold_dir, "test")
+if preds_df is None:
+    st.info(f"Prédictions non disponibles pour {selected_fold} (preds_test.csv absent).")
+else:
+    threshold_info = get_fold_threshold(metrics, selected_fold)
+    output_type = get_output_type(metrics)
+
+    if output_type == "signal":
+        st.info("Scatter plot non disponible pour les modèles de type signal.")
+    else:
+        theta = threshold_info["theta"]
+        method = threshold_info["method"]
+        fig_scatter = chart_scatter_predictions(
+            preds_df, theta if theta is not None else 0.0, method
+        )
+        st.plotly_chart(fig_scatter, use_container_width=True)
+
+        # Metrics encart §8.3
+        pred_metrics = build_prediction_metrics(preds_df)
+        metric_cols = st.columns(5)
+        labels = [
+            ("MAE", format_float(pred_metrics["mae"], decimals=4)),
+            ("RMSE", format_float(pred_metrics["rmse"], decimals=4)),
+            ("DA", format_pct(pred_metrics["da"])),
+            ("IC", format_float(pred_metrics["ic"], decimals=4)),
+            ("θ", format_theta(theta)),
+        ]
+        for col, (label, value) in zip(metric_cols, labels, strict=True):
+            with col:
+                st.metric(label=label, value=value)
