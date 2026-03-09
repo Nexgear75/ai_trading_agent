@@ -1,6 +1,6 @@
 # Tâche — Page 4 : navigation par fold et equity curve du fold
 
-Statut : TODO
+Statut : DONE
 Ordre : 085
 Workstream : WS-D-5
 Milestone : MD-3
@@ -36,26 +36,26 @@ Implémenter dans `pages/4_fold_analysis.py` la sélection de run/fold et l'affi
 - Dégradation si `equity_curve.csv` du fold absent : message informatif.
 
 ## Critères d'acceptation
-- [ ] Dropdown run + fold fonctionnels avec identification par stratégie.
-- [ ] Slider alternatif pour navigation entre folds fonctionnel.
-- [ ] Equity curve du fold affichée avec marqueurs d'entrée (▲ vert) et sortie (▼ rouge) des trades.
-- [ ] Zone de drawdown ombrée visible.
-- [ ] Dégradation gracieuse si equity curve du fold absente (message informatif).
-- [ ] Tests couvrent les scénarios nominaux + erreurs + bords.
-- [ ] Suite de tests verte après implémentation.
-- [ ] `ruff check` passe sans erreur.
+- [x] Dropdown run + fold fonctionnels avec identification par stratégie.
+- [x] Slider alternatif pour navigation entre folds fonctionnel.
+- [x] Equity curve du fold affichée avec marqueurs d'entrée (▲ vert) et sortie (▼ rouge) des trades.
+- [x] Zone de drawdown ombrée visible.
+- [x] Dégradation gracieuse si equity curve du fold absente (message informatif).
+- [x] Tests couvrent les scénarios nominaux + erreurs + bords.
+- [x] Suite de tests verte après implémentation.
+- [x] `ruff check` passe sans erreur.
 
 ## Pré-condition de démarrage
 - **Tous les tests existants sont GREEN** avant de commencer.
 - **Créer une branche dédiée** `task/085-wsd5-fold-navigation-equity` depuis `Max6000i1`.
 
 ## Checklist de fin de tâche
-- [ ] Branche `task/085-wsd5-fold-navigation-equity` créée depuis `Max6000i1`.
-- [ ] Tests RED écrits avant implémentation.
-- [ ] **Commit RED** : `[WS-D-5] #085 RED: tests navigation fold et equity curve`.
-- [ ] Tests GREEN passants et reproductibles.
-- [ ] Critères d'acceptation tous satisfaits.
-- [ ] `ruff check ai_trading/ tests/` passe sans erreur.
-- [ ] Fichier de tâche mis à jour (statut DONE, critères cochés).
-- [ ] **Commit GREEN** : `[WS-D-5] #085 GREEN: navigation fold et equity curve`.
+- [x] Branche `task/085-wsd5-fold-navigation-equity` créée depuis `Max6000i1`.
+- [x] Tests RED écrits avant implémentation.
+- [x] **Commit RED** : `[WS-D-5] #085 RED: tests navigation fold et equity curve`.
+- [x] Tests GREEN passants et reproductibles.
+- [x] Critères d'acceptation tous satisfaits.
+- [x] `ruff check ai_trading/ tests/` passe sans erreur.
+- [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
+- [x] **Commit GREEN** : `[WS-D-5] #085 GREEN: navigation fold et equity curve`.
 - [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-D-5] #085 — Page 4 : navigation par fold et equity curve`.
