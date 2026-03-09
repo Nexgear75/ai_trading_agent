@@ -2,15 +2,17 @@
 
 Extracts testable logic from the Streamlit rendering code.
 
-Ref: §8.1 sélection fold, §8.2 equity curve du fold.
+Ref: §8.1 sélection fold, §8.2 equity curve du fold, §8.3 scatter predictions.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
+from scipy.stats import spearmanr
 
 from scripts.dashboard.utils import COLOR_DRAWDOWN
 
@@ -133,3 +135,100 @@ def add_drawdown_to_figure(
     )
 
     return fig
+
+
+# ---------------------------------------------------------------------------
+# §8.3 — Threshold & output type helpers
+# ---------------------------------------------------------------------------
+
+
+def get_fold_threshold(metrics: dict, fold_id: str) -> dict:
+    """Extract threshold info from metrics for a given fold.
+
+    Parameters
+    ----------
+    metrics:
+        Parsed metrics dict with a ``folds`` list.
+    fold_id:
+        Fold identifier (e.g. ``"fold_00"``).
+
+    Returns
+    -------
+    dict
+        ``{"theta": float | None, "method": str}``.
+
+    Raises
+    ------
+    ValueError
+        If ``fold_id`` is not found in metrics folds.
+    """
+    for fold in metrics["folds"]:
+        if fold["fold_id"] == fold_id:
+            threshold = fold["threshold"]
+            return {"theta": threshold["theta"], "method": threshold["method"]}
+    raise ValueError(f"Fold {fold_id!r} not found in metrics")
+
+
+def get_output_type(metrics: dict) -> str:
+    """Detect the output type of the model from metrics.
+
+    Primary: reads ``metrics["strategy"]["output_type"]``.
+    Fallback (older runs): if any fold has ``threshold.method == "none"``
+    for *all* folds → ``"signal"``, else ``"regression"``.
+
+    Parameters
+    ----------
+    metrics:
+        Parsed metrics dict.
+
+    Returns
+    -------
+    str
+        ``"regression"`` or ``"signal"``.
+    """
+    output_type = metrics.get("strategy", {}).get("output_type")
+    if output_type is not None:
+        return output_type
+
+    # Fallback: infer from threshold methods
+    methods = [f["threshold"]["method"] for f in metrics["folds"]]
+    if all(m == "none" for m in methods):
+        return "signal"
+    return "regression"
+
+
+# ---------------------------------------------------------------------------
+# §8.3 — Prediction metrics
+# ---------------------------------------------------------------------------
+
+
+def build_prediction_metrics(preds_df: pd.DataFrame) -> dict:
+    """Compute prediction quality metrics from y_true and y_hat.
+
+    Parameters
+    ----------
+    preds_df:
+        DataFrame with ``y_true`` and ``y_hat`` columns.
+
+    Returns
+    -------
+    dict
+        Keys: ``mae``, ``rmse``, ``da``, ``ic``.
+    """
+    y_true = preds_df["y_true"].to_numpy()
+    y_hat = preds_df["y_hat"].to_numpy()
+
+    diff = y_true - y_hat
+    mae = float(np.mean(np.abs(diff)))
+    rmse = float(np.sqrt(np.mean(diff**2)))
+    da = float(np.mean(np.sign(y_true) == np.sign(y_hat)))
+    ic = float(spearmanr(y_true, y_hat).statistic)
+
+    return {"mae": mae, "rmse": rmse, "da": da, "ic": ic}
+
+
+def format_theta(theta: float | None) -> str:
+    """Format θ for display. None → '—' (em dash)."""
+    if theta is None:
+        return "—"
+    return f"{theta:.4f}"
