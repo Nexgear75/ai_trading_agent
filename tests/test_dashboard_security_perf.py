@@ -58,7 +58,7 @@ class TestNoWriteOperations:
                         f"{py_file.name}:{line_no}: {match.group(0)}"
                     )
         assert not violations, (
-            f"Write operations found in dashboard:\n"
+            "Write operations found in dashboard:\n"
             + "\n".join(violations)
         )
 
@@ -213,5 +213,5 @@ class TestNoNetworkAccess:
                 if re.search(pattern, source):
                     violations.append(f"{py_file.name}: {pattern}")
         assert not violations, (
-            f"Network access found in dashboard:\n" + "\n".join(violations)
+            "Network access found in dashboard:\n" + "\n".join(violations)
         )
