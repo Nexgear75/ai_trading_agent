@@ -1,1 +1,0 @@
-"""Training orchestration — fold trainer."""

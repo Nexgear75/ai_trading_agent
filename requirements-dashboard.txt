@@ -1,7 +1,0 @@
-# === AI Trading Dashboard — Streamlit dependencies ===
-# Ref: docs/specifications/streamlit/Specification_Dashboard_Streamlit_v1.0.md (Annexe C)
-streamlit>=1.30
-plotly>=5.18
-pandas>=2.0
-numpy>=1.24
-PyYAML>=6.0

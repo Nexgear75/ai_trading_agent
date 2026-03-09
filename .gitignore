@@ -1,34 +1,37 @@
-# === Python ===
-.venv/
+# Python
 __pycache__/
 *.py[cod]
+*.pyo
 *.egg-info/
 dist/
 build/
-.eggs/
+*.egg
 
-# === IDE ===
-.idea/
+# Virtual environments
+.venv/
+venv/
+env/
+
+# IDE
 .vscode/
+.idea/
 *.swp
 *.swo
 
-# === Artefacts de run (générés par le pipeline) ===
+# Caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Data (re-fetchable via fetch.py)
+data/
+
+# Pipeline runs (generated artifacts)
 runs/
-output/
-reports/
 
-# === Données brutes (volumineuses) ===
-data/raw/
-
-# === OS ===
-.DS_Store
-Thumbs.db
-
-# === Word / Office temp files ===
-~$*
-*.docx
-
-
-# === Logs ===
+# Logs
 *.log
+
+# OS
+Thumbs.db
+.DS_Store
