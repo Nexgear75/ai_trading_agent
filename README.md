@@ -244,6 +244,59 @@ docker run --rm -v $(pwd)/data:/app/data -v $(pwd)/runs:/app/runs \
 
 ---
 
+## Dashboard
+
+Le dashboard Streamlit permet de visualiser et comparer les résultats des runs du pipeline.
+
+### Installation
+
+```bash
+# Via Makefile
+make install-dashboard
+
+# Ou directement
+pip install -r requirements-dashboard.txt
+```
+
+### Lancement
+
+**Makefile** (recommandé) :
+
+```bash
+# Lancement par défaut (runs/ directory)
+make dashboard
+
+# Avec un répertoire de runs personnalisé
+make dashboard RUNS_DIR=/path/to/my/runs
+```
+
+**CLI directe** :
+
+```bash
+streamlit run scripts/dashboard/app.py -- --runs-dir runs/
+```
+
+**Docker** :
+
+```bash
+# Build
+docker build -f Dockerfile.dashboard -t ai-trading-dashboard .
+
+# Run
+docker run -p 8501:8501 -v $(pwd)/runs:/app/runs ai-trading-dashboard
+
+# Ou via Makefile
+make docker-dashboard
+```
+
+### Variable d'environnement
+
+| Variable | Description | Défaut |
+|---|---|---|
+| `AI_TRADING_RUNS_DIR` | Répertoire contenant les runs à visualiser | `runs/` |
+
+---
+
 ## Configuration
 
 La configuration centralisée est dans `configs/default.yaml`. Tous les paramètres sont documentés dans la [spécification](docs/specifications/Specification_Pipeline_Commun_AI_Trading_v1.0.md) (Annexe E.1).

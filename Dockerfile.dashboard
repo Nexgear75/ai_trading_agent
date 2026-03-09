@@ -1,0 +1,26 @@
+# ============================================================================
+# AI Trading Dashboard — Dockerfile
+# Référence : docs/specifications/streamlit/Specification_Dashboard_Streamlit_v1.0.md §10.5
+# ============================================================================
+
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install dashboard dependencies
+COPY requirements-dashboard.txt .
+RUN pip install --no-cache-dir -r requirements-dashboard.txt
+
+# Copy dashboard code
+COPY scripts/dashboard/ scripts/dashboard/
+
+# Create empty runs directory (populated via volume mount at runtime)
+RUN mkdir -p runs/
+
+# Non-root user for security
+RUN useradd --create-home appuser
+USER appuser
+
+EXPOSE 8501
+
+CMD ["streamlit", "run", "scripts/dashboard/app.py", "--server.headless=true"]

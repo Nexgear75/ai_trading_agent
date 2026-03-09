@@ -14,6 +14,7 @@ SHELL := /bin/bash
 CONFIG ?= configs/default.yaml
 MODEL ?=
 SEED ?=
+RUNS_DIR ?= runs/
 
 # Build --set overrides for the run target
 OVERRIDES :=
@@ -74,6 +75,22 @@ help: ## Display this help message
 	@echo ""
 	@grep -E '^[a-zA-Z0-9_-]+:.*##' $(MAKEFILE_LIST) | \
 		awk 'BEGIN {FS = ":.*##"}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
+
+# ============================================================================
+# Dashboard targets
+# ============================================================================
+
+.PHONY: dashboard install-dashboard docker-dashboard
+
+install-dashboard: ## Install dashboard dependencies from requirements-dashboard.txt
+	pip install -r requirements-dashboard.txt
+
+dashboard: ## Launch Streamlit dashboard (use RUNS_DIR= to override runs directory)
+	streamlit run scripts/dashboard/app.py -- --runs-dir $(RUNS_DIR)
+
+docker-dashboard: ## Build and run dashboard Docker container (port 8501)
+	docker build -f Dockerfile.dashboard -t ai-trading-dashboard .
+	docker run --rm -p 8501:8501 -v $(shell pwd)/runs:/app/runs ai-trading-dashboard
 
 # ============================================================================
 # Gate milestone targets
