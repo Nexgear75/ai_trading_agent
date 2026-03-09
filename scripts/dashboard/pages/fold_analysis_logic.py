@@ -2,7 +2,8 @@
 
 Extracts testable logic from the Streamlit rendering code.
 
-Ref: §8.1 sélection fold, §8.2 equity curve du fold, §8.3 scatter predictions.
+Ref: §8.1 sélection fold, §8.2 equity curve du fold, §8.3 scatter predictions,
+     §8.4 journal des trades du fold.
 """
 
 from __future__ import annotations
@@ -14,7 +15,7 @@ import pandas as pd
 import plotly.graph_objects as go
 from scipy.stats import spearmanr
 
-from scripts.dashboard.utils import COLOR_DRAWDOWN
+from scripts.dashboard.utils import _NULL_DISPLAY, COLOR_DRAWDOWN
 
 # ---------------------------------------------------------------------------
 # §8.1 — Fold listing and selection helpers
@@ -232,3 +233,145 @@ def format_theta(theta: float | None) -> str:
     if theta is None:
         return "—"
     return f"{theta:.4f}"
+
+
+# ---------------------------------------------------------------------------
+# §8.4 — Fold trade journal helpers
+# ---------------------------------------------------------------------------
+
+
+def prepare_fold_trades(trades_df: pd.DataFrame) -> pd.DataFrame:
+    """Add computed ``costs`` column to fold trades.
+
+    ``load_fold_trades()`` does not include ``costs``, unlike
+    ``load_trades()`` which adds it. This function adds it so the
+    data is ready for journal construction.
+
+    Parameters
+    ----------
+    trades_df:
+        Trades from ``load_fold_trades()`` with ``fees_paid`` and
+        ``slippage_paid`` columns.
+
+    Returns
+    -------
+    pd.DataFrame
+        Copy with ``costs`` column added.
+    """
+    result = trades_df.copy()
+    result["costs"] = result["fees_paid"] + result["slippage_paid"]
+    return result
+
+
+def join_fold_equity_after(
+    trades_df: pd.DataFrame,
+    equity_df: pd.DataFrame | None,
+) -> pd.Series | None:
+    """Join equity values to trades for a single fold via merge_asof.
+
+    Simplified version of ``run_detail_logic.join_equity_after`` that
+    does not require a ``fold`` column (single-fold context).
+
+    Parameters
+    ----------
+    trades_df:
+        Trades DataFrame with ``exit_time_utc`` column.
+    equity_df:
+        Fold equity curve with ``time_utc`` and ``equity`` columns.
+        If None, returns None.
+
+    Returns
+    -------
+    pd.Series or None
+        Series of equity values aligned with trades_df.
+        NaN where no backward match is found.
+    """
+    if equity_df is None:
+        return None
+
+    trades_time = pd.to_datetime(trades_df["exit_time_utc"])
+    equity_time = pd.to_datetime(equity_df["time_utc"])
+
+    trades_work = pd.DataFrame({
+        "exit_ts": trades_time,
+        "_orig_idx": range(len(trades_df)),
+    }).sort_values("exit_ts")
+
+    equity_work = pd.DataFrame({
+        "exit_ts": equity_time,
+        "equity": equity_df["equity"].values,
+    }).sort_values("exit_ts")
+
+    if equity_work.empty:
+        return pd.Series(
+            np.full(len(trades_df), np.nan, dtype=np.float64),
+            index=trades_df.index,
+        )
+
+    merged = pd.merge_asof(
+        trades_work[["exit_ts", "_orig_idx"]],
+        equity_work[["exit_ts", "equity"]],
+        on="exit_ts",
+        direction="backward",
+    )
+
+    result = np.full(len(trades_df), np.nan, dtype=np.float64)
+    valid = merged.dropna(subset=["equity"])
+    if not valid.empty:
+        idxs = valid["_orig_idx"].astype(int).values
+        result[idxs] = valid["equity"].values
+
+    return pd.Series(result, index=trades_df.index)
+
+
+def build_fold_trade_journal(
+    trades_df: pd.DataFrame,
+    equity_df: pd.DataFrame | None,
+) -> pd.DataFrame:
+    """Build trade journal for a single fold (§8.4 reusing §6.6 structure).
+
+    Like ``run_detail_logic.build_trade_journal`` but without the ``Fold``
+    column, since the fold is already selected upstream.
+
+    Parameters
+    ----------
+    trades_df:
+        Trades DataFrame with ``costs`` column (from ``prepare_fold_trades``).
+    equity_df:
+        Fold equity curve, or None.
+
+    Returns
+    -------
+    pd.DataFrame
+        Journal with columns: Entry time, Exit time, Entry price,
+        Exit price, Gross return, Costs, Net return, and optionally
+        Equity after.
+    """
+    base_cols = [
+        "Entry time", "Exit time", "Entry price", "Exit price",
+        "Gross return", "Costs", "Net return",
+    ]
+
+    if trades_df.empty:
+        cols = list(base_cols)
+        if equity_df is not None:
+            cols.append("Equity after")
+        return pd.DataFrame(columns=cols)
+
+    journal = pd.DataFrame({
+        "Entry time": trades_df["entry_time_utc"].values,
+        "Exit time": trades_df["exit_time_utc"].values,
+        "Entry price": trades_df["entry_price"].values,
+        "Exit price": trades_df["exit_price"].values,
+        "Gross return": trades_df["gross_return"].values,
+        "Costs": trades_df["costs"].values,
+        "Net return": trades_df["net_return"].values,
+    })
+
+    equity_after = join_fold_equity_after(trades_df, equity_df)
+    if equity_after is not None:
+        journal["Equity after"] = equity_after.apply(
+            lambda v: _NULL_DISPLAY if pd.isna(v) else v
+        )
+
+    return journal

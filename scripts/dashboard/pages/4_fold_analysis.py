@@ -2,13 +2,16 @@
 
 Navigation fold par fold : sélection d'un run puis d'un fold,
 equity curve du fold avec marqueurs entry/exit et drawdown,
-scatter plot prédictions vs réalisés avec coloration Go/No-Go.
+scatter plot prédictions vs réalisés avec coloration Go/No-Go,
+journal des trades du fold.
 
-Ref: §10.2 — pages/4_fold_analysis.py, §8.1 sélection, §8.2 equity, §8.3 scatter.
+Ref: §10.2 — pages/4_fold_analysis.py, §8.1 sélection, §8.2 equity,
+     §8.3 scatter, §8.4 journal des trades.
 """
 
 from __future__ import annotations
 
+import math
 from pathlib import Path
 
 import pandas as pd
@@ -24,11 +27,17 @@ from scripts.dashboard.data_loader import (
 from scripts.dashboard.pages.fold_analysis_logic import (
     add_drawdown_to_figure,
     build_fold_selector_options,
+    build_fold_trade_journal,
     build_prediction_metrics,
     format_theta,
     get_fold_dir,
     get_fold_threshold,
     get_output_type,
+    prepare_fold_trades,
+)
+from scripts.dashboard.pages.run_detail_logic import (
+    filter_trades,
+    paginate_dataframe,
 )
 from scripts.dashboard.utils import format_float, format_pct
 
@@ -140,3 +149,70 @@ else:
         for col, (label, value) in zip(metric_cols, labels, strict=True):
             with col:
                 st.metric(label=label, value=value)
+
+st.divider()
+
+# ---------------------------------------------------------------------------
+# §8.4 — Journal des trades du fold
+# ---------------------------------------------------------------------------
+
+st.subheader("Journal des trades")
+
+if trades_df is None or trades_df.empty:
+    st.info(f"Trades non disponibles pour {selected_fold} (trades.csv absent).")
+else:
+    prepared_trades = prepare_fold_trades(trades_df)
+
+    # Filters: sign + date (no fold filter — fold already selected upstream)
+    filter_col1, filter_col2 = st.columns(2)
+    with filter_col1:
+        sign_options = ["Tous", "Gagnant", "Perdant"]
+        selected_sign = st.radio(
+            "Signe", sign_options, horizontal=True, key="fold_journal_sign",
+        )
+    with filter_col2:
+        entry_times = pd.to_datetime(prepared_trades["entry_time_utc"])
+        min_date = entry_times.min().date()
+        max_date = entry_times.max().date()
+        date_range = st.date_input(
+            "Période",
+            value=(min_date, max_date),
+            min_value=min_date,
+            max_value=max_date,
+            key="fold_journal_dates",
+        )
+
+    # Map sign selection to filter_trades parameter
+    sign_map = {"Tous": None, "Gagnant": "winning", "Perdant": "losing"}
+    sign_filter = sign_map[selected_sign]
+
+    # Parse date range
+    date_start = None
+    date_end = None
+    if isinstance(date_range, tuple) and len(date_range) == 2:
+        date_start = pd.Timestamp(date_range[0])
+        date_end = pd.Timestamp(date_range[1]) + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
+
+    # Apply filters (DRY: reuse filter_trades from run_detail_logic)
+    filtered = filter_trades(
+        prepared_trades, sign=sign_filter, date_start=date_start, date_end=date_end,
+    )
+
+    # Build journal (DRY: fold-specific helper, no Fold column)
+    journal = build_fold_trade_journal(filtered, equity_df)
+
+    # Pagination (DRY: reuse paginate_dataframe from run_detail_logic)
+    total_rows = len(journal)
+    page_size = 50
+    total_pages = max(1, math.ceil(total_rows / page_size))
+    st.caption(f"{total_rows} trades — {total_pages} page(s)")
+
+    if total_rows > 0:
+        current_page = st.number_input(
+            "Page", min_value=1, max_value=total_pages, value=1,
+            key="fold_journal_page",
+        )
+        page_df = paginate_dataframe(journal, page=current_page, page_size=page_size)
+        st.dataframe(page_df, use_container_width=True, hide_index=True)
+    else:
+        st.info("Aucun trade ne correspond aux filtres sélectionnés.")

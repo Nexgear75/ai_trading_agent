@@ -1,6 +1,6 @@
 # Tâche — Page 4 : journal des trades du fold
 
-Statut : TODO
+Statut : DONE
 Ordre : 087
 Workstream : WS-D-5
 Milestone : MD-3
@@ -36,27 +36,27 @@ Implémenter dans `pages/4_fold_analysis.py` le journal des trades du fold séle
 - Dégradation si `trades.csv` du fold absent : message informatif.
 
 ## Critères d'acceptation
-- [ ] Journal des trades conforme à §6.6 et §8.4, filtré sur le fold sélectionné.
-- [ ] Logique de journal factorisée (DRY avec tâche #082) — pas de duplication du code de tableau.
-- [ ] Pagination à 50 lignes/page.
-- [ ] Filtres par signe et par période fonctionnels.
-- [ ] Colonne Equity after présente si equity curve disponible, omise sinon.
-- [ ] Dégradation gracieuse si trades du fold absents (message informatif).
-- [ ] Tests couvrent les scénarios nominaux + erreurs + bords.
-- [ ] Suite de tests verte après implémentation.
-- [ ] `ruff check` passe sans erreur.
+- [x] Journal des trades conforme à §6.6 et §8.4, filtré sur le fold sélectionné.
+- [x] Logique de journal factorisée (DRY avec tâche #082) — pas de duplication du code de tableau.
+- [x] Pagination à 50 lignes/page.
+- [x] Filtres par signe et par période fonctionnels.
+- [x] Colonne Equity after présente si equity curve disponible, omise sinon.
+- [x] Dégradation gracieuse si trades du fold absents (message informatif).
+- [x] Tests couvrent les scénarios nominaux + erreurs + bords.
+- [x] Suite de tests verte après implémentation.
+- [x] `ruff check` passe sans erreur.
 
 ## Pré-condition de démarrage
 - **Tous les tests existants sont GREEN** avant de commencer.
 - **Créer une branche dédiée** `task/087-wsd5-fold-trades-journal` depuis `Max6000i1`.
 
 ## Checklist de fin de tâche
-- [ ] Branche `task/087-wsd5-fold-trades-journal` créée depuis `Max6000i1`.
-- [ ] Tests RED écrits avant implémentation.
-- [ ] **Commit RED** : `[WS-D-5] #087 RED: tests journal trades du fold`.
-- [ ] Tests GREEN passants et reproductibles.
-- [ ] Critères d'acceptation tous satisfaits.
-- [ ] `ruff check ai_trading/ tests/` passe sans erreur.
-- [ ] Fichier de tâche mis à jour (statut DONE, critères cochés).
+- [x] Branche `task/087-wsd5-fold-trades-journal` créée depuis `Max6000i1`.
+- [x] Tests RED écrits avant implémentation.
+- [x] **Commit RED** : `[WS-D-5] #087 RED: tests journal trades du fold`.
+- [x] Tests GREEN passants et reproductibles.
+- [x] Critères d'acceptation tous satisfaits.
+- [x] `ruff check ai_trading/ tests/` passe sans erreur.
+- [x] Fichier de tâche mis à jour (statut DONE, critères cochés).
 - [ ] **Commit GREEN** : `[WS-D-5] #087 GREEN: journal trades du fold`.
 - [ ] **Pull Request ouverte** vers `Max6000i1` : `[WS-D-5] #087 — Page 4 : journal des trades du fold`.
