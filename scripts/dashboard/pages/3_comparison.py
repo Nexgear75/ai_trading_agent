@@ -14,9 +14,12 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
+from scripts.dashboard.charts import chart_equity_overlay, chart_radar
 from scripts.dashboard.data_loader import load_config_snapshot
 from scripts.dashboard.pages.comparison_logic import (
     build_comparison_dataframe,
+    build_equity_overlay_curves,
+    build_radar_data,
     check_criterion_14_4,
     format_comparison_dataframe,
     get_aggregate_notes,
@@ -137,3 +140,32 @@ for m in selected_runs:
     notes = get_aggregate_notes(m)
     if notes is not None:
         st.warning(f"⚠️ **{m['run_id']}** : {notes}")
+
+# ---------------------------------------------------------------------------
+# §7.3 — Equity overlay
+# ---------------------------------------------------------------------------
+
+st.divider()
+
+if runs_dir is not None:
+    curves, missing_runs = build_equity_overlay_curves(selected_runs, Path(runs_dir))
+    if missing_runs:
+        st.info(f"Equity curves absentes pour : {', '.join(missing_runs)}")
+    if curves:
+        fig_overlay = chart_equity_overlay(curves)
+        st.plotly_chart(fig_overlay, use_container_width=True)
+    else:
+        st.info("Aucune equity curve disponible pour les runs sélectionnés.")
+else:
+    st.info("Aucune equity curve disponible pour les runs sélectionnés.")
+
+# ---------------------------------------------------------------------------
+# §7.4 — Radar chart
+# ---------------------------------------------------------------------------
+
+st.divider()
+
+radar_data = build_radar_data(selected_runs)
+if radar_data:
+    fig_radar = chart_radar(radar_data)
+    st.plotly_chart(fig_radar, use_container_width=True)

@@ -1,15 +1,20 @@
 """Pure business logic for the comparison page (Page 3).
 
 Extracts testable logic (DataFrame construction, highlighting, criterion check,
-radar data, notes extraction, formatting) from the Streamlit rendering code.
+radar data, notes extraction, formatting, equity overlay) from the Streamlit
+rendering code.
 
-Ref: §7.1 multiselect, §7.2 tableau comparatif, §9.3 conventions d'affichage.
+Ref: §7.1 multiselect, §7.2 tableau comparatif, §7.3 equity overlay,
+§7.4 radar chart, §9.3 conventions d'affichage.
 """
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pandas as pd
 
+from scripts.dashboard.data_loader import load_equity_curve
 from scripts.dashboard.pages.overview_logic import (
     build_overview_dataframe,
     format_overview_dataframe,
@@ -177,6 +182,46 @@ def build_radar_data(runs: list[dict]) -> list[dict]:
             "profit_factor": _none_to_zero(trading_mean.get("profit_factor")),
         })
     return result
+
+
+# ---------------------------------------------------------------------------
+# Equity overlay curves (§7.3)
+# ---------------------------------------------------------------------------
+
+
+def build_equity_overlay_curves(
+    runs: list[dict], runs_dir: Path
+) -> tuple[dict[str, pd.DataFrame], list[str]]:
+    """Load equity curves for selected runs and build overlay dict.
+
+    Parameters
+    ----------
+    runs:
+        List of validated metrics dicts (from ``discover_runs()``).
+    runs_dir:
+        Root directory containing run subdirectories.
+
+    Returns
+    -------
+    tuple[dict[str, pd.DataFrame], list[str]]
+        - curves: ``{"{strategy_name} ({run_id})": DataFrame}``
+        - missing: list of run_ids without equity curve.
+    """
+    curves: dict[str, pd.DataFrame] = {}
+    missing: list[str] = []
+
+    for m in runs:
+        run_id = m["run_id"]
+        strategy_name = m["strategy"]["name"]
+        label = f"{strategy_name} ({run_id})"
+        run_dir = runs_dir / run_id
+        equity_df = load_equity_curve(run_dir)
+        if equity_df is None:
+            missing.append(run_id)
+        else:
+            curves[label] = equity_df
+
+    return curves, missing
 
 
 # ---------------------------------------------------------------------------
