@@ -587,3 +587,19 @@ class TestBuildEquityOverlayCurves:
         df = curves["s (run_A)"]
         assert isinstance(df, pd.DataFrame)
         assert "equity" in df.columns
+
+    def test_empty_equity_treated_as_missing(self, tmp_path: Path) -> None:
+        """#084 — Empty equity DataFrame treated as missing."""
+        from scripts.dashboard.pages.comparison_logic import build_equity_overlay_curves
+
+        # Create CSV with headers only (empty DataFrame)
+        run_dir = tmp_path / "run_A"
+        run_dir.mkdir(parents=True, exist_ok=True)
+        pd.DataFrame(
+            columns=["time_utc", "equity", "in_trade", "fold"]
+        ).to_csv(run_dir / "equity_curve.csv", index=False)
+
+        runs = [_make_metrics(run_id="run_A", strategy_name="s")]
+        curves, missing = build_equity_overlay_curves(runs, tmp_path)
+        assert curves == {}
+        assert missing == ["run_A"]

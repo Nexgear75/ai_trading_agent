@@ -80,15 +80,31 @@ if not fold_ids:
     st.info("Aucun fold disponible pour ce run.")
     st.stop()
 
-selected_fold = st.selectbox("Fold", fold_ids, key="fold_select")
-fold_index = fold_ids.index(selected_fold)
-fold_slider = st.slider(
-    "Navigation fold", 0, len(fold_ids) - 1, fold_index, key="fold_slider"
+# Clamp session state if run changed (fewer folds)
+if "fold_slider" in st.session_state and st.session_state["fold_slider"] >= len(fold_ids):
+    st.session_state["fold_slider"] = 0
+    st.session_state["fold_select"] = fold_ids[0]
+
+
+def _on_fold_select():
+    """Sync slider when selectbox changes."""
+    st.session_state["fold_slider"] = fold_ids.index(st.session_state["fold_select"])
+
+
+def _on_fold_slider():
+    """Sync selectbox when slider changes."""
+    st.session_state["fold_select"] = fold_ids[st.session_state["fold_slider"]]
+
+
+selected_fold = st.selectbox(
+    "Fold", fold_ids, key="fold_select", on_change=_on_fold_select,
+)
+st.slider(
+    "Navigation fold", 0, len(fold_ids) - 1, key="fold_slider",
+    on_change=_on_fold_slider,
 )
 
-# Sync slider with dropdown
-if fold_slider != fold_index:
-    selected_fold = fold_ids[fold_slider]
+selected_fold = fold_ids[st.session_state.get("fold_slider", 0)]
 
 fold_dir = get_fold_dir(run_dir, selected_fold)
 
@@ -131,10 +147,14 @@ else:
     else:
         theta = threshold_info["theta"]
         method = threshold_info["method"]
-        fig_scatter = chart_scatter_predictions(
-            preds_df, theta if theta is not None else 0.0, method
-        )
-        st.plotly_chart(fig_scatter, use_container_width=True)
+
+        if theta is None:
+            st.warning(
+                "Seuil θ non disponible pour ce fold — scatter plot non affiché."
+            )
+        else:
+            fig_scatter = chart_scatter_predictions(preds_df, theta, method)
+            st.plotly_chart(fig_scatter, use_container_width=True)
 
         # Metrics encart §8.3
         pred_metrics = build_prediction_metrics(preds_df)

@@ -216,7 +216,7 @@ def build_equity_overlay_curves(
         label = f"{strategy_name} ({run_id})"
         run_dir = runs_dir / run_id
         equity_df = load_equity_curve(run_dir)
-        if equity_df is None:
+        if equity_df is None or equity_df.empty:
             missing.append(run_id)
         else:
             curves[label] = equity_df

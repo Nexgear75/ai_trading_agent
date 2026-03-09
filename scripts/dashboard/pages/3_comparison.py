@@ -8,6 +8,7 @@ Ref: §10.2 — pages/3_comparison.py, §7.1 multiselect, §7.2 tableau comparat
 
 from __future__ import annotations
 
+import html as html_mod
 import logging
 from pathlib import Path
 
@@ -123,7 +124,7 @@ styled_rows = []
 for idx in range(len(df_formatted)):
     row = {}
     for col in df_formatted.columns:
-        val = str(df_formatted.iloc[idx][col])
+        val = html_mod.escape(str(df_formatted.iloc[idx][col]))
         if col in highlights:
             val = _style_cell(idx, col, val)
         row[col] = val

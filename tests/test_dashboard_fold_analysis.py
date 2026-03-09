@@ -107,9 +107,9 @@ class TestBuildFoldSelectorOptions:
         """#085 — build_fold_selector_options returns fold IDs from metrics."""
         metrics = {
             "folds": [
-                {"fold_id": "fold_00", "trading": {}, "prediction": {}},
-                {"fold_id": "fold_01", "trading": {}, "prediction": {}},
-                {"fold_id": "fold_02", "trading": {}, "prediction": {}},
+                {"fold_id": 0, "trading": {}, "prediction": {}},
+                {"fold_id": 1, "trading": {}, "prediction": {}},
+                {"fold_id": 2, "trading": {}, "prediction": {}},
             ],
             "aggregate": {},
             "run_id": "run_001",
@@ -131,6 +131,19 @@ class TestBuildFoldSelectorOptions:
 
     def test_single_fold(self) -> None:
         """#085 — build_fold_selector_options handles single fold."""
+        metrics = {
+            "folds": [
+                {"fold_id": 0, "trading": {}, "prediction": {}},
+            ],
+            "aggregate": {},
+            "run_id": "run_001",
+            "strategy": {"name": "test", "strategy_type": "model"},
+        }
+        result = build_fold_selector_options(metrics)
+        assert result == ["fold_00"]
+
+    def test_string_fold_ids_passthrough(self) -> None:
+        """#085 — build_fold_selector_options handles string fold_ids (legacy)."""
         metrics = {
             "folds": [
                 {"fold_id": "fold_00", "trading": {}, "prediction": {}},
@@ -162,6 +175,12 @@ class TestGetFoldDir:
         run_dir = tmp_path / "my_run"
         assert get_fold_dir(run_dir, "fold_05") == run_dir / "folds" / "fold_05"
         assert get_fold_dir(run_dir, "fold_99") == run_dir / "folds" / "fold_99"
+
+    def test_int_fold_id(self, tmp_path: Path) -> None:
+        """#085 — get_fold_dir handles integer fold_id from metrics."""
+        run_dir = tmp_path / "my_run"
+        assert get_fold_dir(run_dir, 0) == run_dir / "folds" / "fold_00"
+        assert get_fold_dir(run_dir, 5) == run_dir / "folds" / "fold_05"
 
 
 # ---------------------------------------------------------------------------
@@ -256,7 +275,7 @@ class TestGetFoldThreshold:
 
     def _make_metrics(
         self,
-        fold_id: str = "fold_00",
+        fold_id: int = 0,
         theta: float | None = 0.005,
         method: str = "quantile",
     ) -> dict:
@@ -302,7 +321,7 @@ class TestGetFoldThreshold:
 
     def test_fold_not_found_raises(self) -> None:
         """#086 — get_fold_threshold raises ValueError when fold not found."""
-        metrics = self._make_metrics(fold_id="fold_00")
+        metrics = self._make_metrics(fold_id=0)
         with pytest.raises(ValueError, match="fold_99"):
             get_fold_threshold(metrics, "fold_99")
 
@@ -311,13 +330,13 @@ class TestGetFoldThreshold:
         metrics = {
             "folds": [
                 {
-                    "fold_id": "fold_00",
+                    "fold_id": 0,
                     "threshold": {"theta": 0.001, "method": "quantile"},
                     "trading": {},
                     "prediction": {},
                 },
                 {
-                    "fold_id": "fold_01",
+                    "fold_id": 1,
                     "threshold": {"theta": 0.009, "method": "quantile"},
                     "trading": {},
                     "prediction": {},
@@ -344,7 +363,7 @@ class TestGetOutputType:
         metrics = {
             "strategy": {"output_type": "regression"},
             "folds": [
-                {"fold_id": "fold_00", "threshold": {"method": "quantile"}},
+                {"fold_id": 0, "threshold": {"method": "quantile"}},
             ],
         }
         assert get_output_type(metrics) == "regression"
@@ -354,7 +373,7 @@ class TestGetOutputType:
         metrics = {
             "strategy": {"output_type": "signal"},
             "folds": [
-                {"fold_id": "fold_00", "threshold": {"method": "none"}},
+                {"fold_id": 0, "threshold": {"method": "none"}},
             ],
         }
         assert get_output_type(metrics) == "signal"
@@ -364,8 +383,8 @@ class TestGetOutputType:
         metrics = {
             "strategy": {"name": "sma_rule"},
             "folds": [
-                {"fold_id": "fold_00", "threshold": {"method": "none"}},
-                {"fold_id": "fold_01", "threshold": {"method": "none"}},
+                {"fold_id": 0, "threshold": {"method": "none"}},
+                {"fold_id": 1, "threshold": {"method": "none"}},
             ],
         }
         assert get_output_type(metrics) == "signal"
@@ -375,7 +394,7 @@ class TestGetOutputType:
         metrics = {
             "strategy": {"name": "xgboost"},
             "folds": [
-                {"fold_id": "fold_00", "threshold": {"method": "quantile"}},
+                {"fold_id": 0, "threshold": {"method": "quantile"}},
             ],
         }
         assert get_output_type(metrics) == "regression"
@@ -385,8 +404,8 @@ class TestGetOutputType:
         metrics = {
             "strategy": {"name": "test"},
             "folds": [
-                {"fold_id": "fold_00", "threshold": {"method": "none"}},
-                {"fold_id": "fold_01", "threshold": {"method": "quantile"}},
+                {"fold_id": 0, "threshold": {"method": "none"}},
+                {"fold_id": 1, "threshold": {"method": "quantile"}},
             ],
         }
         assert get_output_type(metrics) == "regression"

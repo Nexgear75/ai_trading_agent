@@ -17,6 +17,19 @@ from scipy.stats import spearmanr
 
 from scripts.dashboard.utils import _NULL_DISPLAY, COLOR_DRAWDOWN
 
+
+def _normalize_fold_id(fold_id: int | str) -> str:
+    """Normalize fold_id to directory label format ``fold_XX``.
+
+    The pipeline stores fold_id as an integer in metrics.json (0, 1, 2...)
+    while fold directories are named ``fold_00``, ``fold_01``, etc.
+    This helper ensures consistency.
+    """
+    if isinstance(fold_id, int):
+        return f"fold_{fold_id:02d}"
+    return fold_id
+
+
 # ---------------------------------------------------------------------------
 # §8.1 — Fold listing and selection helpers
 # ---------------------------------------------------------------------------
@@ -57,10 +70,10 @@ def build_fold_selector_options(metrics: dict) -> list[str]:
     list[str]
         List of fold_id strings in order.
     """
-    return [fold["fold_id"] for fold in metrics["folds"]]
+    return [_normalize_fold_id(fold["fold_id"]) for fold in metrics["folds"]]
 
 
-def get_fold_dir(run_dir: Path, fold_id: str) -> Path:
+def get_fold_dir(run_dir: Path, fold_id: int | str) -> Path:
     """Build the path to a specific fold directory.
 
     Parameters
@@ -68,14 +81,14 @@ def get_fold_dir(run_dir: Path, fold_id: str) -> Path:
     run_dir:
         Path to the run directory.
     fold_id:
-        Fold identifier (e.g. "fold_00").
+        Fold identifier (int like ``0`` or string like ``"fold_00"``).
 
     Returns
     -------
     Path
         ``run_dir / "folds" / fold_id``.
     """
-    return run_dir / "folds" / fold_id
+    return run_dir / "folds" / _normalize_fold_id(fold_id)
 
 
 # ---------------------------------------------------------------------------
@@ -163,8 +176,9 @@ def get_fold_threshold(metrics: dict, fold_id: str) -> dict:
     ValueError
         If ``fold_id`` is not found in metrics folds.
     """
+    normalized = _normalize_fold_id(fold_id)
     for fold in metrics["folds"]:
-        if fold["fold_id"] == fold_id:
+        if _normalize_fold_id(fold["fold_id"]) == normalized:
             threshold = fold["threshold"]
             return {"theta": threshold["theta"], "method": threshold["method"]}
     raise ValueError(f"Fold {fold_id!r} not found in metrics")
