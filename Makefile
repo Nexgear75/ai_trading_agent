@@ -80,13 +80,17 @@ help: ## Display this help message
 # Dashboard targets
 # ============================================================================
 
-.PHONY: dashboard install-dashboard
+.PHONY: dashboard install-dashboard docker-dashboard
 
 install-dashboard: ## Install dashboard dependencies from requirements-dashboard.txt
 	pip install -r requirements-dashboard.txt
 
 dashboard: ## Launch Streamlit dashboard (use RUNS_DIR= to override runs directory)
 	streamlit run scripts/dashboard/app.py -- --runs-dir $(RUNS_DIR)
+
+docker-dashboard: ## Build and run dashboard Docker container (port 8501)
+	docker build -f Dockerfile.dashboard -t ai-trading-dashboard .
+	docker run --rm -p 8501:8501 -v $(shell pwd)/runs:/app/runs ai-trading-dashboard
 
 # ============================================================================
 # Gate milestone targets
