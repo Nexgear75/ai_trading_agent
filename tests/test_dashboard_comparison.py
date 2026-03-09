@@ -1,7 +1,9 @@
 """Tests for scripts/dashboard/pages/comparison_logic.py — comparison table logic.
 
 Task #083 — WS-D-4: Page 3 — sélection des runs et tableau comparatif.
-Spec refs: §7.1 multiselect, §7.2 tableau comparatif, §9.3 conventions d'affichage.
+Task #084 — WS-D-4: Page 3 — courbes d'équité superposées et radar chart.
+Spec refs: §7.1 multiselect, §7.2 tableau comparatif, §7.3 equity overlay,
+§7.4 radar chart, §9.3 conventions d'affichage.
 
 Tests cover:
 - build_comparison_dataframe: 0 runs, 1 run, 3 runs, None values
@@ -10,9 +12,12 @@ Tests cover:
 - build_radar_data: normal, None values, single run
 - get_aggregate_notes: present, absent, empty
 - format_comparison_dataframe: formatting correctness
+- build_equity_overlay_curves: nominal, partial missing, all missing, empty list
 """
 
 from __future__ import annotations
+
+from pathlib import Path
 
 import pandas as pd
 import pytest
@@ -485,3 +490,100 @@ class TestFormatComparisonDataframe:
         formatted = format_comparison_dataframe(df)
         assert formatted.iloc[0]["Net PnL (moy)"] == "—"
         assert formatted.iloc[0]["Sharpe (moy)"] == "—"
+
+
+# ===========================================================================
+# §7.3 — build_equity_overlay_curves
+# ===========================================================================
+
+
+def _create_equity_csv(run_dir: Path, *, rows: int = 5) -> None:
+    """Create a minimal equity_curve.csv in *run_dir*."""
+    run_dir.mkdir(parents=True, exist_ok=True)
+    df = pd.DataFrame({
+        "time_utc": pd.date_range("2025-01-01", periods=rows, freq="h"),
+        "equity": [1000.0 + i * 10 for i in range(rows)],
+        "in_trade": [False] * rows,
+        "fold": ["fold_00"] * rows,
+    })
+    df.to_csv(run_dir / "equity_curve.csv", index=False)
+
+
+class TestBuildEquityOverlayCurves:
+    """#084 — Build equity overlay curves for chart_equity_overlay (§7.3)."""
+
+    def test_nominal_two_runs(self, tmp_path: Path) -> None:
+        """#084 — Two runs with equity curves → both in dict, no missing."""
+        from scripts.dashboard.pages.comparison_logic import build_equity_overlay_curves
+
+        _create_equity_csv(tmp_path / "run_A")
+        _create_equity_csv(tmp_path / "run_B")
+        runs = [
+            _make_metrics(run_id="run_A", strategy_name="strat_a"),
+            _make_metrics(run_id="run_B", strategy_name="strat_b"),
+        ]
+        curves, missing = build_equity_overlay_curves(runs, tmp_path)
+        assert len(curves) == 2
+        assert "strat_a (run_A)" in curves
+        assert "strat_b (run_B)" in curves
+        assert missing == []
+
+    def test_partial_missing(self, tmp_path: Path) -> None:
+        """#084 — One run has equity curve, one doesn't → partial result."""
+        from scripts.dashboard.pages.comparison_logic import build_equity_overlay_curves
+
+        _create_equity_csv(tmp_path / "run_A")
+        # run_B has no equity_curve.csv
+        (tmp_path / "run_B").mkdir(parents=True, exist_ok=True)
+        runs = [
+            _make_metrics(run_id="run_A", strategy_name="strat_a"),
+            _make_metrics(run_id="run_B", strategy_name="strat_b"),
+        ]
+        curves, missing = build_equity_overlay_curves(runs, tmp_path)
+        assert len(curves) == 1
+        assert "strat_a (run_A)" in curves
+        assert missing == ["run_B"]
+
+    def test_all_missing(self, tmp_path: Path) -> None:
+        """#084 — No runs have equity curves → empty dict, all in missing."""
+        from scripts.dashboard.pages.comparison_logic import build_equity_overlay_curves
+
+        (tmp_path / "run_A").mkdir(parents=True, exist_ok=True)
+        (tmp_path / "run_B").mkdir(parents=True, exist_ok=True)
+        runs = [
+            _make_metrics(run_id="run_A", strategy_name="strat_a"),
+            _make_metrics(run_id="run_B", strategy_name="strat_b"),
+        ]
+        curves, missing = build_equity_overlay_curves(runs, tmp_path)
+        assert curves == {}
+        assert set(missing) == {"run_A", "run_B"}
+
+    def test_empty_run_list(self, tmp_path: Path) -> None:
+        """#084 — Empty run list → empty dict, empty missing list."""
+        from scripts.dashboard.pages.comparison_logic import build_equity_overlay_curves
+
+        curves, missing = build_equity_overlay_curves([], tmp_path)
+        assert curves == {}
+        assert missing == []
+
+    def test_labels_contain_strategy_and_run_id(self, tmp_path: Path) -> None:
+        """#084 — Curve labels are '{strategy_name} ({run_id})'."""
+        from scripts.dashboard.pages.comparison_logic import build_equity_overlay_curves
+
+        _create_equity_csv(tmp_path / "20260301_120000_xgb")
+        runs = [
+            _make_metrics(run_id="20260301_120000_xgb", strategy_name="xgboost_reg"),
+        ]
+        curves, _ = build_equity_overlay_curves(runs, tmp_path)
+        assert list(curves.keys()) == ["xgboost_reg (20260301_120000_xgb)"]
+
+    def test_curves_are_dataframes_with_equity_column(self, tmp_path: Path) -> None:
+        """#084 — Each curve value is a DataFrame with an 'equity' column."""
+        from scripts.dashboard.pages.comparison_logic import build_equity_overlay_curves
+
+        _create_equity_csv(tmp_path / "run_A")
+        runs = [_make_metrics(run_id="run_A", strategy_name="s")]
+        curves, _ = build_equity_overlay_curves(runs, tmp_path)
+        df = curves["s (run_A)"]
+        assert isinstance(df, pd.DataFrame)
+        assert "equity" in df.columns
