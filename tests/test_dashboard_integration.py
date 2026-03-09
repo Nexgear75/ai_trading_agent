@@ -32,8 +32,6 @@ from dashboard.pages.fold_analysis_logic import (  # noqa: E402
 # Fixtures: synthetic run data
 # ---------------------------------------------------------------------------
 
-_RNG = np.random.RandomState(42)
-
 
 def _make_metrics(
     run_id: str,
@@ -158,12 +156,12 @@ def _make_trades_csv() -> pd.DataFrame:
 
 def _make_preds_csv() -> pd.DataFrame:
     """Build a minimal preds_test.csv DataFrame."""
-    rng = np.random.RandomState(42)
+    rng = np.random.default_rng(42)
     n = 50
     return pd.DataFrame({
         "timestamp": pd.date_range("2024-01-01", periods=n, freq="h"),
-        "y_true": rng.randn(n) * 0.01,
-        "y_hat": rng.randn(n) * 0.01,
+        "y_true": rng.standard_normal(n) * 0.01,
+        "y_hat": rng.standard_normal(n) * 0.01,
     })
 
 
@@ -472,10 +470,10 @@ class TestNoNetworkDependency:
     """Integration tests are deterministic and use no network."""
 
     def test_seeds_fixed(self) -> None:
-        """Verify that _RNG with seed 42 is deterministic."""
-        rng1 = np.random.RandomState(42)
-        rng2 = np.random.RandomState(42)
-        assert (rng1.randn(10) == rng2.randn(10)).all()
+        """Verify that default_rng with seed 42 is deterministic."""
+        rng1 = np.random.default_rng(42)
+        rng2 = np.random.default_rng(42)
+        assert (rng1.standard_normal(10) == rng2.standard_normal(10)).all()
 
     def test_fixtures_are_synthetic(self, tmp_path: Path) -> None:
         """All fixtures use tmp_path, no real run directory."""

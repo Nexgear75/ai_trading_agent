@@ -27,7 +27,7 @@ try:
     import streamlit as st
 
     _cache_data = st.cache_data
-except Exception:  # noqa: BLE001
+except (ImportError, AttributeError):
     def _cache_data(func: Any = None, **kwargs: Any) -> Any:  # type: ignore[misc]
         """No-op fallback when Streamlit is not available."""
         if func is not None:

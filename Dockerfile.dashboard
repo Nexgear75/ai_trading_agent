@@ -11,9 +11,11 @@ WORKDIR /app
 COPY requirements-dashboard.txt .
 RUN pip install --no-cache-dir -r requirements-dashboard.txt
 
-# Copy dashboard code and run artifacts
+# Copy dashboard code
 COPY scripts/dashboard/ scripts/dashboard/
-COPY runs/ runs/
+
+# Create empty runs directory (populated via volume mount at runtime)
+RUN mkdir -p runs/
 
 # Non-root user for security
 RUN useradd --create-home appuser
