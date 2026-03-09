@@ -31,24 +31,27 @@ Le projet comprend le **pipeline principal** et des **extensions** (modèles, da
 - **Tâches** : `docs/tasks/M<N>/NNN__slug.md`
 - **Spécification** : `docs/specifications/Specification_Pipeline_Commun_AI_Trading_v1.0.md`
 - **Plan** : `docs/plan/implementation.md` (WS-1..WS-13, M1..M6)
-- **Code source** : `ai_trading/`
+- **Code source** (`<CODE_DIR>`) : `ai_trading/`
 - **Linter** : `ruff check ai_trading/ tests/`
+- **Git add** : `git add ai_trading/ tests/ configs/`
 
 ### Scope : Extension modèle (milestones MX-*)
 
 - **Tâches** : `docs/tasks/MX-<N>/NNN__slug.md`
 - **Spécification** : `docs/specifications/models/` (ex : `Specification_Modele_XGBoost_v1.0.md`)
 - **Plan** : `docs/plan/models/` (ex : `implementation_xgboost.md`)
-- **Code source** : `ai_trading/` (principalement `ai_trading/models/`)
+- **Code source** (`<CODE_DIR>`) : `ai_trading/` (principalement `ai_trading/models/`)
 - **Linter** : `ruff check ai_trading/ tests/`
+- **Git add** : `git add ai_trading/ tests/ configs/`
 
 ### Scope : Extension Streamlit dashboard (milestones MD-*)
 
 - **Tâches** : `docs/tasks/MD-<N>/NNN__slug.md`
 - **Spécification** : `docs/specifications/streamlit/Specification_Dashboard_Streamlit_v1.0.md`
 - **Plan** : `docs/plan/streamlit/implementation.md`
-- **Code source** : `scripts/dashboard/`
+- **Code source** (`<CODE_DIR>`) : `scripts/dashboard/`
 - **Linter** : `ruff check scripts/dashboard/ tests/`
+- **Git add** : `git add scripts/dashboard/ tests/`
 
 ### Commun à tous les scopes
 
@@ -64,7 +67,7 @@ Le projet comprend le **pipeline principal** et des **extensions** (modèles, da
 - `docs/tasks/MD-*/` → scope **streamlit**
 - `docs/tasks/M*/` (sans X ni D) → scope **pipeline**
 
-Les commandes `ruff check` et `git add` utilisent les chemins du scope détecté.
+Les commandes `ruff check`, `git add` et les chemins de code utilisent le `<CODE_DIR>` du scope détecté.
 
 ## Principes non négociables
 
