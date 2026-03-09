@@ -4,6 +4,8 @@ Task #090 — WS-D-6: Dockerfile dashboard et documentation README.
 Ref: Specification_Dashboard_Streamlit_v1.0.md §10.5, §10.3
 """
 
+from __future__ import annotations
+
 import re
 from pathlib import Path
 
@@ -54,12 +56,10 @@ class TestDockerfileDashboard:
         assert "pip install" in dockerfile_content
 
     def test_no_root_user(self, dockerfile_content: str) -> None:
-        """Should not run as root — must have a USER directive or equivalent."""
-        # Accept either USER directive or --chown in COPY
-        has_user = "USER" in dockerfile_content and not dockerfile_content.strip().endswith(
-            "USER root"
-        )
-        assert has_user, "Dockerfile.dashboard should not run as root"
+        """Should not run as root — must have a USER directive with non-root user."""
+        assert re.search(
+            r"^\s*USER\s+(?!root\b)\S+", dockerfile_content, re.MULTILINE
+        ), "Dockerfile.dashboard must have a USER directive with a non-root user"
 
     def test_distinct_from_pipeline_dockerfile(self) -> None:
         """Dockerfile.dashboard must be distinct from the pipeline Dockerfile."""

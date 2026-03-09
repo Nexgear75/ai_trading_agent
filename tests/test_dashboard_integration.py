@@ -4,18 +4,15 @@ Task #091 — WS-D-6: Tests d'intégration et smoke test du dashboard.
 Ref: Specification_Dashboard_Streamlit_v1.0.md §12.2
 """
 
+from __future__ import annotations
+
 import json
-import sys
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
-# Ensure dashboard package is importable
-ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / "scripts"))
-
-from dashboard.data_loader import (  # noqa: E402
+from scripts.dashboard.data_loader import (
     discover_runs,
     load_equity_curve,
     load_predictions,
@@ -23,7 +20,7 @@ from dashboard.data_loader import (  # noqa: E402
     load_run_metrics,
     load_trades,
 )
-from dashboard.pages.fold_analysis_logic import (  # noqa: E402
+from scripts.dashboard.pages.fold_analysis_logic import (
     get_fold_threshold,
     get_output_type,
 )
@@ -39,7 +36,7 @@ def _make_metrics(
     strategy_type: str = "model",
     output_type: str = "regression",
     n_folds: int = 2,
-    theta: float = 0.003,
+    theta: float | None = 0.003,
     threshold_method: str = "quantile_grid",
 ) -> dict:
     """Build a minimal valid metrics.json dict."""
@@ -173,7 +170,7 @@ def _write_run(
     include_equity: bool = True,
     include_trades: bool = True,
     include_preds: bool = True,
-    theta: float = 0.003,
+    theta: float | None = 0.003,
     threshold_method: str = "quantile_grid",
     output_type: str = "regression",
 ) -> Path:
@@ -377,10 +374,9 @@ class TestGoNoGoThetaPositive:
         fold_dir = run_dir / "folds" / "fold_00"
         preds = load_predictions(fold_dir, "test")
         go_mask = preds["y_hat"] > theta
-        # Some should be Go, some No-Go
-        assert go_mask.any() or not go_mask.any()  # no crash
-        # Verify determinism with seed 42
-        assert go_mask.sum() == go_mask.sum()
+        # With seed 42, some should be Go and some No-Go
+        assert go_mask.any(), "At least one prediction should exceed theta"
+        assert (~go_mask).any(), "At least one prediction should be below theta"
 
 
 class TestGoNoGoThetaNegative:
@@ -413,8 +409,8 @@ class TestGoNoGoThetaZero:
         fold_dir = run_dir / "folds" / "fold_00"
         preds = load_predictions(fold_dir, "test")
         go_mask = preds["y_hat"] > 0.0
-        # All positive y_hat should be Go
-        expected = (preds["y_hat"] > 0.0).sum()
+        # Count via numpy to avoid tautological comparison
+        expected = np.count_nonzero(preds["y_hat"].to_numpy() > 0.0)
         assert go_mask.sum() == expected
 
 
