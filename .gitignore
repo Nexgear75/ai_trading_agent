@@ -1,5 +1,37 @@
-.venv/
-.idea/
-AGENTS.md
+# Python
 __pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Data (re-fetchable via fetch.py)
+data/
+
+# Pipeline runs (generated artifacts)
 runs/
+
+# Logs
+*.log
+
+# OS
+Thumbs.db
+.DS_Store
