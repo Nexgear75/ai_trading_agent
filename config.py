@@ -17,5 +17,7 @@ START_DATE = "2020-01-01"
 LABEL_THRESHOLD = 0.02  # seuil de 2% pour considérer un mouvement significatif
 PREDICTION_HORIZON = 3
 
+WINDOW_SIZE = 30
+
 RAW_DATA_PATH = "data/raw/"
 OUTPUT_PATH = "output/"
