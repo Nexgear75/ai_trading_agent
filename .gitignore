@@ -2,4 +2,7 @@
 .idea/
 AGENTS.md
 __pycache__/
+raw/
+*.pth
+*.joblib
 runs/
