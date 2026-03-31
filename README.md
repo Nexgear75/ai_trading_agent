@@ -5,6 +5,16 @@
 
 ---
 
+## Créer le dataset
+
+La commande suivante téléchargera sur 5 ans 10 crypto et créera l'ensemble des features décrite ci-dessous
+
+```python3
+python3 -m data.main
+```
+
+---
+
 ## Table des matières
 
 1. [Vue d'ensemble](#vue-densemble)
