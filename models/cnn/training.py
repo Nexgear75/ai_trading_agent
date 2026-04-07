@@ -1,12 +1,14 @@
 import argparse
+import gc
 import os
 
 import joblib
 import torch
 import torch.nn as nn
+from tqdm import tqdm
 
-from config import DEFAULT_TIMEFRAME, get_timeframe_config
-from data.features.pipeline import FEATURE_COLUMNS
+from config import DEFAULT_TIMEFRAME, get_timeframe_config, get_cnn_config
+from data.features.pipeline import get_feature_columns
 from models.cnn.CNN import CNN1D
 from models.cnn.data_preparator import prepare_data
 
@@ -27,7 +29,7 @@ def train(
     epochs: int = 200,
     batch_size: int = 32,
     lr: float = 1e-3,
-    patience: int = 10,
+    patience: int = 7,
 ):
     """Entraîne le modèle CNN1D.
 
@@ -43,6 +45,8 @@ def train(
     # Get timeframe configuration
     tf_config = get_timeframe_config(timeframe)
     window_size = tf_config["window_size"]
+    cnn_cfg = get_cnn_config(timeframe)
+    feature_cols = get_feature_columns(timeframe)
 
     # Setup checkpoint paths for this timeframe
     paths = _get_checkpoint_paths(timeframe)
@@ -51,7 +55,9 @@ def train(
     print(f"\n{'=' * 60}")
     print(f"  ENTRAÎNEMENT CNN1D")
     print(f"  Timeframe: {timeframe}")
-    print(f"  Window size: {window_size}")
+    print(f"  Window size: {window_size}  |  Features: {len(feature_cols)}")
+    print(f"  Channels: {cnn_cfg['channels']}  |  Kernels: {cnn_cfg['kernel_sizes']}")
+    print(f"  Dropout: conv={cnn_cfg['dropout_conv']}  fc={cnn_cfg['dropout_fc']}")
     print(f"  Checkpoint: {paths['dir']}")
     print(f"{'=' * 60}\n")
 
@@ -59,16 +65,20 @@ def train(
     print(f"Device: {device}")
 
     # Données
-    train_loader, val_loader, feature_scaler, target_scaler, clip_bounds = prepare_data(
+    train_loader, val_loader, feature_scaler, target_scaler, clip_bounds, _ = prepare_data(
         symbol=symbol, timeframe=timeframe, batch_size=batch_size
     )
 
     # Modèle
-    model = CNN1D(window_size=window_size, n_features=len(FEATURE_COLUMNS)).to(device)
+    model = CNN1D(
+        window_size=window_size,
+        n_features=len(feature_cols),
+        **cnn_cfg,
+    ).to(device)
     criterion = nn.HuberLoss(delta=1.0)
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=1e-4)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, mode="min", factor=0.5, patience=10
+        optimizer, mode="min", factor=0.5, patience=5
     )
 
     # Training loop
@@ -80,7 +90,8 @@ def train(
         # --- Train ---
         model.train()
         train_loss = 0.0
-        for X_batch, y_batch in train_loader:
+        pbar = tqdm(train_loader, desc=f"Epoch {epoch:3d}/{epochs} [Train]", leave=False)
+        for X_batch, y_batch in pbar:
             X_batch, y_batch = X_batch.to(device), y_batch.to(device)
 
             optimizer.zero_grad()
@@ -90,12 +101,19 @@ def train(
             optimizer.step()
 
             train_loss += loss.item() * len(X_batch)
+            pbar.set_postfix(loss=f"{loss.item():.5f}")
+
+            # Libération mémoire explicite pour éviter OOM
+            del preds, loss
+            if device.type == "mps":
+                torch.mps.empty_cache()
 
         train_loss /= len(train_loader.dataset)
 
         # --- Validation ---
         model.eval()
         val_loss = 0.0
+        correct_dir = 0
         with torch.no_grad():
             for X_batch, y_batch in val_loader:
                 X_batch, y_batch = X_batch.to(device), y_batch.to(device)
@@ -103,16 +121,31 @@ def train(
                 loss = criterion(preds, y_batch)
                 val_loss += loss.item() * len(X_batch)
 
+                # Direction accuracy : % de fois où signe(pred) == signe(target)
+                correct_dir += ((preds > 0) == (y_batch > 0)).sum().item()
+
+                # Libération mémoire explicite
+                if device.type == "mps":
+                    torch.mps.empty_cache()
+
         val_loss /= len(val_loader.dataset)
+        dir_acc = correct_dir / len(val_loader.dataset)
         history["train_loss"].append(train_loss)
         history["val_loss"].append(val_loss)
         scheduler.step(val_loss)
 
+        # Garbage collection périodique
+        if epoch % 5 == 0:
+            gc.collect()
+            if device.type == "mps":
+                torch.mps.empty_cache()
+
         current_lr = optimizer.param_groups[0]["lr"]
-        print(
+        tqdm.write(
             f"Epoch {epoch:3d}/{epochs} | "
             f"Train Loss: {train_loss:.6f} | "
             f"Val Loss: {val_loss:.6f} | "
+            f"Dir Acc: {dir_acc:.1%} | "
             f"LR: {current_lr:.1e}"
         )
 
@@ -126,6 +159,8 @@ def train(
                     "history": history,
                     "timeframe": timeframe,
                     "window_size": window_size,
+                    "cnn_cfg": cnn_cfg,
+                    "n_features": len(feature_cols),
                 },
                 paths["model"],
             )
@@ -162,9 +197,9 @@ if __name__ == "__main__":
     parser.add_argument("--timeframe", type=str, default=DEFAULT_TIMEFRAME,
                         help=f"Timeframe (défaut: {DEFAULT_TIMEFRAME})")
     parser.add_argument("--epochs", type=int, default=50)
-    parser.add_argument("--batch-size", type=int, default=32)
+    parser.add_argument("--batch-size", type=int, default=16)
     parser.add_argument("--lr", type=float, default=1e-3)
-    parser.add_argument("--patience", type=int, default=10)
+    parser.add_argument("--patience", type=int, default=7)
     args = parser.parse_args()
 
     train(

@@ -4,7 +4,7 @@ from sklearn.preprocessing import RobustScaler, StandardScaler
 from torch.utils.data import TensorDataset, DataLoader
 
 from config import DEFAULT_TIMEFRAME, get_timeframe_config
-from data.features.pipeline import FEATURE_COLUMNS
+from data.features.pipeline import get_feature_columns
 from data.preprocessing.builder import build_windows
 from utils.dataset_loader import load_symbol, load_all
 
@@ -21,7 +21,7 @@ def prepare_data(
     timeframe: str = DEFAULT_TIMEFRAME,
     train_ratio: float = 0.8,
     batch_size: int = 32,
-) -> tuple[DataLoader, DataLoader, RobustScaler, StandardScaler, np.ndarray]:
+) -> tuple[DataLoader, DataLoader, RobustScaler, StandardScaler, np.ndarray, np.ndarray]:
     """Prépare les DataLoaders d'entraînement et de validation.
 
     Args:
@@ -32,14 +32,16 @@ def prepare_data(
         batch_size: Taille des batchs.
 
     Returns:
-        (train_loader, val_loader, feature_scaler, target_scaler, clip_bounds)
+        (train_loader, val_loader, feature_scaler, target_scaler, clip_bounds, close_val)
     """
     # Get timeframe-specific configuration
     tf_config = get_timeframe_config(timeframe)
     window_size = tf_config["window_size"]
     prediction_horizon = tf_config["prediction_horizon"]
+    feature_cols = get_feature_columns(timeframe)
 
-    print(f"  [Data Prep] Timeframe: {timeframe}, Window size: {window_size}, Horizon: {prediction_horizon}")
+    print(f"  [Data Prep] Timeframe: {timeframe}, Window size: {window_size}, "
+          f"Horizon: {prediction_horizon}, Features: {len(feature_cols)}")
 
     df = load_symbol(symbol, timeframe=timeframe) if symbol else load_all(timeframe=timeframe)
 
@@ -52,13 +54,18 @@ def prepare_data(
 
     # Construction des fenêtres glissantes PAR SYMBOLE
     # pour ne jamais créer de fenêtre à cheval sur deux cryptos
-    all_X, all_y = [], []
+    all_X, all_y, all_close = [], [], []
     for _, group in df.groupby("symbol"):
-        X_sym, y_sym, _ = build_windows(group, window_size=window_size)
+        X_sym, y_sym, _ = build_windows(group, window_size=window_size,
+                                        feature_columns=feature_cols)
+        # Prix close correspondant à chaque fenêtre (dernier jour de la fenêtre)
+        close_sym = group["close"].values[window_size:]
         all_X.append(X_sym)
         all_y.append(y_sym)
+        all_close.append(close_sym)
     X = np.concatenate(all_X)
     y = np.concatenate(all_y)
+    close_prices = np.concatenate(all_close)
 
     # Vérification NaN
     nan_x, nan_y = np.isnan(X).sum(), np.isnan(y).sum()
@@ -69,6 +76,7 @@ def prepare_data(
     split = int(train_ratio * len(X))
     X_train, X_val = X[:split], X[split:]
     y_train, y_val = y[:split], y[split:]
+    close_val = close_prices[split:]
 
     # Clipping des outliers sur les targets (winsorize 1er/99e percentile)
     # Fitté sur train uniquement, appliqué à train et val
@@ -100,6 +108,12 @@ def prepare_data(
     y_train = target_scaler.fit_transform(y_train.reshape(-1, 1)).ravel()
     y_val = target_scaler.transform(y_val.reshape(-1, 1)).ravel()
 
+    # Libération mémoire des arrays intermédiaires
+    import gc
+
+    del X_train_flat, X_val_flat
+    gc.collect()
+
     # Conversion en tenseurs PyTorch
     train_ds = TensorDataset(
         torch.tensor(X_train, dtype=torch.float32),
@@ -110,9 +124,13 @@ def prepare_data(
         torch.tensor(y_val, dtype=torch.float32),
     )
 
-    train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True)
-    val_loader = DataLoader(val_ds, batch_size=batch_size, shuffle=False)
+    # Libération des arrays numpy originaux
+    del X_train, X_val, y_train, y_val
+    gc.collect()
+
+    train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True, num_workers=0)
+    val_loader = DataLoader(val_ds, batch_size=batch_size, shuffle=False, num_workers=0)
 
     print(f"Train: {len(train_ds)} samples | Val: {len(val_ds)} samples")
 
-    return train_loader, val_loader, feature_scaler, target_scaler, clip_bounds
+    return train_loader, val_loader, feature_scaler, target_scaler, clip_bounds, close_val

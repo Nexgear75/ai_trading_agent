@@ -36,18 +36,23 @@ def load_model(model_path: str, device: torch.device, window_size: int = None) -
     Args:
         model_path: Chemin vers le checkpoint .pth.
         device: Device cible.
-        window_size: Taille de la fenêtre (si None, extrait du checkpoint).
+        window_size: Ignoré — l'architecture est lue depuis le checkpoint.
 
     Returns:
         (model, history) avec le modèle en mode eval.
     """
     checkpoint = torch.load(model_path, weights_only=False, map_location=device)
 
-    # Extract window_size from checkpoint or use default
-    if window_size is None:
-        window_size = checkpoint.get("window_size", 30)
+    # Reconstruit l'architecture exacte depuis les paramètres sauvegardés
+    ckpt_window_size = checkpoint.get("window_size", 30)
+    ckpt_n_features = checkpoint.get("n_features", len(FEATURE_COLUMNS))
+    ckpt_cnn_cfg = checkpoint.get("cnn_cfg", {})
 
-    model = CNN1D(window_size=window_size, n_features=len(FEATURE_COLUMNS)).to(device)
+    model = CNN1D(
+        window_size=ckpt_window_size,
+        n_features=ckpt_n_features,
+        **ckpt_cnn_cfg,
+    ).to(device)
     model.load_state_dict(checkpoint["model_state"])
     model.eval()
     return model, checkpoint["history"]
@@ -87,7 +92,7 @@ def evaluate(
 
     # Charger modèle, données, et scalers
     model, history = load_model(model_path, device, window_size=window_size)
-    _, val_loader, _, _ = prepare_data(symbol=symbol, timeframe=timeframe)
+    _, val_loader, _, _, _, close_val = prepare_data(symbol=symbol, timeframe=timeframe)
     scalers = joblib.load(paths["scalers"])
 
     # Create results directory for this timeframe
@@ -101,6 +106,8 @@ def evaluate(
         history=history,
         results_dir=paths["results"],
         device=device,
+        close_prices=close_val,
+        prediction_horizon=tf_config["prediction_horizon"],
     )
 
 
