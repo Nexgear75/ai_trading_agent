@@ -9,7 +9,7 @@ import pandas as pd
 from data.features.pipeline import FEATURE_COLUMNS
 
 
-def build_windows(df: pd.DataFrame, window_size: int = None):
+def build_windows(df: pd.DataFrame, window_size: int = None, feature_columns: list = None):
     """
     Build sliding windows from time series data for machine learning.
 
@@ -17,9 +17,11 @@ def build_windows(df: pd.DataFrame, window_size: int = None):
     with corresponding labels and dates for supervised learning.
 
     Args:
-        df: DataFrame containing FEATURE_COLUMNS and 'label' column
+        df: DataFrame containing feature columns and 'label' column
         window_size: Number of periods in each window. If None, uses
                      WINDOW_SIZE from config (legacy behavior).
+        feature_columns: List of feature column names to use. If None,
+                         falls back to FEATURE_COLUMNS (1d standard).
 
     Returns:
         Tuple of (X, y, idx) where:
@@ -32,7 +34,10 @@ def build_windows(df: pd.DataFrame, window_size: int = None):
         from config import WINDOW_SIZE as _window_size
         window_size = _window_size
 
-    data = df[FEATURE_COLUMNS].values
+    if feature_columns is None:
+        feature_columns = FEATURE_COLUMNS
+
+    data = df[feature_columns].values
     labels = df["label"].values
     dates = df.index
 
