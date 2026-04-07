@@ -33,8 +33,8 @@ def process_symbol(symbol: str, timeframe: str = DEFAULT_TIMEFRAME):
     print(f"{'-' * 50}")
 
     df = fetch_ohlcv(symbol, timeframe=timeframe)
-    df = build_features(df)
-    df = add_labels(df)
+    df = build_features(df, timeframe=timeframe)
+    df = add_labels(df, timeframe=timeframe)
     df.insert(0, "symbol", symbol.replace("/", "_"))
 
     print(f"  Lignes générées : {len(df)}")
