@@ -1,0 +1,21 @@
+{
+  "symbol": "BTC/USDT",
+  "model_type": "cnn",
+  "capital": 1000.0,
+  "threshold": 0.03,
+  "allow_short": false,
+  "rrr": 1.0,
+  "risk_pct": 0.025,
+  "check_interval_hours": 4,
+  "entry_fee_pct": 0.001,
+  "exit_fee_pct": 0.001,
+  "log_level": "INFO",
+  "sizing_mode": "fixed",
+  "max_position_pct": 0.25,
+  "max_position_size": null,
+  "rebalance_interval": 50,
+  "max_drawdown_pct": 0.20,
+  "cooldown_bars": 3,
+  "max_trades_per_day": 4,
+  "max_expiration_rate": 0.50
+}
