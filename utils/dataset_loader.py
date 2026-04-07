@@ -1,19 +1,21 @@
 import os
 import pandas as pd
 
-from config import SYMBOLS, OUTPUT_PATH
+from config import SYMBOLS, BACKTEST_SYMBOLS, DEFAULT_TIMEFRAME, get_timeframe_config
 
 
 # Correspondance entre noms courts et noms de fichiers
-AVAILABLE_SYMBOLS = {s.replace("/", "_"): s for s in SYMBOLS}
+AVAILABLE_SYMBOLS = {s.replace("/", "_"): s for s in SYMBOLS + BACKTEST_SYMBOLS}
 
 
-def load_symbol(symbol: str) -> pd.DataFrame:
+def load_symbol(symbol: str, timeframe: str = DEFAULT_TIMEFRAME) -> pd.DataFrame:
     """Charge le dataset d'une seule crypto monnaie.
 
     Args:
         symbol: Nom de la crypto, accepte plusieurs formats :
                 "BTC/USDT", "BTC_USDT" ou "BTC"
+        timeframe: Timeframe du dataset (ex: "1d", "1h", "4h").
+                   Défaut: DEFAULT_TIMEFRAME ("1d").
 
     Returns:
         DataFrame avec les features et le label, indexé par timestamp.
@@ -23,12 +25,14 @@ def load_symbol(symbol: str) -> pd.DataFrame:
         FileNotFoundError: Si le fichier CSV n'existe pas.
     """
     filename = _resolve_symbol(symbol)
-    path = os.path.join(OUTPUT_PATH, f"{filename}.csv")
+    tf_config = get_timeframe_config(timeframe)
+    output_path = tf_config["output_path"]
+    path = os.path.join(output_path, f"{filename}.csv")
 
     if not os.path.isfile(path):
         raise FileNotFoundError(
             f"Fichier introuvable : {path}. "
-            f"Lance `python data/main.py` pour générer les datasets."
+            f"Lance `python -m data.main --timeframe {timeframe}` pour générer les datasets."
         )
 
     df = pd.read_csv(path, parse_dates=["timestamp"])
@@ -36,8 +40,12 @@ def load_symbol(symbol: str) -> pd.DataFrame:
     return df
 
 
-def load_all() -> pd.DataFrame:
+def load_all(timeframe: str = DEFAULT_TIMEFRAME) -> pd.DataFrame:
     """Charge le dataset complet contenant toutes les cryptos.
+
+    Args:
+        timeframe: Timeframe du dataset (ex: "1d", "1h", "4h").
+                   Défaut: DEFAULT_TIMEFRAME ("1d").
 
     Returns:
         DataFrame combiné, indexé par timestamp, avec colonne 'symbol'.
@@ -45,12 +53,14 @@ def load_all() -> pd.DataFrame:
     Raises:
         FileNotFoundError: Si full_dataset.csv n'existe pas.
     """
-    path = os.path.join(OUTPUT_PATH, "full_dataset.csv")
+    tf_config = get_timeframe_config(timeframe)
+    output_path = tf_config["output_path"]
+    path = os.path.join(output_path, "full_dataset.csv")
 
     if not os.path.isfile(path):
         raise FileNotFoundError(
             f"Fichier introuvable : {path}. "
-            f"Lance `python data/main.py` pour générer les datasets."
+            f"Lance `python -m data.main --timeframe {timeframe}` pour générer les datasets."
         )
 
     df = pd.read_csv(path, parse_dates=["timestamp"])
@@ -58,16 +68,18 @@ def load_all() -> pd.DataFrame:
     return df
 
 
-def load_symbols(symbols: list[str]) -> pd.DataFrame:
+def load_symbols(symbols: list[str], timeframe: str = DEFAULT_TIMEFRAME) -> pd.DataFrame:
     """Charge et combine les datasets de plusieurs cryptos.
 
     Args:
         symbols: Liste de symboles (mêmes formats que load_symbol).
+        timeframe: Timeframe du dataset (ex: "1d", "1h", "4h").
+                   Défaut: DEFAULT_TIMEFRAME ("1d").
 
     Returns:
         DataFrame combiné, indexé par timestamp, avec colonne 'symbol'.
     """
-    dfs = [load_symbol(s) for s in symbols]
+    dfs = [load_symbol(s, timeframe=timeframe) for s in symbols]
     return pd.concat(dfs)
 
 

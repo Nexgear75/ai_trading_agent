@@ -29,7 +29,13 @@ def compute_rsi(series: pd.Series, period: int = 14) -> pd.Series:
     return 100 - (100 / (1 + rs))
 
 
-def add_oscillator_features(df: pd.DataFrame) -> pd.DataFrame:
+def add_oscillator_features(
+    df: pd.DataFrame,
+    rsi_period: int = 14,
+    macd_fast: int = 12,
+    macd_slow: int = 26,
+    macd_sig: int = 9,
+) -> pd.DataFrame:
     """
     Add oscillator features to a DataFrame containing price data.
 
@@ -38,6 +44,10 @@ def add_oscillator_features(df: pd.DataFrame) -> pd.DataFrame:
 
     Args:
         df: DataFrame with a 'close' column
+        rsi_period: RSI lookback period. Default 14 (1d). For 1h use 336 (14×24).
+        macd_fast: MACD fast EMA period. Default 12. For 1h use 288 (12×24).
+        macd_slow: MACD slow EMA period. Default 26. For 1h use 624 (26×24).
+        macd_sig: MACD signal EMA period. Default 9. For 1h use 216 (9×24).
 
     Returns:
         DataFrame with added columns: 'rsi', 'macd', 'macd_signal', 'macd_hist'
@@ -45,12 +55,12 @@ def add_oscillator_features(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
 
     # ----- Normalized RSI between 0 and 1 ----- #
-    df["rsi"] = compute_rsi(df["close"], 14) / 100
+    df["rsi"] = compute_rsi(df["close"], rsi_period) / 100
 
-    ema12 = df["close"].ewm(span=12, adjust=False).mean()
-    ema26 = df["close"].ewm(span=26, adjust=False).mean()
-    df["macd"] = (ema12 - ema26) / df["close"]
-    df["macd_signal"] = df["macd"].ewm(span=9, adjust=False).mean()
+    ema_fast = df["close"].ewm(span=macd_fast, adjust=False).mean()
+    ema_slow = df["close"].ewm(span=macd_slow, adjust=False).mean()
+    df["macd"] = (ema_fast - ema_slow) / df["close"]
+    df["macd_signal"] = df["macd"].ewm(span=macd_sig, adjust=False).mean()
     df["macd_hist"] = df["macd"] - df["macd_signal"]
 
     return df
