@@ -31,11 +31,51 @@ TIMEFRAME_MINUTES = {
 
 # ----- Paramètres de Base (référence 1d) -----
 # Ces valeurs sont en "périodes" mais représentent des durées calendaires
-BASE_WINDOW_DAYS = 30        # 30 jours d'historique de référence
+BASE_WINDOW_DAYS = 15        # 15 jours d'historique de référence (fallback pour les timeframes non listés dans WINDOW_SIZES)
 BASE_PREDICTION_DAYS = 3     # Prédiction à 3 jours de référence
+
+# Window size explicite par timeframe (en nombre de barres).
+# Prioritaire sur le calcul automatique BASE_WINDOW_DAYS.
+# Fallback pour les timeframes non listés : int(BASE_WINDOW_DAYS * 24 * 60 / minutes_per_bar)
+WINDOW_SIZES: dict = {
+    "1d": 30,   # 30 jours
+    "1h": 72,   # 3 jours
+    "4h": 120,  # 20 jours
+    "1w": 20,   # 20 semaines
+}
+
+# Horizon de prédiction explicite par timeframe (en nombre de barres).
+# Définit ce que le modèle cherche à prédire : le rendement N barres plus tard.
+# Prioritaire sur le calcul automatique BASE_PREDICTION_DAYS.
+# Fallback pour les timeframes non listés : int(BASE_PREDICTION_DAYS * 24 * 60 / minutes_per_bar)
+PREDICTION_HORIZONS: dict = {
+    "1d": 3,    # prédire le rendement 3 jours plus tard
+    "1h": 6,    # prédire le rendement 6 heures plus tard
+    "4h": 1,    # prédire le rendement de la prochaine bougie 4h
+    "1w": 1,    # prédire le rendement de la semaine suivante
+}
 START_DATE = "2020-01-01"
 
 LABEL_THRESHOLD = 0.02  # seuil de 2% pour considérer un mouvement significatif
+
+# Seuil de prédiction pour ouvrir une position (en rendement brut, ex: 0.005 = 0.5%).
+# Adapté à l'horizon : plus l'horizon est court, plus les returns attendus sont petits.
+SIGNAL_THRESHOLDS: dict = {
+    "1d": 0.010,   # 1.0%  sur 3 jours
+    "1h": 0.003,   # 0.3%  sur 6 heures
+    "4h": 0.005,   # 0.5%  sur 4 heures
+    "1w": 0.020,   # 2.0%  sur 1 semaine
+}
+
+# Pourcentage de risque par trade, adapté à la volatilité de chaque timeframe.
+# SL = entry × (1 - risk_pct)   TP = entry × (1 + risk_pct × rrr)
+# Calibré sur ~1 ATR de l'horizon (6h BTC σ ≈ 0.8%, 3d BTC σ ≈ 2.5%)
+RISK_PCTS: dict = {
+    "1d": 0.025,   # 2.5%  SL / 5.0% TP (rrr=2)
+    "1h": 0.008,   # 0.8%  SL / 1.6% TP (rrr=2)  ← 1 ATR sur 6h
+    "4h": 0.015,   # 1.5%  SL / 3.0% TP (rrr=2)
+    "1w": 0.040,   # 4.0%  SL / 8.0% TP (rrr=2)
+}
 
 # Paramètres legacy - pour rétro-compatibilité
 def _get_legacy_config():
@@ -60,10 +100,9 @@ def get_timeframe_config(timeframe: str = DEFAULT_TIMEFRAME) -> dict:
     """
     Retourne les paramètres scalés pour un timeframe donné.
 
-    Les paramètres window_size et prediction_horizon sont automatiquement
-    scalés pour maintenir des durées calendaires constantes:
-    - 30 jours d'historique (BASE_WINDOW_DAYS)
-    - 3 jours de prédiction (BASE_PREDICTION_DAYS)
+    window_size : utilise WINDOW_SIZES[timeframe] si défini, sinon calcule
+    automatiquement depuis BASE_WINDOW_DAYS pour maintenir une durée calendaire constante.
+    prediction_horizon : toujours calculé depuis BASE_PREDICTION_DAYS.
 
     Args:
         timeframe: Le timeframe ("1m", "5m", "15m", "30m", "1h", "2h",
@@ -83,9 +122,16 @@ def get_timeframe_config(timeframe: str = DEFAULT_TIMEFRAME) -> dict:
 
     minutes_per_bar = TIMEFRAME_MINUTES[timeframe]
 
-    # Conversion de jours en nombre de périodes du timeframe
-    window_size = int(BASE_WINDOW_DAYS * 24 * 60 / minutes_per_bar)
-    prediction_horizon = int(BASE_PREDICTION_DAYS * 24 * 60 / minutes_per_bar)
+    # window_size : valeur explicite si disponible, sinon fallback calendaire
+    window_size = WINDOW_SIZES.get(
+        timeframe,
+        int(BASE_WINDOW_DAYS * 24 * 60 / minutes_per_bar)
+    )
+    # prediction_horizon : valeur explicite si disponible, sinon fallback calendaire
+    prediction_horizon = PREDICTION_HORIZONS.get(
+        timeframe,
+        int(BASE_PREDICTION_DAYS * 24 * 60 / minutes_per_bar)
+    )
 
     return {
         "timeframe": timeframe,
@@ -111,7 +157,90 @@ def update_global_config(timeframe: str = DEFAULT_TIMEFRAME):
     TIMEFRAME = timeframe
     return config
 
-# Frais de transaction (en pourcentage, ex: 0.001 = 0.1%)
+# ----- Architecture CNN par timeframe -----
+# Deux profils distincts : 1d (original) et 1h (optimisé).
+# Fallback pour les autres timeframes : pool_size calculé dynamiquement.
+CNN_CONFIGS: dict = {
+    "1d": {
+        "channels": [16, 32, 64],
+        "kernel_sizes": [3, 3, 3],
+        "dropout_conv": 0.2,
+        "dropout_fc": 0.3,
+        "pool_size": 5,       # 30 % 5 == 0 ✓ MPS
+    },
+    "1h": {
+        "channels": [16, 32, 64],
+        "kernel_sizes": [5, 5, 3],
+        "dropout_conv": 0.2,
+        "dropout_fc": 0.3,
+        "pool_size": 8,       # 72 % 8 == 0 ✓ MPS
+    },
+}
+
+
+def get_cnn_config(timeframe: str = DEFAULT_TIMEFRAME) -> dict:
+    """Retourne la config d'architecture CNN pour le timeframe donné."""
+    if timeframe in CNN_CONFIGS:
+        return CNN_CONFIGS[timeframe]
+    # Fallback : pool_size calculé comme le plus grand diviseur de window_size <= 8
+    window_size = get_timeframe_config(timeframe)["window_size"]
+    pool_size = next(p for p in range(8, 0, -1) if window_size % p == 0)
+    return {
+        "channels": [16, 32, 64],
+        "kernel_sizes": [3, 3, 3],
+        "dropout_conv": 0.2,
+        "dropout_fc": 0.3,
+        "pool_size": pool_size,
+    }
+
+
+# ----- Architecture CNN-BiLSTM-AM par timeframe -----
+CNN_BILSTM_AM_CONFIGS: dict = {
+    "1d": {
+        "channels": [16, 32, 64],
+        "kernel_sizes": [3, 3, 3],
+        "dropout_conv": 0.2,
+        "pool_size": 15,          # 30 % 15 == 0 ✓ MPS — conserve plus de contexte pour BiLSTM
+        "lstm_hidden": 64,
+        "lstm_layers": 1,
+        "dropout_lstm": 0.0,
+        "dropout_fc": 0.3,
+    },
+    "1h": {
+        "channels": [16, 32, 64],
+        "kernel_sizes": [5, 5, 3],
+        "dropout_conv": 0.2,
+        "pool_size": 24,          # 72 % 24 == 0 ✓ MPS — conserve plus de contexte pour BiLSTM
+        "lstm_hidden": 64,
+        "lstm_layers": 1,
+        "dropout_lstm": 0.0,
+        "dropout_fc": 0.3,
+    },
+}
+
+
+def get_cnn_bilstm_am_config(timeframe: str = DEFAULT_TIMEFRAME) -> dict:
+    """Retourne la config d'architecture CNN-BiLSTM-AM pour le timeframe donné."""
+    if timeframe in CNN_BILSTM_AM_CONFIGS:
+        return CNN_BILSTM_AM_CONFIGS[timeframe]
+    # Fallback : pool_size ~ window_size/3 (arrondi au diviseur le plus proche)
+    # Le BiLSTM a besoin de suffisamment de timesteps pour capturer les dépendances
+    window_size = get_timeframe_config(timeframe)["window_size"]
+    target = max(window_size // 3, 4)
+    pool_size = next(p for p in range(target, 0, -1) if window_size % p == 0)
+    return {
+        "channels": [16, 32, 64],
+        "kernel_sizes": [3, 3, 3],
+        "dropout_conv": 0.2,
+        "pool_size": pool_size,
+        "lstm_hidden": 64,
+        "lstm_layers": 1,
+        "dropout_lstm": 0.0,
+        "dropout_fc": 0.3,
+    }
+
+
+# ----- Frais de transaction (en pourcentage, ex: 0.001 = 0.1%)
 # Centralized Exchange (Binance, Coinbase)
 MAKER_FEE_CEX = 0.0010  # 0.100% - Binance VIP 0 spot
 TAKER_FEE_CEX = 0.0010  # 0.100% - Binance VIP 0 spot
