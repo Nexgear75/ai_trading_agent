@@ -141,6 +141,54 @@ def plot_residuals(y_true: np.ndarray, y_pred: np.ndarray, save_path: str):
     plt.close(fig)
 
 
+def plot_price_vs_predicted(
+    close_prices: np.ndarray,
+    y_true: np.ndarray,
+    y_pred: np.ndarray,
+    prediction_horizon: int,
+    save_path: str,
+):
+    """Prix réel vs prix prédit par le modèle.
+
+    Pour chaque sample t, le modèle prédit le return à horizon h.
+    On reconstruit : predicted_price[t] = close[t] * (1 + predicted_return[t])
+    et on compare à : actual_price[t] = close[t] * (1 + actual_return[t]).
+
+    Args:
+        close_prices: Prix close au moment de chaque prédiction.
+        y_true: Forward returns réels (inverse-transformés, en %).
+        y_pred: Forward returns prédits (inverse-transformés, en %).
+        prediction_horizon: Horizon de prédiction (ex: 3 jours).
+        save_path: Dossier de sauvegarde.
+    """
+    actual_future = close_prices * (1 + y_true)
+    predicted_future = close_prices * (1 + y_pred)
+
+    fig, axes = plt.subplots(2, 1, figsize=(14, 10), height_ratios=[3, 1])
+
+    # ----- Panel 1 : Prix réel vs prédit -----
+    ax = axes[0]
+    ax.plot(actual_future, label="Prix réel (futur)", linewidth=1)
+    ax.plot(predicted_future, label="Prix prédit", alpha=0.7, linewidth=1)
+    ax.set_ylabel("Prix ($)")
+    ax.set_title(f"Prix réel vs prédit (horizon = {prediction_horizon})")
+    ax.legend()
+    ax.grid(True, alpha=0.3)
+
+    # ----- Panel 2 : Erreur absolue -----
+    ax2 = axes[1]
+    error = np.abs(actual_future - predicted_future)
+    ax2.fill_between(range(len(error)), error, alpha=0.5, color="red")
+    ax2.set_xlabel("Sample")
+    ax2.set_ylabel("Erreur absolue ($)")
+    ax2.set_title("Écart prix réel vs prédit")
+    ax2.grid(True, alpha=0.3)
+
+    fig.tight_layout()
+    fig.savefig(os.path.join(save_path, "price_vs_predicted.png"), dpi=150)
+    plt.close(fig)
+
+
 def plot_direction_accuracy(
     y_true: np.ndarray, y_pred: np.ndarray, save_path: str
 ):
@@ -173,6 +221,8 @@ def run_evaluation(
     history: dict,
     results_dir: str,
     device: torch.device,
+    close_prices: np.ndarray | None = None,
+    prediction_horizon: int | None = None,
 ) -> dict:
     """Évalue un modèle et génère tous les graphiques.
 
@@ -211,6 +261,9 @@ def run_evaluation(
     plot_scatter(y_true, y_pred, results_dir)
     plot_residuals(y_true, y_pred, results_dir)
     plot_direction_accuracy(y_true, y_pred, results_dir)
+
+    if close_prices is not None and prediction_horizon is not None:
+        plot_price_vs_predicted(close_prices, y_true, y_pred, prediction_horizon, results_dir)
 
     print(f"\nGraphiques sauvegardés dans {results_dir}/")
 

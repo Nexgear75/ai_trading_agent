@@ -3,8 +3,8 @@ import torch
 from sklearn.preprocessing import RobustScaler, StandardScaler
 from torch.utils.data import TensorDataset, DataLoader
 
-from config import PREDICTION_HORIZON
-from data.features.pipeline import FEATURE_COLUMNS
+from config import DEFAULT_TIMEFRAME, get_timeframe_config
+from data.features.pipeline import get_feature_columns
 from data.preprocessing.builder import build_windows
 from utils.dataset_loader import load_symbol, load_all
 
@@ -18,37 +18,54 @@ def _clip_outliers(arr: np.ndarray, lower: float = 1.0, upper: float = 99.0) -> 
 
 def prepare_data(
     symbol: str | None = None,
+    timeframe: str = DEFAULT_TIMEFRAME,
     train_ratio: float = 0.8,
     batch_size: int = 32,
-) -> tuple[DataLoader, DataLoader, RobustScaler, StandardScaler]:
+) -> tuple[DataLoader, DataLoader, RobustScaler, StandardScaler, np.ndarray, np.ndarray]:
     """Prépare les DataLoaders d'entraînement et de validation.
 
     Args:
         symbol: Symbole à charger (ex: "BTC"). None = toutes les cryptos.
+        timeframe: Timeframe du dataset (ex: "1d", "1h", "4h").
+                   Défaut: DEFAULT_TIMEFRAME ("1d").
         train_ratio: Proportion des données pour l'entraînement.
         batch_size: Taille des batchs.
 
     Returns:
-        (train_loader, val_loader, feature_scaler, target_scaler)
+        (train_loader, val_loader, feature_scaler, target_scaler, clip_bounds, close_val)
     """
-    df = load_symbol(symbol) if symbol else load_all()
+    # Get timeframe-specific configuration
+    tf_config = get_timeframe_config(timeframe)
+    window_size = tf_config["window_size"]
+    prediction_horizon = tf_config["prediction_horizon"]
+    feature_cols = get_feature_columns(timeframe)
+
+    print(f"  [Data Prep] Timeframe: {timeframe}, Window size: {window_size}, "
+          f"Horizon: {prediction_horizon}, Features: {len(feature_cols)}")
+
+    df = load_symbol(symbol, timeframe=timeframe) if symbol else load_all(timeframe=timeframe)
 
     # Calcul du forward return PAR SYMBOLE pour éviter la contamination
     # entre cryptos aux frontières du DataFrame concaténé
     df["label"] = df.groupby("symbol")["close"].transform(
-        lambda c: c.shift(-PREDICTION_HORIZON) / c - 1
+        lambda c: c.shift(-prediction_horizon) / c - 1
     )
     df = df.dropna(subset=["label"])
 
     # Construction des fenêtres glissantes PAR SYMBOLE
     # pour ne jamais créer de fenêtre à cheval sur deux cryptos
-    all_X, all_y = [], []
+    all_X, all_y, all_close = [], [], []
     for _, group in df.groupby("symbol"):
-        X_sym, y_sym, _ = build_windows(group)
+        X_sym, y_sym, _ = build_windows(group, window_size=window_size,
+                                        feature_columns=feature_cols)
+        # Prix close correspondant à chaque fenêtre (dernier jour de la fenêtre)
+        close_sym = group["close"].values[window_size:]
         all_X.append(X_sym)
         all_y.append(y_sym)
+        all_close.append(close_sym)
     X = np.concatenate(all_X)
     y = np.concatenate(all_y)
+    close_prices = np.concatenate(all_close)
 
     # Vérification NaN
     nan_x, nan_y = np.isnan(X).sum(), np.isnan(y).sum()
@@ -59,6 +76,7 @@ def prepare_data(
     split = int(train_ratio * len(X))
     X_train, X_val = X[:split], X[split:]
     y_train, y_val = y[:split], y[split:]
+    close_val = close_prices[split:]
 
     # Clipping des outliers sur les targets (winsorize 1er/99e percentile)
     # Fitté sur train uniquement, appliqué à train et val
@@ -72,9 +90,11 @@ def prepare_data(
     n_val = X_val.shape[0]
     X_train_flat = X_train.reshape(-1, nf)
     X_val_flat = X_val.reshape(-1, nf)
+    clip_bounds = np.zeros((nf, 2))
     for i in range(nf):
         lo_f = np.percentile(X_train_flat[:, i], 1.0)
         hi_f = np.percentile(X_train_flat[:, i], 99.0)
+        clip_bounds[i] = [lo_f, hi_f]
         X_train_flat[:, i] = np.clip(X_train_flat[:, i], lo_f, hi_f)
         X_val_flat[:, i] = np.clip(X_val_flat[:, i], lo_f, hi_f)
 
@@ -88,6 +108,12 @@ def prepare_data(
     y_train = target_scaler.fit_transform(y_train.reshape(-1, 1)).ravel()
     y_val = target_scaler.transform(y_val.reshape(-1, 1)).ravel()
 
+    # Libération mémoire des arrays intermédiaires
+    import gc
+
+    del X_train_flat, X_val_flat
+    gc.collect()
+
     # Conversion en tenseurs PyTorch
     train_ds = TensorDataset(
         torch.tensor(X_train, dtype=torch.float32),
@@ -98,9 +124,13 @@ def prepare_data(
         torch.tensor(y_val, dtype=torch.float32),
     )
 
-    train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True)
-    val_loader = DataLoader(val_ds, batch_size=batch_size, shuffle=False)
+    # Libération des arrays numpy originaux
+    del X_train, X_val, y_train, y_val
+    gc.collect()
+
+    train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True, num_workers=0)
+    val_loader = DataLoader(val_ds, batch_size=batch_size, shuffle=False, num_workers=0)
 
     print(f"Train: {len(train_ds)} samples | Val: {len(val_ds)} samples")
 
-    return train_loader, val_loader, feature_scaler, target_scaler
+    return train_loader, val_loader, feature_scaler, target_scaler, clip_bounds, close_val

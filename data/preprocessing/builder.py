@@ -7,33 +7,44 @@ Created on 19 febuary 2026
 import numpy as np
 import pandas as pd
 from data.features.pipeline import FEATURE_COLUMNS
-from config import WINDOW_SIZE
 
 
-def build_windows(df: pd.DataFrame):
+def build_windows(df: pd.DataFrame, window_size: int = None, feature_columns: list = None):
     """
     Build sliding windows from time series data for machine learning.
 
-    Creates sequences of WINDOW_SIZE length from feature columns
+    Creates sequences of window_size length from feature columns
     with corresponding labels and dates for supervised learning.
 
     Args:
-        df: DataFrame containing FEATURE_COLUMNS and 'label' column
+        df: DataFrame containing feature columns and 'label' column
+        window_size: Number of periods in each window. If None, uses
+                     WINDOW_SIZE from config (legacy behavior).
+        feature_columns: List of feature column names to use. If None,
+                         falls back to FEATURE_COLUMNS (1d standard).
 
     Returns:
         Tuple of (X, y, idx) where:
-            - X: 3D array of shape (n_samples, WINDOW_SIZE, n_features)
+            - X: 3D array of shape (n_samples, window_size, n_features)
             - y: 1D array of labels
             - idx: 1D array of timestamps
     """
-    data = df[FEATURE_COLUMNS].values
+    # Import here to avoid circular dependencies
+    if window_size is None:
+        from config import WINDOW_SIZE as _window_size
+        window_size = _window_size
+
+    if feature_columns is None:
+        feature_columns = FEATURE_COLUMNS
+
+    data = df[feature_columns].values
     labels = df["label"].values
     dates = df.index
 
     X, y, idx = [], [], []
 
-    for i in range(WINDOW_SIZE, len(data)):
-        X.append(data[i - WINDOW_SIZE : i])
+    for i in range(window_size, len(data)):
+        X.append(data[i - window_size : i])
         y.append(labels[i])
         idx.append(dates[i])
 
