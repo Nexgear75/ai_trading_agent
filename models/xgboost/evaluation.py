@@ -5,6 +5,8 @@ Réutilise les fonctions de métriques et de plots de utils.evaluation,
 mais sans passer par run_evaluation (couplé à PyTorch).
 """
 
+from __future__ import annotations
+
 import argparse
 import os
 

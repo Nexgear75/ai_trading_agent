@@ -6,6 +6,8 @@ et un orchestrateur `run_evaluation` réutilisable par n'importe quel
 modèle (CNN, LSTM, GRU, Transformer, etc.).
 """
 
+from __future__ import annotations
+
 import os
 
 import matplotlib.pyplot as plt
