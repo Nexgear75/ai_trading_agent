@@ -9,7 +9,6 @@ import argparse
 import os
 
 import joblib
-import numpy as np
 import xgboost as xgb
 
 from config import DEFAULT_TIMEFRAME, get_timeframe_config
@@ -71,7 +70,7 @@ def evaluate(
     os.makedirs(paths["results"], exist_ok=True)
 
     print(f"\n{'=' * 60}")
-    print(f"  ÉVALUATION XGBOOST")
+    print("  ÉVALUATION XGBOOST")
     print(f"  Timeframe: {timeframe}")
     print(f"  Model: {model_path}")
     print(f"{'=' * 60}\n")
