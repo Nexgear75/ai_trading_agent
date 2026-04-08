@@ -240,6 +240,35 @@ def get_cnn_bilstm_am_config(timeframe: str = DEFAULT_TIMEFRAME) -> dict:
     }
 
 
+# ----- Architecture XGBoost par timeframe -----
+XGBOOST_CONFIGS: dict = {
+    "1d": {
+        "n_estimators": 1000,
+        "max_depth": 6,
+        "learning_rate": 0.05,
+        "early_stopping_rounds": 50,
+    },
+    "1h": {
+        "n_estimators": 1500,
+        "max_depth": 8,
+        "learning_rate": 0.03,
+        "early_stopping_rounds": 80,
+    },
+}
+
+
+def get_xgboost_config(timeframe: str = DEFAULT_TIMEFRAME) -> dict:
+    """Retourne la config d'hyperparamètres XGBoost pour le timeframe donné."""
+    if timeframe in XGBOOST_CONFIGS:
+        return XGBOOST_CONFIGS[timeframe]
+    return {
+        "n_estimators": 1000,
+        "max_depth": 6,
+        "learning_rate": 0.05,
+        "early_stopping_rounds": 50,
+    }
+
+
 # ----- Frais de transaction (en pourcentage, ex: 0.001 = 0.1%)
 # Centralized Exchange (Binance, Coinbase)
 MAKER_FEE_CEX = 0.0010  # 0.100% - Binance VIP 0 spot
