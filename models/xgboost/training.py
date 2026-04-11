@@ -85,6 +85,7 @@ def train(
         "timeframe": timeframe,
         "window_size": tf_config["window_size"],
         "train_ratio": train_ratio,
+        "prediction_horizon": tf_config["prediction_horizon"],
         "n_features": len(feature_cols),
         "xgb_cfg": xgb_cfg,
     }, paths["scalers"])

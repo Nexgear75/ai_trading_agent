@@ -252,10 +252,25 @@ def build_val_from_checkpoint(
 
     scalers = joblib.load(scalers_path)
 
-    # Validate target_clip_bounds
-    if scalers.get("target_clip_bounds") is None:
+    # Validate checkpoint structure
+    if not hasattr(scalers, "get"):
+        raise TypeError(
+            "Invalid checkpoint format: expected a dict-like object containing "
+            "preprocessing artifacts. Re-train the model to generate a compatible "
+            "checkpoint."
+        )
+
+    required_artifacts = (
+        "feature_scaler",
+        "target_scaler",
+        "clip_bounds",
+        "target_clip_bounds",
+    )
+    missing_artifacts = [key for key in required_artifacts if scalers.get(key) is None]
+    if missing_artifacts:
+        missing_str = ", ".join(f"'{k}'" for k in missing_artifacts)
         raise KeyError(
-            "Checkpoint missing 'target_clip_bounds'. "
+            f"Checkpoint missing required preprocessing artifact(s): {missing_str}. "
             "Re-train the model to generate a compatible checkpoint."
         )
 
@@ -277,6 +292,16 @@ def build_val_from_checkpoint(
         )
     window_size = persisted_window_size if persisted_window_size is not None else config_window_size
     prediction_horizon = tf_config["prediction_horizon"]
+
+    # Validate prediction_horizon consistency
+    persisted_horizon = scalers.get("prediction_horizon")
+    if persisted_horizon is not None and persisted_horizon != prediction_horizon:
+        raise ValueError(
+            f"Prediction horizon mismatch: checkpoint trained with "
+            f"prediction_horizon={persisted_horizon} but config uses "
+            f"prediction_horizon={prediction_horizon} for timeframe '{timeframe}'."
+        )
+
     feature_cols = get_feature_columns(timeframe)
 
     # Load raw data and compute forward returns
