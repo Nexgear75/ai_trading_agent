@@ -14,7 +14,7 @@ def prepare_data(
     timeframe: str = DEFAULT_TIMEFRAME,
     train_ratio: float = 0.8,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray,
-           RobustScaler, StandardScaler, np.ndarray, np.ndarray]:
+           RobustScaler, StandardScaler, np.ndarray, np.ndarray, np.ndarray]:
     """Prépare les données tabulaires pour XGBoost.
 
     Même pipeline que CNN (fenêtres glissantes, clipping, scaling)
@@ -77,6 +77,7 @@ def prepare_data(
 
     # Clipping targets (fit sur train uniquement)
     lo, hi = np.percentile(y_train, 1.0), np.percentile(y_train, 99.0)
+    target_clip_bounds = np.array([lo, hi])
     y_train = np.clip(y_train, lo, hi)
     y_val = np.clip(y_val, lo, hi)
 
@@ -100,4 +101,4 @@ def prepare_data(
     print(f"  Features: {X_train.shape[1]} ({window_size} × {len(feature_cols)})")
 
     return (X_train, X_val, y_train, y_val,
-            feature_scaler, target_scaler, clip_bounds, close_val)
+            feature_scaler, target_scaler, clip_bounds, target_clip_bounds, close_val)

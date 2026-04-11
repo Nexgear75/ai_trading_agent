@@ -11,19 +11,12 @@ from data.preprocessing.builder import build_windows
 from utils.dataset_loader import load_symbol, load_all
 
 
-def _clip_outliers(arr: np.ndarray, lower: float = 1.0, upper: float = 99.0) -> np.ndarray:
-    """Winsorize un array aux percentiles donnés."""
-    lo = np.percentile(arr, lower)
-    hi = np.percentile(arr, upper)
-    return np.clip(arr, lo, hi)
-
-
 def prepare_data(
     symbol: str | None = None,
     timeframe: str = DEFAULT_TIMEFRAME,
     train_ratio: float = 0.8,
     batch_size: int = 32,
-) -> tuple[DataLoader, DataLoader, RobustScaler, StandardScaler, np.ndarray, np.ndarray]:
+) -> tuple[DataLoader, DataLoader, RobustScaler, StandardScaler, np.ndarray, np.ndarray, np.ndarray]:
     """Prépare les DataLoaders d'entraînement et de validation.
 
     Args:
@@ -34,7 +27,8 @@ def prepare_data(
         batch_size: Taille des batchs.
 
     Returns:
-        (train_loader, val_loader, feature_scaler, target_scaler, clip_bounds, close_val)
+        (train_loader, val_loader, feature_scaler, target_scaler,
+         clip_bounds, target_clip_bounds, close_val)
     """
     # Get timeframe-specific configuration
     tf_config = get_timeframe_config(timeframe)
@@ -55,50 +49,46 @@ def prepare_data(
     df = df.dropna(subset=["label"])
 
     # Construction des fenêtres glissantes PAR SYMBOLE
-    # pour ne jamais créer de fenêtre à cheval sur deux cryptos
-    all_X, all_y, all_close = [], [], []
+    # Split temporel par symbole puis concaténation pour garantir
+    # que train < val en chronologie (même avec multi-symbole)
+    train_X, val_X, train_y, val_y = [], [], [], []
+    train_close, val_close_list = [], []
     for _, group in df.groupby("symbol"):
         X_sym, y_sym, _ = build_windows(group, window_size=window_size,
                                         feature_columns=feature_cols)
-        # Prix close correspondant à chaque fenêtre (dernier jour de la fenêtre)
         close_sym = group["close"].values[window_size:]
-        all_X.append(X_sym)
-        all_y.append(y_sym)
-        all_close.append(close_sym)
-    X = np.concatenate(all_X)
-    y = np.concatenate(all_y)
-    close_prices = np.concatenate(all_close)
+        n = len(X_sym)
+        split = int(train_ratio * n)
+        train_X.append(X_sym[:split])
+        val_X.append(X_sym[split:])
+        train_y.append(y_sym[:split])
+        val_y.append(y_sym[split:])
+        train_close.append(close_sym[:split])
+        val_close_list.append(close_sym[split:])
 
-    # Vérification NaN
-    nan_x, nan_y = np.isnan(X).sum(), np.isnan(y).sum()
-    if nan_x > 0 or nan_y > 0:
-        print(f"Warning: NaN détectés (X: {nan_x}, y: {nan_y})")
-
-    # Split temporel (pas de shuffle pour respecter l'ordre chronologique)
-    split = int(train_ratio * len(X))
-    X_train, X_val = X[:split], X[split:]
-    y_train, y_val = y[:split], y[split:]
-    close_val = close_prices[split:]
+    X_train = np.concatenate(train_X)
+    X_val = np.concatenate(val_X)
+    y_train = np.concatenate(train_y)
+    y_val = np.concatenate(val_y)
+    close_val = np.concatenate(val_close_list)
 
     # Clipping des outliers sur les targets (winsorize 1er/99e percentile)
     # Fitté sur train uniquement, appliqué à train et val
     lo = np.percentile(y_train, 1.0)
     hi = np.percentile(y_train, 99.0)
+    target_clip_bounds = np.array([lo, hi])
     y_train = np.clip(y_train, lo, hi)
     y_val = np.clip(y_val, lo, hi)
 
-    # Clipping des outliers sur les features (par feature, sur train)
+    # Clipping des outliers sur les features (par feature, sur train) — vectorisé
     n_train, ws, nf = X_train.shape
     n_val = X_val.shape[0]
     X_train_flat = X_train.reshape(-1, nf)
     X_val_flat = X_val.reshape(-1, nf)
-    clip_bounds = np.zeros((nf, 2))
-    for i in range(nf):
-        lo_f = np.percentile(X_train_flat[:, i], 1.0)
-        hi_f = np.percentile(X_train_flat[:, i], 99.0)
-        clip_bounds[i] = [lo_f, hi_f]
-        X_train_flat[:, i] = np.clip(X_train_flat[:, i], lo_f, hi_f)
-        X_val_flat[:, i] = np.clip(X_val_flat[:, i], lo_f, hi_f)
+    lo_f, hi_f = np.percentile(X_train_flat, [1.0, 99.0], axis=0)
+    clip_bounds = np.column_stack((lo_f, hi_f))
+    X_train_flat = np.clip(X_train_flat, lo_f, hi_f)
+    X_val_flat = np.clip(X_val_flat, lo_f, hi_f)
 
     # RobustScaler (median/IQR) pour les features — insensible aux outliers restants
     feature_scaler = RobustScaler()
@@ -115,6 +105,12 @@ def prepare_data(
 
     del X_train_flat, X_val_flat
     gc.collect()
+
+    # Vérification NaN
+    nan_x = np.isnan(X_train).sum() + np.isnan(X_val).sum()
+    nan_y = np.isnan(y_train).sum() + np.isnan(y_val).sum()
+    if nan_x > 0 or nan_y > 0:
+        print(f"Warning: NaN détectés (X: {nan_x}, y: {nan_y})")
 
     # Conversion en tenseurs PyTorch
     train_ds = TensorDataset(
@@ -135,4 +131,4 @@ def prepare_data(
 
     print(f"Train: {len(train_ds)} samples | Val: {len(val_ds)} samples")
 
-    return train_loader, val_loader, feature_scaler, target_scaler, clip_bounds, close_val
+    return train_loader, val_loader, feature_scaler, target_scaler, clip_bounds, target_clip_bounds, close_val
