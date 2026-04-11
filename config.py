@@ -269,6 +269,53 @@ def get_xgboost_config(timeframe: str = DEFAULT_TIMEFRAME) -> dict:
     }
 
 
+# ----- Architecture PatchTST par timeframe -----
+# Contraintes : d_model % n_heads == 0
+#               num_patches = (window_size - patch_len) // stride + 1  ≥ 2
+PATCHTST_CONFIGS: dict = {
+    "1d": {
+        "patch_len": 6,       # 6 jours par patch
+        "stride": 3,          # stride 3 → chevauchement 50%  → 9 patches (window=30)
+        "d_model": 64,
+        "n_heads": 4,         # 64 / 4 = 16 per head
+        "n_layers": 3,
+        "d_ff": 128,
+        "dropout": 0.2,
+        "dropout_fc": 0.3,
+    },
+    "1h": {
+        "patch_len": 12,      # 12 barres = 12h par patch
+        "stride": 6,          # stride 6 → chevauchement 50%  → 11 patches (window=72)
+        "d_model": 64,
+        "n_heads": 4,
+        "n_layers": 3,
+        "d_ff": 128,
+        "dropout": 0.2,
+        "dropout_fc": 0.3,
+    },
+}
+
+
+def get_patchtst_config(timeframe: str = DEFAULT_TIMEFRAME) -> dict:
+    """Retourne la config d'architecture PatchTST pour le timeframe donné."""
+    if timeframe in PATCHTST_CONFIGS:
+        return PATCHTST_CONFIGS[timeframe]
+    # Fallback : patch_len = window_size // 5, stride = patch_len // 2
+    window_size = get_timeframe_config(timeframe)["window_size"]
+    patch_len = max(window_size // 5, 2)
+    stride = max(patch_len // 2, 1)
+    return {
+        "patch_len": patch_len,
+        "stride": stride,
+        "d_model": 64,
+        "n_heads": 4,
+        "n_layers": 3,
+        "d_ff": 128,
+        "dropout": 0.2,
+        "dropout_fc": 0.3,
+    }
+
+
 # ----- Frais de transaction (en pourcentage, ex: 0.001 = 0.1%)
 # Centralized Exchange (Binance, Coinbase)
 MAKER_FEE_CEX = 0.0010  # 0.100% - Binance VIP 0 spot
