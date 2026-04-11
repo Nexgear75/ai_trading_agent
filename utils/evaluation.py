@@ -230,8 +230,8 @@ def build_val_from_checkpoint(
     """Validate checkpoint metadata and build raw validation arrays.
 
     Loads scalers from checkpoint, validates consistency (timeframe,
-    window_size, train_ratio, target_clip_bounds), then rebuilds
-    validation windows from raw data WITHOUT refitting any scaler.
+    window_size, prediction_horizon), then rebuilds validation windows
+    from raw data WITHOUT refitting any scaler.
 
     Args:
         scalers_path: Path to the scalers.joblib checkpoint file.
@@ -330,6 +330,11 @@ def build_val_from_checkpoint(
             "Re-train the model to generate a compatible checkpoint."
         )
     train_ratio = scalers["train_ratio"]
+    if not (0 < train_ratio < 1):
+        raise ValueError(
+            f"Invalid train_ratio={train_ratio} in checkpoint. "
+            "Expected a value strictly between 0 and 1."
+        )
     val_X, val_y, val_close = [], [], []
     skipped = 0
     for sym_name, group in df.groupby("symbol"):
