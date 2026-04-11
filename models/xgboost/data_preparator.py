@@ -48,45 +48,43 @@ def prepare_data(
     df = df.dropna(subset=["label"])
 
     # Construction des fenêtres glissantes PAR SYMBOLE
-    all_X, all_y, all_close = [], [], []
+    # Split temporel par symbole puis concaténation pour guarantir
+    # que train < val en chronologie (même avec multi-symbole)
+    train_X, val_X, train_y, val_y, train_close, val_close = [], [], [], [], [], []
     for _, group in df.groupby("symbol"):
         X_sym, y_sym, _ = build_windows(
             group, window_size=window_size, feature_columns=feature_cols
         )
         close_sym = group["close"].values[window_size:]
-        all_X.append(X_sym)
-        all_y.append(y_sym)
-        all_close.append(close_sym)
+        n = len(X_sym)
+        split = int(train_ratio * n)
+        train_X.append(X_sym[:split])
+        val_X.append(X_sym[split:])
+        train_y.append(y_sym[:split])
+        val_y.append(y_sym[split:])
+        train_close.append(close_sym[:split])
+        val_close.append(close_sym[split:])
 
-    X = np.concatenate(all_X)       # shape: [n, window, n_features]
-    y = np.concatenate(all_y)
-    close_prices = np.concatenate(all_close)
+    X_train_3d = np.concatenate(train_X)
+    X_val_3d = np.concatenate(val_X)
+    y_train = np.concatenate(train_y)
+    y_val = np.concatenate(val_y)
+    close_val = np.concatenate(val_close)
 
     # Aplatir les fenêtres → [n, window × n_features]
-    n_samples = X.shape[0]
-    nf = len(feature_cols)
-    X_flat = X.reshape(n_samples, -1)
-
-    # Split temporel (pas de shuffle)
-    split = int(train_ratio * n_samples)
-    X_train, X_val = X_flat[:split], X_flat[split:]
-    y_train, y_val = y[:split], y[split:]
-    close_val = close_prices[split:]
+    X_train = X_train_3d.reshape(X_train_3d.shape[0], -1)
+    X_val = X_val_3d.reshape(X_val_3d.shape[0], -1)
 
     # Clipping targets (fit sur train uniquement)
     lo, hi = np.percentile(y_train, 1.0), np.percentile(y_train, 99.0)
     y_train = np.clip(y_train, lo, hi)
     y_val = np.clip(y_val, lo, hi)
 
-    # Clipping features (fit sur train uniquement)
-    n_flat_features = X_train.shape[1]
-    clip_bounds = np.zeros((n_flat_features, 2))
-    for i in range(n_flat_features):
-        lo_f = np.percentile(X_train[:, i], 1.0)
-        hi_f = np.percentile(X_train[:, i], 99.0)
-        clip_bounds[i] = [lo_f, hi_f]
-        X_train[:, i] = np.clip(X_train[:, i], lo_f, hi_f)
-        X_val[:, i] = np.clip(X_val[:, i], lo_f, hi_f)
+    # Clipping features (fit sur train uniquement) — vectorisé
+    lo_f, hi_f = np.percentile(X_train, [1.0, 99.0], axis=0)
+    clip_bounds = np.column_stack((lo_f, hi_f))
+    X_train = np.clip(X_train, lo_f, hi_f)
+    X_val = np.clip(X_val, lo_f, hi_f)
 
     # RobustScaler pour les features
     feature_scaler = RobustScaler()
@@ -99,7 +97,7 @@ def prepare_data(
     y_val = target_scaler.transform(y_val.reshape(-1, 1)).ravel()
 
     print(f"  Train: {len(X_train)} samples | Val: {len(X_val)} samples")
-    print(f"  Features: {n_flat_features} ({window_size} × {nf})")
+    print(f"  Features: {X_train.shape[1]} ({window_size} × {len(feature_cols)})")
 
     return (X_train, X_val, y_train, y_val,
             feature_scaler, target_scaler, clip_bounds, close_val)
