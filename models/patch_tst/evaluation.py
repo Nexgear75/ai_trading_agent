@@ -102,7 +102,12 @@ def evaluate(
     feature_scaler = scalers["feature_scaler"]
     target_scaler = scalers["target_scaler"]
     clip_bounds = scalers["clip_bounds"]
-    target_clip_bounds = scalers["target_clip_bounds"]
+    target_clip_bounds = scalers.get("target_clip_bounds")
+    if target_clip_bounds is None:
+        raise KeyError(
+            "Checkpoint missing 'target_clip_bounds'. "
+            "Re-train the model to generate a compatible checkpoint."
+        )
 
     # Validation de cohérence du timeframe
     if "timeframe" in scalers and scalers["timeframe"] != timeframe:
