@@ -221,6 +221,106 @@ def plot_direction_accuracy(
 # ----- Orchestrateur ----- #
 
 
+def build_val_from_checkpoint(
+    scalers_path: str,
+    timeframe: str,
+    tf_config: dict,
+    symbol: str | None = None,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, dict, int]:
+    """Validate checkpoint metadata and build raw validation arrays.
+
+    Loads scalers from checkpoint, validates consistency (timeframe,
+    window_size, train_ratio, target_clip_bounds), then rebuilds
+    validation windows from raw data WITHOUT refitting any scaler.
+
+    Args:
+        scalers_path: Path to the scalers.joblib checkpoint file.
+        timeframe: Requested timeframe (must match checkpoint).
+        tf_config: Timeframe config dict (from get_timeframe_config).
+        symbol: Symbol to evaluate (e.g. "BTC"). None = all symbols.
+
+    Returns:
+        (X_val, y_val, close_val, scalers, prediction_horizon) where
+        X_val has shape (n_val, window_size, n_features) — raw, NOT
+        clipped or scaled. scalers dict contains all checkpoint artifacts.
+    """
+    import joblib
+
+    from data.features.pipeline import get_feature_columns
+    from data.preprocessing.builder import build_windows
+    from utils.dataset_loader import load_symbol, load_all
+
+    scalers = joblib.load(scalers_path)
+
+    # Validate target_clip_bounds
+    if scalers.get("target_clip_bounds") is None:
+        raise KeyError(
+            "Checkpoint missing 'target_clip_bounds'. "
+            "Re-train the model to generate a compatible checkpoint."
+        )
+
+    # Validate timeframe consistency
+    if "timeframe" in scalers and scalers["timeframe"] != timeframe:
+        raise ValueError(
+            f"Timeframe mismatch: checkpoint trained with '{scalers['timeframe']}' "
+            f"but evaluation requested with '{timeframe}'"
+        )
+
+    # Validate window_size consistency
+    config_window_size = tf_config["window_size"]
+    persisted_window_size = scalers.get("window_size")
+    if persisted_window_size is not None and persisted_window_size != config_window_size:
+        raise ValueError(
+            f"Window size mismatch: checkpoint trained with "
+            f"window_size={persisted_window_size} but config uses "
+            f"window_size={config_window_size} for timeframe '{timeframe}'."
+        )
+    window_size = persisted_window_size if persisted_window_size is not None else config_window_size
+    prediction_horizon = tf_config["prediction_horizon"]
+    feature_cols = get_feature_columns(timeframe)
+
+    # Load raw data and compute forward returns
+    df = load_symbol(symbol, timeframe=timeframe) if symbol else load_all(timeframe=timeframe)
+    df["label"] = df.groupby("symbol")["close"].transform(
+        lambda c: c.shift(-prediction_horizon) / c - 1
+    )
+    df = df.dropna(subset=["label"])
+
+    # Build validation windows per symbol
+    if "train_ratio" not in scalers:
+        raise KeyError(
+            "Checkpoint missing 'train_ratio'. "
+            "Re-train the model to generate a compatible checkpoint."
+        )
+    train_ratio = scalers["train_ratio"]
+    val_X, val_y, val_close = [], [], []
+    skipped = 0
+    for sym_name, group in df.groupby("symbol"):
+        X_sym, y_sym, _ = build_windows(
+            group, window_size=window_size, feature_columns=feature_cols
+        )
+        if len(X_sym) == 0:
+            skipped += 1
+            continue
+        close_sym = group["close"].values[window_size:]
+        n = len(X_sym)
+        split = int(train_ratio * n)
+        val_X.append(X_sym[split:])
+        val_y.append(y_sym[split:])
+        val_close.append(close_sym[split:])
+
+    if skipped:
+        print(f"  {skipped} symbole(s) ignoré(s) (historique insuffisant)")
+    if not val_X:
+        raise ValueError("No validation samples after windowing. Check data availability.")
+
+    X_val = np.concatenate(val_X)
+    y_val = np.concatenate(val_y)
+    close_val = np.concatenate(val_close)
+
+    return X_val, y_val, close_val, scalers, prediction_horizon
+
+
 def run_evaluation(
     model: nn.Module,
     dataloader: torch.utils.data.DataLoader,
