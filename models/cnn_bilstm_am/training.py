@@ -53,7 +53,7 @@ def train(
     os.makedirs(paths["dir"], exist_ok=True)
 
     print(f"\n{'=' * 60}")
-    print(f"  ENTRAÎNEMENT CNN-BiLSTM-AM")
+    print("  ENTRAÎNEMENT CNN-BiLSTM-AM")
     print(f"  Timeframe: {timeframe}")
     print(f"  Window size: {window_size}  |  Features: {len(feature_cols)}")
     print(f"  CNN: channels={model_cfg['channels']}  kernels={model_cfg['kernel_sizes']}")
@@ -66,7 +66,7 @@ def train(
     print(f"Device: {device}")
 
     # Données
-    train_loader, val_loader, feature_scaler, target_scaler, clip_bounds, _ = prepare_data(
+    train_loader, val_loader, feature_scaler, target_scaler, clip_bounds, target_clip_bounds, _ = prepare_data(
         symbol=symbol, timeframe=timeframe, batch_size=batch_size
     )
 
@@ -171,6 +171,7 @@ def train(
                     "feature_scaler": feature_scaler,
                     "target_scaler": target_scaler,
                     "clip_bounds": clip_bounds,
+                    "target_clip_bounds": target_clip_bounds,
                     "timeframe": timeframe,
                     "window_size": window_size,
                 },

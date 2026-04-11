@@ -81,7 +81,7 @@ def evaluate(
     device = torch.device("mps" if torch.mps.is_available() else "cpu")
 
     print(f"\n{'=' * 60}")
-    print(f"  ÉVALUATION CNN-BiLSTM-AM")
+    print("  ÉVALUATION CNN-BiLSTM-AM")
     print(f"  Timeframe: {timeframe}")
     print(f"  Model: {model_path}")
     print(f"{'=' * 60}\n")
@@ -92,7 +92,7 @@ def evaluate(
 
     # Charger modèle, données, et scalers
     model, history = load_model(model_path, device, window_size=window_size)
-    _, val_loader, _, _, _, close_val = prepare_data(symbol=symbol, timeframe=timeframe)
+    _, val_loader, _, _, _, _, close_val = prepare_data(symbol=symbol, timeframe=timeframe)
     scalers = joblib.load(paths["scalers"])
 
     # Create results directory for this timeframe
