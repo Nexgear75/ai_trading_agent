@@ -330,6 +330,7 @@ class TestEvaluation:
             "timeframe": "1d",
             "window_size": 30,
             "train_ratio": 0.8,
+            "prediction_horizon": 3,
         }, scalers_path)
 
         paths = {

@@ -274,28 +274,40 @@ def build_val_from_checkpoint(
             "Re-train the model to generate a compatible checkpoint."
         )
 
+    # Validate required metadata
+    required_metadata = ("timeframe", "window_size", "prediction_horizon")
+    missing_metadata = [key for key in required_metadata if key not in scalers]
+    if missing_metadata:
+        missing_str = ", ".join(f"'{key}'" for key in missing_metadata)
+        raise KeyError(
+            f"Checkpoint missing required metadata: {missing_str}. "
+            "Re-train the model to generate a compatible checkpoint."
+        )
+
+    persisted_timeframe = scalers["timeframe"]
+    persisted_window_size = scalers["window_size"]
+    persisted_horizon = scalers["prediction_horizon"]
+
     # Validate timeframe consistency
-    if "timeframe" in scalers and scalers["timeframe"] != timeframe:
+    if persisted_timeframe != timeframe:
         raise ValueError(
-            f"Timeframe mismatch: checkpoint trained with '{scalers['timeframe']}' "
+            f"Timeframe mismatch: checkpoint trained with '{persisted_timeframe}' "
             f"but evaluation requested with '{timeframe}'"
         )
 
     # Validate window_size consistency
     config_window_size = tf_config["window_size"]
-    persisted_window_size = scalers.get("window_size")
-    if persisted_window_size is not None and persisted_window_size != config_window_size:
+    if persisted_window_size != config_window_size:
         raise ValueError(
             f"Window size mismatch: checkpoint trained with "
             f"window_size={persisted_window_size} but config uses "
             f"window_size={config_window_size} for timeframe '{timeframe}'."
         )
-    window_size = persisted_window_size if persisted_window_size is not None else config_window_size
-    prediction_horizon = tf_config["prediction_horizon"]
+    window_size = persisted_window_size
 
     # Validate prediction_horizon consistency
-    persisted_horizon = scalers.get("prediction_horizon")
-    if persisted_horizon is not None and persisted_horizon != prediction_horizon:
+    prediction_horizon = tf_config["prediction_horizon"]
+    if persisted_horizon != prediction_horizon:
         raise ValueError(
             f"Prediction horizon mismatch: checkpoint trained with "
             f"prediction_horizon={persisted_horizon} but config uses "
