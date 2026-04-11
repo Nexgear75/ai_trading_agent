@@ -23,7 +23,7 @@ Ajouter un modèle PatchTST (Patch Time Series Transformer) dans `models/patch_t
    - **Positional embedding** : `nn.Parameter` apprenable de shape `(1, num_patches, d_model)`
    - **Transformer Encoder** : `nn.TransformerEncoder` avec `nn.TransformerEncoderLayer(d_model, n_heads, d_ff, dropout, batch_first=True)`
    - **Head** : flatten `(batch, num_patches * d_model)` → MLP `→ d_model → 32 → 1`
-   - **Init poids** : Xavier pour Linear, Kaiming pour dernière couche (gain=2.0), même pattern que CNN-BiLSTM-AM
+   - **Init poids** : Xavier pour les couches Linear, avec `gain=2.0` pour la dernière couche
    - Paramètres constructeur : `window_size, n_features, patch_len, stride, d_model, n_heads, n_layers, d_ff, dropout, dropout_fc`
    - `from __future__ import annotations` en haut (Python 3.9 compat)
 
