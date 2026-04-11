@@ -53,7 +53,7 @@ def train(
     os.makedirs(paths["dir"], exist_ok=True)
 
     print(f"\n{'=' * 60}")
-    print(f"  ENTRAÎNEMENT CNN1D")
+    print("  ENTRAÎNEMENT CNN1D")
     print(f"  Timeframe: {timeframe}")
     print(f"  Window size: {window_size}  |  Features: {len(feature_cols)}")
     print(f"  Channels: {cnn_cfg['channels']}  |  Kernels: {cnn_cfg['kernel_sizes']}")
@@ -183,7 +183,7 @@ def train(
                 break
 
     # Charger les meilleurs poids et scalers
-    checkpoint = torch.load(paths["model"], weights_only=False)
+    checkpoint = torch.load(paths["model"], weights_only=False, map_location=device)
     model.load_state_dict(checkpoint["model_state"])
     scalers = joblib.load(paths["scalers"])
     print(f"\nTraining terminé. Best val loss: {best_val_loss:.6f}")

@@ -103,6 +103,13 @@ def evaluate(
     clip_bounds = scalers["clip_bounds"]
     target_clip_bounds = scalers["target_clip_bounds"]
 
+    # Validation de cohérence du timeframe
+    if "timeframe" in scalers and scalers["timeframe"] != timeframe:
+        raise ValueError(
+            f"Timeframe mismatch: checkpoint trained with '{scalers['timeframe']}' "
+            f"but evaluation requested with '{timeframe}'"
+        )
+
     # Charger les données brutes et construire les fenêtres de validation
     # SANS refitter les scalers (utilise ceux du checkpoint)
     window_size = tf_config["window_size"]

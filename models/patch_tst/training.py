@@ -185,7 +185,7 @@ def train(
                 break
 
     # Charger les meilleurs poids et scalers
-    checkpoint = torch.load(paths["model"], weights_only=False)
+    checkpoint = torch.load(paths["model"], weights_only=False, map_location=device)
     model.load_state_dict(checkpoint["model_state"])
     scalers = joblib.load(paths["scalers"])
     print(f"\nTraining terminé. Best val loss: {best_val_loss:.6f}")
