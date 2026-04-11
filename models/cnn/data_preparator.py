@@ -53,9 +53,13 @@ def prepare_data(
     # que train < val en chronologie (même avec multi-symbole)
     train_X, val_X, train_y, val_y = [], [], [], []
     val_close_list = []
-    for _, group in df.groupby("symbol"):
+    skipped = 0
+    for sym_name, group in df.groupby("symbol"):
         X_sym, y_sym, _ = build_windows(group, window_size=window_size,
                                         feature_columns=feature_cols)
+        if len(X_sym) == 0:
+            skipped += 1
+            continue
         close_sym = group["close"].values[window_size:]
         n = len(X_sym)
         split = int(train_ratio * n)
@@ -64,6 +68,11 @@ def prepare_data(
         train_y.append(y_sym[:split])
         val_y.append(y_sym[split:])
         val_close_list.append(close_sym[split:])
+
+    if skipped:
+        print(f"  {skipped} symbole(s) ignoré(s) (historique insuffisant)")
+    if not train_X:
+        raise ValueError("No training samples after windowing. Check data availability.")
 
     X_train = np.concatenate(train_X)
     X_val = np.concatenate(val_X)
