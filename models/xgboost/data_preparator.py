@@ -28,7 +28,7 @@ def prepare_data(
 
     Returns:
         (X_train, X_val, y_train, y_val,
-         feature_scaler, target_scaler, clip_bounds, close_val)
+         feature_scaler, target_scaler, clip_bounds, target_clip_bounds, close_val)
     """
     tf_config = get_timeframe_config(timeframe)
     window_size = tf_config["window_size"]
@@ -48,7 +48,7 @@ def prepare_data(
     df = df.dropna(subset=["label"])
 
     # Construction des fenêtres glissantes PAR SYMBOLE
-    # Split temporel par symbole puis concaténation pour guarantir
+    # Split temporel par symbole puis concaténation pour garantir
     # que train < val en chronologie (même avec multi-symbole)
     train_X, val_X, train_y, val_y, train_close, val_close = [], [], [], [], [], []
     for _, group in df.groupby("symbol"):
