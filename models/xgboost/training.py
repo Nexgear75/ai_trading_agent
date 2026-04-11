@@ -51,8 +51,10 @@ def train(
     print(f"  Checkpoint: {paths['dir']}")
     print(f"{'=' * 60}\n")
 
+    train_ratio = 0.8
+
     X_train, X_val, y_train, y_val, feature_scaler, target_scaler, clip_bounds, target_clip_bounds, _ = (
-        prepare_data(symbol=symbol, timeframe=timeframe)
+        prepare_data(symbol=symbol, timeframe=timeframe, train_ratio=train_ratio)
     )
 
     model = xgb.XGBRegressor(
@@ -82,7 +84,7 @@ def train(
         "target_clip_bounds": target_clip_bounds,
         "timeframe": timeframe,
         "window_size": tf_config["window_size"],
-        "train_ratio": 0.8,
+        "train_ratio": train_ratio,
         "n_features": len(feature_cols),
         "xgb_cfg": xgb_cfg,
     }, paths["scalers"])

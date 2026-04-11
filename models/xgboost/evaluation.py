@@ -110,7 +110,15 @@ def evaluate(
 
     # Charger les données brutes et construire les fenêtres de validation
     # SANS refitter les scalers (utilise ceux du checkpoint)
-    window_size = tf_config["window_size"]
+    config_window_size = tf_config["window_size"]
+    persisted_window_size = scalers.get("window_size")
+    if persisted_window_size is not None and persisted_window_size != config_window_size:
+        raise ValueError(
+            f"Window size mismatch: checkpoint trained with "
+            f"window_size={persisted_window_size} but config uses "
+            f"window_size={config_window_size} for timeframe '{timeframe}'."
+        )
+    window_size = persisted_window_size if persisted_window_size is not None else config_window_size
     prediction_horizon = tf_config["prediction_horizon"]
     feature_cols = get_feature_columns(timeframe)
 
@@ -121,7 +129,12 @@ def evaluate(
     df = df.dropna(subset=["label"])
 
     # Fenêtres + split temporel par symbole
-    train_ratio = scalers.get("train_ratio", 0.8)
+    if "train_ratio" not in scalers:
+        raise KeyError(
+            "Checkpoint missing 'train_ratio'. "
+            "Re-train the model to generate a compatible checkpoint."
+        )
+    train_ratio = scalers["train_ratio"]
     val_X, val_y, val_close = [], [], []
     for _, group in df.groupby("symbol"):
         X_sym, y_sym, _ = build_windows(

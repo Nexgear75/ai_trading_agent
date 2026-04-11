@@ -47,6 +47,10 @@ class PatchTST(nn.Module):
             )
         if stride <= 0:
             raise ValueError(f"stride must be positive, got {stride}.")
+        if d_model % n_heads != 0:
+            raise ValueError(
+                f"d_model ({d_model}) must be divisible by n_heads ({n_heads})."
+            )
 
         self.patch_len = patch_len
         self.stride = stride
