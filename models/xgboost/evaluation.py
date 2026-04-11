@@ -11,10 +11,13 @@ import argparse
 import os
 
 import joblib
+import numpy as np
 import xgboost as xgb
 
 from config import DEFAULT_TIMEFRAME, get_timeframe_config
-from models.xgboost.data_preparator import prepare_data
+from data.features.pipeline import get_feature_columns
+from data.preprocessing.builder import build_windows
+from utils.dataset_loader import load_symbol, load_all
 from utils.evaluation import (
     compute_metrics,
     plot_predictions_vs_actual,
@@ -57,6 +60,9 @@ def evaluate(
 ):
     """Évalue le modèle XGBoost et génère les graphiques.
 
+    Charge les scalers/clip_bounds du checkpoint pour appliquer la même
+    préproc que l'entraînement (pas de refit).
+
     Args:
         symbol: Symbole évalué (ex: "BTC"). None = toutes les cryptos.
         timeframe: Timeframe du modèle (ex: "1d", "1h", "4h").
@@ -67,9 +73,14 @@ def evaluate(
     paths = _get_checkpoint_paths(timeframe)
     if model_path is None:
         model_path = paths["model"]
+        scalers_path = paths["scalers"]
+    else:
+        # Dériver le chemin des scalers depuis le model_path
+        scalers_path = os.path.join(os.path.dirname(model_path), "scalers.joblib")
 
     tf_config = get_timeframe_config(timeframe)
-    os.makedirs(paths["results"], exist_ok=True)
+    results_dir = paths["results"]
+    os.makedirs(results_dir, exist_ok=True)
 
     print(f"\n{'=' * 60}")
     print("  ÉVALUATION XGBOOST")
@@ -77,13 +88,51 @@ def evaluate(
     print(f"  Model: {model_path}")
     print(f"{'=' * 60}\n")
 
-    # Charger modèle et données
+    # Charger modèle et scalers du checkpoint
     model = load_model(model_path)
-    _, X_val, _, y_val, _, _, _, close_val = prepare_data(
-        symbol=symbol, timeframe=timeframe
-    )
-    scalers = joblib.load(paths["scalers"])
+    scalers = joblib.load(scalers_path)
+    feature_scaler = scalers["feature_scaler"]
     target_scaler = scalers["target_scaler"]
+    clip_bounds = scalers["clip_bounds"]
+
+    # Charger les données brutes et construire les fenêtres de validation
+    # SANS refitter les scalers (utilise ceux du checkpoint)
+    window_size = tf_config["window_size"]
+    prediction_horizon = tf_config["prediction_horizon"]
+    feature_cols = get_feature_columns(timeframe)
+
+    df = load_symbol(symbol, timeframe=timeframe) if symbol else load_all(timeframe=timeframe)
+    df["label"] = df.groupby("symbol")["close"].transform(
+        lambda c: c.shift(-prediction_horizon) / c - 1
+    )
+    df = df.dropna(subset=["label"])
+
+    # Fenêtres + split temporel par symbole
+    val_X, val_y, val_close = [], [], []
+    for _, group in df.groupby("symbol"):
+        X_sym, y_sym, _ = build_windows(
+            group, window_size=window_size, feature_columns=feature_cols
+        )
+        close_sym = group["close"].values[window_size:]
+        n = len(X_sym)
+        split = int(0.8 * n)
+        val_X.append(X_sym[split:])
+        val_y.append(y_sym[split:])
+        val_close.append(close_sym[split:])
+
+    X_val = np.concatenate(val_X).reshape(-1, window_size * len(feature_cols))
+    y_val = np.concatenate(val_y)
+    close_val = np.concatenate(val_close)
+
+    # Appliquer le clipping + scaling DU CHECKPOINT (pas de refit)
+    lo_f = clip_bounds[:, 0]
+    hi_f = clip_bounds[:, 1]
+    X_val = np.clip(X_val, lo_f, hi_f)
+    X_val = feature_scaler.transform(X_val)
+
+    lo_t, hi_t = np.percentile(y_val, 1.0), np.percentile(y_val, 99.0)
+    y_val = np.clip(y_val, lo_t, hi_t)
+    y_val = target_scaler.transform(y_val.reshape(-1, 1)).ravel()
 
     # Prédictions
     preds_scaled = model.predict(X_val)
@@ -97,19 +146,19 @@ def evaluate(
         print(f"    {name}: {value:.6f}")
 
     # Graphiques
-    plot_predictions_vs_actual(actuals, preds, paths["results"])
-    plot_scatter(actuals, preds, paths["results"])
-    plot_residuals(actuals, preds, paths["results"])
-    plot_direction_accuracy(actuals, preds, paths["results"])
+    plot_predictions_vs_actual(actuals, preds, results_dir)
+    plot_scatter(actuals, preds, results_dir)
+    plot_residuals(actuals, preds, results_dir)
+    plot_direction_accuracy(actuals, preds, results_dir)
 
     if close_val is not None:
         plot_price_vs_predicted(
             close_val, actuals, preds,
-            prediction_horizon=tf_config["prediction_horizon"],
-            save_path=paths["results"],
+            prediction_horizon=prediction_horizon,
+            save_path=results_dir,
         )
 
-    print(f"\n  Graphiques → {paths['results']}/")
+    print(f"\n  Graphiques → {results_dir}/")
 
     return metrics
 
