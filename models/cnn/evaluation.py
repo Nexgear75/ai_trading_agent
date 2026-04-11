@@ -143,16 +143,25 @@ def evaluate(
         )
     train_ratio = scalers["train_ratio"]
     val_X, val_y, val_close = [], [], []
-    for _, group in df.groupby("symbol"):
+    skipped = 0
+    for sym_name, group in df.groupby("symbol"):
         X_sym, y_sym, _ = build_windows(
             group, window_size=window_size, feature_columns=feature_cols
         )
+        if len(X_sym) == 0:
+            skipped += 1
+            continue
         close_sym = group["close"].values[window_size:]
         n = len(X_sym)
         split = int(train_ratio * n)
         val_X.append(X_sym[split:])
         val_y.append(y_sym[split:])
         val_close.append(close_sym[split:])
+
+    if skipped:
+        print(f"  {skipped} symbole(s) ignoré(s) (historique insuffisant)")
+    if not val_X:
+        raise ValueError("No validation samples after windowing. Check data availability.")
 
     X_val = np.concatenate(val_X)
     y_val = np.concatenate(val_y)

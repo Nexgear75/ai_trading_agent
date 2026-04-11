@@ -17,6 +17,7 @@ from data.features.pipeline import get_feature_columns, FEATURE_COLUMNS
 def _force_cpu(monkeypatch):
     """Force le device CPU pour éviter les crashs MPS dans les tests."""
     monkeypatch.setattr("torch.mps.is_available", lambda: False)
+    torch.manual_seed(42)
 
 
 @pytest.fixture
