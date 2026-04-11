@@ -3,14 +3,12 @@ from __future__ import annotations
 import torch
 import torch.nn as nn
 
-from data.features.pipeline import FEATURE_COLUMNS
-
 
 class PatchTST(nn.Module):
     def __init__(
         self,
-        window_size: int = 30,
-        n_features: int = len(FEATURE_COLUMNS),
+        window_size: int,
+        n_features: int,
         patch_len: int = 6,
         stride: int = 3,
         d_model: int = 64,
