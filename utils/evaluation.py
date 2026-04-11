@@ -8,6 +8,7 @@ modèle (CNN, LSTM, GRU, Transformer, etc.).
 
 from __future__ import annotations
 
+import logging
 import os
 from typing import TYPE_CHECKING
 
@@ -352,7 +353,7 @@ def build_val_from_checkpoint(
         val_close.append(close_sym[split:])
 
     if skipped:
-        print(f"  {skipped} symbole(s) ignoré(s) (historique insuffisant)")
+        logging.warning("%d symbole(s) ignoré(s) (historique insuffisant)", skipped)
     if not val_X:
         raise ValueError("No validation samples after windowing. Check data availability.")
 

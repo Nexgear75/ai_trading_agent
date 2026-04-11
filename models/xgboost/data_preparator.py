@@ -30,6 +30,12 @@ def prepare_data(
         (X_train, X_val, y_train, y_val,
          feature_scaler, target_scaler, clip_bounds, target_clip_bounds, close_val)
     """
+    if not (0 < train_ratio < 1):
+        raise ValueError(
+            f"Invalid train_ratio={train_ratio}. "
+            "Expected a value strictly between 0 and 1."
+        )
+
     tf_config = get_timeframe_config(timeframe)
     window_size = tf_config["window_size"]
     prediction_horizon = tf_config["prediction_horizon"]
