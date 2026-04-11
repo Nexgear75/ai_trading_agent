@@ -101,6 +101,15 @@ def evaluate(
     # Aplatir 3D → 2D pour XGBoost
     X_val = X_val_3d.reshape(X_val_3d.shape[0], -1)
 
+    # Vérifier la compatibilité des dimensions features
+    expected_flat_nf = clip_bounds.shape[0]
+    if X_val.shape[1] != expected_flat_nf:
+        raise ValueError(
+            f"Feature dimension mismatch: checkpoint expects {expected_flat_nf} "
+            f"flat features but data has {X_val.shape[1]}. "
+            "Check timeframe/feature pipeline."
+        )
+
     # Appliquer le clipping + scaling DU CHECKPOINT (pas de refit)
     lo_f = clip_bounds[:, 0]
     hi_f = clip_bounds[:, 1]

@@ -43,7 +43,7 @@ def load_model(model_path: str, device: torch.device, window_size: int = None) -
     checkpoint = torch.load(model_path, weights_only=False, map_location=device)
 
     # Reconstruit l'architecture exacte depuis les paramètres sauvegardés
-    required_keys = ("window_size", "n_features", "cnn_cfg")
+    required_keys = ("model_state", "history", "window_size", "n_features", "cnn_cfg")
     missing = [k for k in required_keys if k not in checkpoint]
     if missing:
         raise KeyError(
@@ -106,6 +106,15 @@ def evaluate(
     X_val, y_val, close_val, scalers, prediction_horizon = build_val_from_checkpoint(
         scalers_path, timeframe, tf_config, symbol
     )
+
+    # Vérifier la compatibilité des dimensions features
+    expected_nf = scalers["clip_bounds"].shape[0]
+    if X_val.shape[2] != expected_nf:
+        raise ValueError(
+            f"Feature dimension mismatch: checkpoint expects {expected_nf} features "
+            f"but data has {X_val.shape[2]}. Check timeframe/feature pipeline."
+        )
+
     feature_scaler = scalers["feature_scaler"]
     target_scaler = scalers["target_scaler"]
     clip_bounds = scalers["clip_bounds"]
