@@ -14,7 +14,6 @@ import torch
 from torch.utils.data import TensorDataset, DataLoader
 
 from config import DEFAULT_TIMEFRAME, get_timeframe_config
-from data.features.pipeline import FEATURE_COLUMNS
 from models.cnn_bilstm_am.CNN_BiLSTM_AM import CNNBiLSTMAM
 from utils.evaluation import build_val_from_checkpoint, run_evaluation
 
@@ -44,9 +43,16 @@ def load_model(model_path: str, device: torch.device, window_size: int = None) -
     checkpoint = torch.load(model_path, weights_only=False, map_location=device)
 
     # Reconstruit l'architecture exacte depuis les paramètres sauvegardés
-    ckpt_window_size = checkpoint.get("window_size", 30)
-    ckpt_n_features = checkpoint.get("n_features", len(FEATURE_COLUMNS))
-    ckpt_model_cfg = checkpoint.get("model_cfg", {})
+    required_keys = ("window_size", "n_features", "model_cfg")
+    missing = [k for k in required_keys if k not in checkpoint]
+    if missing:
+        raise KeyError(
+            f"Checkpoint missing required key(s): {', '.join(missing)}. "
+            "Re-train the model to generate a compatible checkpoint."
+        )
+    ckpt_window_size = checkpoint["window_size"]
+    ckpt_n_features = checkpoint["n_features"]
+    ckpt_model_cfg = checkpoint["model_cfg"]
 
     model = CNNBiLSTMAM(
         window_size=ckpt_window_size,
