@@ -41,9 +41,21 @@ class PatchTST(nn.Module):
         """
         super().__init__()
 
+        if patch_len > window_size:
+            raise ValueError(
+                f"patch_len ({patch_len}) must be <= window_size ({window_size})."
+            )
+        if stride <= 0:
+            raise ValueError(f"stride must be positive, got {stride}.")
+
         self.patch_len = patch_len
         self.stride = stride
         self.num_patches = (window_size - patch_len) // stride + 1
+        if self.num_patches < 1:
+            raise ValueError(
+                f"Invalid patch config: num_patches={self.num_patches} "
+                f"(window_size={window_size}, patch_len={patch_len}, stride={stride})."
+            )
         patch_dim = patch_len * n_features
 
         # ----- Projection linéaire des patches -----

@@ -128,6 +128,7 @@ def evaluate(
     df = df.dropna(subset=["label"])
 
     # Fenêtres + split temporel par symbole
+    train_ratio = scalers.get("train_ratio", 0.8)
     val_X, val_y, val_close = [], [], []
     for _, group in df.groupby("symbol"):
         X_sym, y_sym, _ = build_windows(
@@ -135,7 +136,7 @@ def evaluate(
         )
         close_sym = group["close"].values[window_size:]
         n = len(X_sym)
-        split = int(0.8 * n)
+        split = int(train_ratio * n)
         val_X.append(X_sym[split:])
         val_y.append(y_sym[split:])
         val_close.append(close_sym[split:])

@@ -82,6 +82,7 @@ def train(
         "target_clip_bounds": target_clip_bounds,
         "timeframe": timeframe,
         "window_size": tf_config["window_size"],
+        "train_ratio": 0.8,
         "n_features": len(feature_cols),
         "xgb_cfg": xgb_cfg,
     }, paths["scalers"])
