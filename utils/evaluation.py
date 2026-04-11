@@ -359,7 +359,9 @@ def build_val_from_checkpoint(
 
     X_val = np.concatenate(val_X)
     y_val = np.concatenate(val_y)
-    close_val = np.concatenate(val_close)
+    # close_val is only meaningful for single-symbol evaluation;
+    # mixing prices from different symbols produces a misleading series.
+    close_val = np.concatenate(val_close) if symbol else None
 
     return X_val, y_val, close_val, scalers, prediction_horizon
 

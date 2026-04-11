@@ -314,11 +314,12 @@ class TestEvaluation:
         scalers_path = os.path.join(checkpoint_dir, "scalers.joblib")
         results_dir = str(tmp_path / "eval_results" / "1d")
 
+        tf_config = get_timeframe_config("1d")
         torch.save({
             "model_state": model.state_dict(),
             "history": {"train_loss": [0.5], "val_loss": [0.6]},
             "timeframe": "1d",
-            "window_size": 30,
+            "window_size": tf_config["window_size"],
             "n_features": len(get_feature_columns("1d")),
             "patchtst_cfg": cfg,
         }, model_path)
@@ -328,9 +329,9 @@ class TestEvaluation:
             "clip_bounds": clip_bounds,
             "target_clip_bounds": target_clip_bounds,
             "timeframe": "1d",
-            "window_size": 30,
+            "window_size": tf_config["window_size"],
             "train_ratio": 0.8,
-            "prediction_horizon": 3,
+            "prediction_horizon": tf_config["prediction_horizon"],
         }, scalers_path)
 
         paths = {

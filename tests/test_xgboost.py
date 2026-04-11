@@ -240,6 +240,7 @@ class TestEvaluation:
         scalers_path = os.path.join(checkpoint_dir, "scalers.joblib")
         results_dir = str(tmp_path / "eval_results" / "1d")
 
+        tf_config = get_timeframe_config("1d")
         model.save_model(model_path)
         joblib.dump({
             "feature_scaler": feat_scaler,
@@ -247,9 +248,9 @@ class TestEvaluation:
             "clip_bounds": clip_bounds,
             "target_clip_bounds": target_clip_bounds,
             "timeframe": "1d",
-            "window_size": 30,
+            "window_size": tf_config["window_size"],
             "train_ratio": 0.8,
-            "prediction_horizon": 3,
+            "prediction_horizon": tf_config["prediction_horizon"],
         }, scalers_path)
 
         paths = {
@@ -291,6 +292,7 @@ class TestEvaluation:
         scalers_path = os.path.join(checkpoint_dir, "scalers.joblib")
         results_dir = str(tmp_path / "plot_results" / "1d")
 
+        tf_config = get_timeframe_config("1d")
         model.save_model(model_path)
         joblib.dump({
             "feature_scaler": feat_scaler,
@@ -298,9 +300,9 @@ class TestEvaluation:
             "clip_bounds": clip_bounds,
             "target_clip_bounds": target_clip_bounds,
             "timeframe": "1d",
-            "window_size": 30,
+            "window_size": tf_config["window_size"],
             "train_ratio": 0.8,
-            "prediction_horizon": 3,
+            "prediction_horizon": tf_config["prediction_horizon"],
         }, scalers_path)
 
         paths = {
