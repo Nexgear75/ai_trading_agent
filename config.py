@@ -301,9 +301,22 @@ def get_patchtst_config(timeframe: str = DEFAULT_TIMEFRAME) -> dict:
     if timeframe in PATCHTST_CONFIGS:
         return PATCHTST_CONFIGS[timeframe]
     # Fallback : patch_len = window_size // 5, stride = patch_len // 2
+    # Valider explicitement pour garantir num_patches >= 2
     window_size = get_timeframe_config(timeframe)["window_size"]
-    patch_len = max(window_size // 5, 2)
-    stride = max(patch_len // 2, 1)
+    if window_size < 3:
+        raise ValueError(
+            f"Invalid window_size={window_size} for timeframe '{timeframe}': "
+            "PatchTST fallback requires window_size >= 3."
+        )
+    patch_len = min(max(window_size // 5, 2), window_size - 1)
+    stride = min(max(patch_len // 2, 1), window_size - patch_len)
+    num_patches = (window_size - patch_len) // stride + 1
+    if num_patches < 2:
+        raise ValueError(
+            f"Invalid PatchTST fallback for timeframe '{timeframe}': "
+            f"window_size={window_size}, patch_len={patch_len}, stride={stride}, "
+            f"num_patches={num_patches} (need >= 2)."
+        )
     return {
         "patch_len": patch_len,
         "stride": stride,

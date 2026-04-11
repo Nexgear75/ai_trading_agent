@@ -172,6 +172,7 @@ def train(
                     "target_clip_bounds": target_clip_bounds,
                     "timeframe": timeframe,
                     "window_size": window_size,
+                    "train_ratio": 0.8,
                 },
                 paths["scalers"],
             )
