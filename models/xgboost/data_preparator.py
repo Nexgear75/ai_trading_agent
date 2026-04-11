@@ -50,7 +50,7 @@ def prepare_data(
     # Construction des fenêtres glissantes PAR SYMBOLE
     # Split temporel par symbole puis concaténation pour garantir
     # que train < val en chronologie (même avec multi-symbole)
-    train_X, val_X, train_y, val_y, train_close, val_close = [], [], [], [], [], []
+    train_X, val_X, train_y, val_y, val_close = [], [], [], [], []
     for _, group in df.groupby("symbol"):
         X_sym, y_sym, _ = build_windows(
             group, window_size=window_size, feature_columns=feature_cols
@@ -62,7 +62,6 @@ def prepare_data(
         val_X.append(X_sym[split:])
         train_y.append(y_sym[:split])
         val_y.append(y_sym[split:])
-        train_close.append(close_sym[:split])
         val_close.append(close_sym[split:])
 
     X_train_3d = np.concatenate(train_X)

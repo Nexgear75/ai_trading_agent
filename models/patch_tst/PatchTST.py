@@ -94,7 +94,7 @@ class PatchTST(nn.Module):
         self._init_weights()
 
     def _init_weights(self):
-        """Initialisation Xavier/Kaiming pour une meilleure propagation du signal."""
+        """Initialisation Xavier des couches linéaires, avec gain accru sur la dernière couche."""
         for m in self.modules():
             if isinstance(m, nn.Linear):
                 nn.init.xavier_normal_(m.weight)
