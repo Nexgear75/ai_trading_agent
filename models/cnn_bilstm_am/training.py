@@ -66,8 +66,9 @@ def train(
     print(f"Device: {device}")
 
     # Données
+    train_ratio = 0.8
     train_loader, val_loader, feature_scaler, target_scaler, clip_bounds, target_clip_bounds, _ = prepare_data(
-        symbol=symbol, timeframe=timeframe, batch_size=batch_size
+        symbol=symbol, timeframe=timeframe, batch_size=batch_size, train_ratio=train_ratio
     )
 
     # Modèle
@@ -174,7 +175,7 @@ def train(
                     "target_clip_bounds": target_clip_bounds,
                     "timeframe": timeframe,
                     "window_size": window_size,
-                    "train_ratio": 0.8,
+                    "train_ratio": train_ratio,
                 },
                 paths["scalers"],
             )

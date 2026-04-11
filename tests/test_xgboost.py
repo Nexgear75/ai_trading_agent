@@ -247,6 +247,8 @@ class TestEvaluation:
             "clip_bounds": clip_bounds,
             "target_clip_bounds": target_clip_bounds,
             "timeframe": "1d",
+            "window_size": 30,
+            "train_ratio": 0.8,
         }, scalers_path)
 
         paths = {
@@ -295,6 +297,8 @@ class TestEvaluation:
             "clip_bounds": clip_bounds,
             "target_clip_bounds": target_clip_bounds,
             "timeframe": "1d",
+            "window_size": 30,
+            "train_ratio": 0.8,
         }, scalers_path)
 
         paths = {
