@@ -1,17 +1,6 @@
 """Tests pour le module XGBoost : data_preparator, training, evaluation."""
 
 import os
-import sys
-from unittest.mock import MagicMock
-
-# Mock torch (non installé) pour débloquer l'import de utils.evaluation
-# requis transitivement par models.xgboost.evaluation.
-if "torch" not in sys.modules:
-    _mock_torch = MagicMock()
-    sys.modules["torch"] = _mock_torch
-    sys.modules["torch.nn"] = _mock_torch.nn
-    sys.modules["torch.utils"] = _mock_torch.utils
-    sys.modules["torch.utils.data"] = _mock_torch.utils.data
 
 import joblib
 import numpy as np
@@ -60,6 +49,7 @@ def _patch_output(synthetic_csv, monkeypatch):
 
     monkeypatch.setattr("config.get_timeframe_config", patched)
     monkeypatch.setattr("models.xgboost.data_preparator.get_timeframe_config", patched)
+    monkeypatch.setattr("models.xgboost.evaluation.get_timeframe_config", patched)
     monkeypatch.setattr("utils.dataset_loader.get_timeframe_config", patched)
 
 
@@ -73,7 +63,7 @@ class TestDataPreparator:
         """X_train et X_val doivent être 2D [n, window × n_features]."""
         from models.xgboost.data_preparator import prepare_data
 
-        X_train, X_val, y_train, y_val, _, _, _, close_val = prepare_data(
+        X_train, X_val, y_train, y_val, _, _, _, _, close_val = prepare_data(
             symbol="BTC", timeframe="1d", train_ratio=0.8
         )
         tf_config = get_timeframe_config("1d")
@@ -91,7 +81,7 @@ class TestDataPreparator:
         """Aucun NaN dans les arrays de sortie."""
         from models.xgboost.data_preparator import prepare_data
 
-        X_train, X_val, y_train, y_val, _, _, _, _ = prepare_data(
+        X_train, X_val, y_train, y_val, _, _, _, _, _ = prepare_data(
             symbol="BTC", timeframe="1d"
         )
         assert not np.isnan(X_train).any()
@@ -104,7 +94,7 @@ class TestDataPreparator:
         """Le split train/val respecte approximativement le ratio demandé."""
         from models.xgboost.data_preparator import prepare_data
 
-        X_train, X_val, _, _, _, _, _, _ = prepare_data(
+        X_train, X_val, _, _, _, _, _, _, _ = prepare_data(
             symbol="BTC", timeframe="1d", train_ratio=0.8
         )
         total = len(X_train) + len(X_val)
@@ -116,7 +106,7 @@ class TestDataPreparator:
         """Les scalers retournés sont fitté (ont des attributs center_ / mean_)."""
         from models.xgboost.data_preparator import prepare_data
 
-        _, _, _, _, feature_scaler, target_scaler, _, _ = prepare_data(
+        _, _, _, _, feature_scaler, target_scaler, _, _, _ = prepare_data(
             symbol="BTC", timeframe="1d"
         )
         assert hasattr(feature_scaler, "center_")  # RobustScaler
@@ -127,7 +117,7 @@ class TestDataPreparator:
         """clip_bounds a la bonne shape [n_flat_features, 2]."""
         from models.xgboost.data_preparator import prepare_data
 
-        X_train, _, _, _, _, _, clip_bounds, _ = prepare_data(
+        X_train, _, _, _, _, _, clip_bounds, _, _ = prepare_data(
             symbol="BTC", timeframe="1d"
         )
         assert clip_bounds.shape == (X_train.shape[1], 2)
@@ -201,6 +191,7 @@ class TestTraining:
         assert "feature_scaler" in scalers
         assert "target_scaler" in scalers
         assert "clip_bounds" in scalers
+        assert "target_clip_bounds" in scalers
         assert "timeframe" in scalers
         assert "xgb_cfg" in scalers
         assert scalers["timeframe"] == "1d"
@@ -235,7 +226,7 @@ class TestEvaluation:
         # Préparer un faux modèle entraîné sur les données synthétiques
         from models.xgboost.data_preparator import prepare_data
 
-        X_train, X_val, y_train, y_val, feat_scaler, tgt_scaler, clip_bounds, close_val = (
+        X_train, X_val, y_train, y_val, feat_scaler, tgt_scaler, clip_bounds, target_clip_bounds, close_val = (
             prepare_data(symbol="BTC", timeframe="1d")
         )
 
@@ -254,6 +245,7 @@ class TestEvaluation:
             "feature_scaler": feat_scaler,
             "target_scaler": tgt_scaler,
             "clip_bounds": clip_bounds,
+            "target_clip_bounds": target_clip_bounds,
             "timeframe": "1d",
         }, scalers_path)
 
@@ -283,7 +275,7 @@ class TestEvaluation:
         """evaluate() génère les fichiers PNG attendus."""
         from models.xgboost.data_preparator import prepare_data
 
-        X_train, X_val, y_train, y_val, feat_scaler, tgt_scaler, clip_bounds, close_val = (
+        X_train, X_val, y_train, y_val, feat_scaler, tgt_scaler, clip_bounds, target_clip_bounds, close_val = (
             prepare_data(symbol="BTC", timeframe="1d")
         )
 
@@ -301,6 +293,7 @@ class TestEvaluation:
             "feature_scaler": feat_scaler,
             "target_scaler": tgt_scaler,
             "clip_bounds": clip_bounds,
+            "target_clip_bounds": target_clip_bounds,
             "timeframe": "1d",
         }, scalers_path)
 

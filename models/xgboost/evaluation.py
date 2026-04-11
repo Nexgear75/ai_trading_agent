@@ -94,6 +94,7 @@ def evaluate(
     feature_scaler = scalers["feature_scaler"]
     target_scaler = scalers["target_scaler"]
     clip_bounds = scalers["clip_bounds"]
+    target_clip_bounds = scalers["target_clip_bounds"]
 
     # Charger les données brutes et construire les fenêtres de validation
     # SANS refitter les scalers (utilise ceux du checkpoint)
@@ -130,7 +131,7 @@ def evaluate(
     X_val = np.clip(X_val, lo_f, hi_f)
     X_val = feature_scaler.transform(X_val)
 
-    lo_t, hi_t = np.percentile(y_val, 1.0), np.percentile(y_val, 99.0)
+    lo_t, hi_t = target_clip_bounds[0], target_clip_bounds[1]
     y_val = np.clip(y_val, lo_t, hi_t)
     y_val = target_scaler.transform(y_val.reshape(-1, 1)).ravel()
 

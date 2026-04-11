@@ -51,7 +51,7 @@ def train(
     print(f"  Checkpoint: {paths['dir']}")
     print(f"{'=' * 60}\n")
 
-    X_train, X_val, y_train, y_val, feature_scaler, target_scaler, clip_bounds, _ = (
+    X_train, X_val, y_train, y_val, feature_scaler, target_scaler, clip_bounds, target_clip_bounds, _ = (
         prepare_data(symbol=symbol, timeframe=timeframe)
     )
 
@@ -79,6 +79,7 @@ def train(
         "feature_scaler": feature_scaler,
         "target_scaler": target_scaler,
         "clip_bounds": clip_bounds,
+        "target_clip_bounds": target_clip_bounds,
         "timeframe": timeframe,
         "window_size": tf_config["window_size"],
         "n_features": len(feature_cols),

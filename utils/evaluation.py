@@ -9,12 +9,15 @@ modèle (CNN, LSTM, GRU, Transformer, etc.).
 from __future__ import annotations
 
 import os
+from typing import TYPE_CHECKING
 
 import matplotlib.pyplot as plt
 import numpy as np
-import torch
-import torch.nn as nn
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+
+if TYPE_CHECKING:
+    import torch
+    import torch.nn as nn
 
 
 def predict(
@@ -30,6 +33,8 @@ def predict(
     Returns:
         (predictions, targets) en arrays numpy.
     """
+    import torch  # lazy import — pas nécessaire pour XGBoost
+
     all_preds, all_targets = [], []
     with torch.no_grad():
         for X_batch, y_batch in dataloader:

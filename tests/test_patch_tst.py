@@ -54,6 +54,7 @@ def _patch_output(synthetic_csv, monkeypatch):
 
     monkeypatch.setattr("config.get_timeframe_config", patched)
     monkeypatch.setattr("models.cnn.data_preparator.get_timeframe_config", patched)
+    monkeypatch.setattr("models.patch_tst.evaluation.get_timeframe_config", patched)
     monkeypatch.setattr("utils.dataset_loader.get_timeframe_config", patched)
 
 
@@ -140,7 +141,7 @@ class TestDataPreparator:
         """Les DataLoaders contiennent des tenseurs 3D [batch, window, features]."""
         from models.patch_tst.data_preparator import prepare_data
 
-        train_loader, val_loader, _, _, _, _ = prepare_data(
+        train_loader, val_loader, _, _, _, _, _ = prepare_data(
             symbol="BTC", timeframe="1d", batch_size=16
         )
         X_batch, y_batch = next(iter(train_loader))
@@ -157,7 +158,7 @@ class TestDataPreparator:
         """Aucun NaN dans les tenseurs."""
         from models.patch_tst.data_preparator import prepare_data
 
-        train_loader, val_loader, _, _, _, _ = prepare_data(
+        train_loader, val_loader, _, _, _, _, _ = prepare_data(
             symbol="BTC", timeframe="1d", batch_size=256
         )
         for X_batch, y_batch in train_loader:
@@ -238,6 +239,7 @@ class TestTraining:
         assert "feature_scaler" in scalers
         assert "target_scaler" in scalers
         assert "clip_bounds" in scalers
+        assert "target_clip_bounds" in scalers
 
 
 # ----- Tests evaluation ----- #
@@ -290,7 +292,7 @@ class TestEvaluation:
             "n_layers": 1, "d_ff": 32, "dropout": 0.0, "dropout_fc": 0.0,
         }
         # Préparer données et model
-        train_loader, val_loader, feat_scaler, tgt_scaler, clip_bounds, close_val = (
+        train_loader, val_loader, feat_scaler, tgt_scaler, clip_bounds, target_clip_bounds, close_val = (
             prepare_data(symbol="BTC", timeframe="1d", batch_size=32)
         )
 
@@ -323,6 +325,7 @@ class TestEvaluation:
             "feature_scaler": feat_scaler,
             "target_scaler": tgt_scaler,
             "clip_bounds": clip_bounds,
+            "target_clip_bounds": target_clip_bounds,
             "timeframe": "1d",
             "window_size": 30,
         }, scalers_path)
