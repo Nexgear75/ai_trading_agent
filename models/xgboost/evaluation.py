@@ -10,15 +10,12 @@ from __future__ import annotations
 import argparse
 import os
 
-import joblib
 import numpy as np
 import xgboost as xgb
 
 from config import DEFAULT_TIMEFRAME, get_timeframe_config
-from data.features.pipeline import get_feature_columns
-from data.preprocessing.builder import build_windows
-from utils.dataset_loader import load_symbol, load_all
 from utils.evaluation import (
+    build_val_from_checkpoint,
     compute_metrics,
     plot_predictions_vs_actual,
     plot_scatter,
@@ -88,77 +85,21 @@ def evaluate(
     print(f"  Model: {model_path}")
     print(f"{'=' * 60}\n")
 
-    # Charger modèle et scalers du checkpoint
+    # Charger modèle
     model = load_model(model_path)
-    scalers = joblib.load(scalers_path)
+
+    # Charger scalers du checkpoint et construire les fenêtres de validation
+    # SANS refitter les scalers (utilise ceux du checkpoint)
+    X_val_3d, y_val, close_val, scalers, prediction_horizon = build_val_from_checkpoint(
+        scalers_path, timeframe, tf_config, symbol
+    )
     feature_scaler = scalers["feature_scaler"]
     target_scaler = scalers["target_scaler"]
     clip_bounds = scalers["clip_bounds"]
-    target_clip_bounds = scalers.get("target_clip_bounds")
-    if target_clip_bounds is None:
-        raise KeyError(
-            "Checkpoint missing 'target_clip_bounds'. "
-            "Re-train the model to generate a compatible checkpoint."
-        )
+    target_clip_bounds = scalers["target_clip_bounds"]
 
-    # Validation de cohérence du timeframe
-    if "timeframe" in scalers and scalers["timeframe"] != timeframe:
-        raise ValueError(
-            f"Timeframe mismatch: checkpoint trained with '{scalers['timeframe']}' "
-            f"but evaluation requested with '{timeframe}'"
-        )
-
-    # Charger les données brutes et construire les fenêtres de validation
-    # SANS refitter les scalers (utilise ceux du checkpoint)
-    config_window_size = tf_config["window_size"]
-    persisted_window_size = scalers.get("window_size")
-    if persisted_window_size is not None and persisted_window_size != config_window_size:
-        raise ValueError(
-            f"Window size mismatch: checkpoint trained with "
-            f"window_size={persisted_window_size} but config uses "
-            f"window_size={config_window_size} for timeframe '{timeframe}'."
-        )
-    window_size = persisted_window_size if persisted_window_size is not None else config_window_size
-    prediction_horizon = tf_config["prediction_horizon"]
-    feature_cols = get_feature_columns(timeframe)
-
-    df = load_symbol(symbol, timeframe=timeframe) if symbol else load_all(timeframe=timeframe)
-    df["label"] = df.groupby("symbol")["close"].transform(
-        lambda c: c.shift(-prediction_horizon) / c - 1
-    )
-    df = df.dropna(subset=["label"])
-
-    # Fenêtres + split temporel par symbole
-    if "train_ratio" not in scalers:
-        raise KeyError(
-            "Checkpoint missing 'train_ratio'. "
-            "Re-train the model to generate a compatible checkpoint."
-        )
-    train_ratio = scalers["train_ratio"]
-    val_X, val_y, val_close = [], [], []
-    skipped = 0
-    for sym_name, group in df.groupby("symbol"):
-        X_sym, y_sym, _ = build_windows(
-            group, window_size=window_size, feature_columns=feature_cols
-        )
-        if len(X_sym) == 0:
-            skipped += 1
-            continue
-        close_sym = group["close"].values[window_size:]
-        n = len(X_sym)
-        split = int(train_ratio * n)
-        val_X.append(X_sym[split:])
-        val_y.append(y_sym[split:])
-        val_close.append(close_sym[split:])
-
-    if skipped:
-        print(f"  {skipped} symbole(s) ignoré(s) (historique insuffisant)")
-    if not val_X:
-        raise ValueError("No validation samples after windowing. Check data availability.")
-
-    X_val = np.concatenate(val_X).reshape(-1, window_size * len(feature_cols))
-    y_val = np.concatenate(val_y)
-    close_val = np.concatenate(val_close)
+    # Aplatir 3D → 2D pour XGBoost
+    X_val = X_val_3d.reshape(X_val_3d.shape[0], -1)
 
     # Appliquer le clipping + scaling DU CHECKPOINT (pas de refit)
     lo_f = clip_bounds[:, 0]
