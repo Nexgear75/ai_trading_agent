@@ -7,15 +7,15 @@ import torch
 import torch.nn as nn
 from tqdm import tqdm
 
-from config import DEFAULT_TIMEFRAME, get_timeframe_config, get_cnn_config
+from config import DEFAULT_TIMEFRAME, get_timeframe_config, get_cnn_bilstm_am_config
 from data.features.pipeline import get_feature_columns
-from models.cnn.CNN import CNN1D
-from models.cnn.data_preparator import prepare_data
+from models.cnn_bilstm_am.CNN_BiLSTM_AM import CNNBiLSTMAM
+from models.cnn_bilstm_am.data_preparator import prepare_data
 
 
 def _get_checkpoint_paths(timeframe: str):
     """Retourne les chemins de checkpoint pour un timeframe donné."""
-    checkpoint_dir = f"models/cnn/checkpoints/{timeframe}"
+    checkpoint_dir = f"models/cnn_bilstm_am/checkpoints/{timeframe}"
     return {
         "dir": checkpoint_dir,
         "model": os.path.join(checkpoint_dir, "best_model.pth"),
@@ -31,7 +31,7 @@ def train(
     lr: float = 1e-3,
     patience: int = 7,
 ):
-    """Entraîne le modèle CNN1D.
+    """Entraîne le modèle CNN-BiLSTM-AM.
 
     Args:
         symbol: Symbole à utiliser (ex: "BTC"). None = toutes les cryptos.
@@ -45,7 +45,7 @@ def train(
     # Get timeframe configuration
     tf_config = get_timeframe_config(timeframe)
     window_size = tf_config["window_size"]
-    cnn_cfg = get_cnn_config(timeframe)
+    model_cfg = get_cnn_bilstm_am_config(timeframe)
     feature_cols = get_feature_columns(timeframe)
 
     # Setup checkpoint paths for this timeframe
@@ -53,11 +53,12 @@ def train(
     os.makedirs(paths["dir"], exist_ok=True)
 
     print(f"\n{'=' * 60}")
-    print(f"  ENTRAÎNEMENT CNN1D")
+    print(f"  ENTRAÎNEMENT CNN-BiLSTM-AM")
     print(f"  Timeframe: {timeframe}")
     print(f"  Window size: {window_size}  |  Features: {len(feature_cols)}")
-    print(f"  Channels: {cnn_cfg['channels']}  |  Kernels: {cnn_cfg['kernel_sizes']}")
-    print(f"  Dropout: conv={cnn_cfg['dropout_conv']}  fc={cnn_cfg['dropout_fc']}")
+    print(f"  CNN: channels={model_cfg['channels']}  kernels={model_cfg['kernel_sizes']}")
+    print(f"  BiLSTM: hidden={model_cfg['lstm_hidden']}  layers={model_cfg['lstm_layers']}")
+    print(f"  Dropout: conv={model_cfg['dropout_conv']}  fc={model_cfg['dropout_fc']}")
     print(f"  Checkpoint: {paths['dir']}")
     print(f"{'=' * 60}\n")
 
@@ -70,15 +71,15 @@ def train(
     )
 
     # Modèle
-    model = CNN1D(
+    model = CNNBiLSTMAM(
         window_size=window_size,
         n_features=len(feature_cols),
-        **cnn_cfg,
+        **model_cfg,
     ).to(device)
-    criterion = nn.HuberLoss(delta=1.0)
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=1e-4)
+    criterion = nn.SmoothL1Loss(beta=2.0)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, mode="min", factor=0.5, patience=5
+        optimizer, mode="min", factor=0.5, patience=10
     )
 
     # Training loop
@@ -98,6 +99,7 @@ def train(
             preds = model(X_batch)
             loss = criterion(preds, y_batch)
             loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=5.0)
             optimizer.step()
 
             train_loss += loss.item() * len(X_batch)
@@ -159,7 +161,7 @@ def train(
                     "history": history,
                     "timeframe": timeframe,
                     "window_size": window_size,
-                    "cnn_cfg": cnn_cfg,
+                    "model_cfg": model_cfg,
                     "n_features": len(feature_cols),
                 },
                 paths["model"],
@@ -192,7 +194,7 @@ def train(
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Entraînement CNN1D")
+    parser = argparse.ArgumentParser(description="Entraînement CNN-BiLSTM-AM")
     parser.add_argument("--symbol", type=str, default=None, help="Symbole (ex: BTC)")
     parser.add_argument("--timeframe", type=str, default=DEFAULT_TIMEFRAME,
                         help=f"Timeframe (défaut: {DEFAULT_TIMEFRAME})")

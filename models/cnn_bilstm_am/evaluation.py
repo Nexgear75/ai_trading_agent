@@ -1,9 +1,9 @@
 """
-Évaluation spécifique au modèle CNN1D.
+Évaluation spécifique au modèle CNN-BiLSTM-AM.
 
 Thin wrapper autour de utils.evaluation : gère le chargement du modèle
-CNN et de ses scalers, puis délègue les métriques et graphiques au
-module d'évaluation générique.
+CNN-BiLSTM-AM et de ses scalers, puis délègue les métriques et graphiques
+au module d'évaluation générique.
 """
 
 import argparse
@@ -14,24 +14,24 @@ import torch
 
 from config import DEFAULT_TIMEFRAME, get_timeframe_config
 from data.features.pipeline import FEATURE_COLUMNS
-from models.cnn.CNN import CNN1D
-from models.cnn.data_preparator import prepare_data
+from models.cnn_bilstm_am.CNN_BiLSTM_AM import CNNBiLSTMAM
+from models.cnn_bilstm_am.data_preparator import prepare_data
 from utils.evaluation import run_evaluation
 
 
 def _get_checkpoint_paths(timeframe: str):
     """Retourne les chemins de checkpoint pour un timeframe donné."""
-    checkpoint_dir = f"models/cnn/checkpoints/{timeframe}"
+    checkpoint_dir = f"models/cnn_bilstm_am/checkpoints/{timeframe}"
     return {
         "dir": checkpoint_dir,
         "model": os.path.join(checkpoint_dir, "best_model.pth"),
         "scalers": os.path.join(checkpoint_dir, "scalers.joblib"),
-        "results": f"models/cnn/results/{timeframe}",
+        "results": f"models/cnn_bilstm_am/results/{timeframe}",
     }
 
 
-def load_model(model_path: str, device: torch.device, window_size: int = None) -> tuple[CNN1D, dict]:
-    """Charge le modèle CNN1D et son historique d'entraînement.
+def load_model(model_path: str, device: torch.device, window_size: int = None) -> tuple[CNNBiLSTMAM, dict]:
+    """Charge le modèle CNN-BiLSTM-AM et son historique d'entraînement.
 
     Args:
         model_path: Chemin vers le checkpoint .pth.
@@ -46,12 +46,12 @@ def load_model(model_path: str, device: torch.device, window_size: int = None) -
     # Reconstruit l'architecture exacte depuis les paramètres sauvegardés
     ckpt_window_size = checkpoint.get("window_size", 30)
     ckpt_n_features = checkpoint.get("n_features", len(FEATURE_COLUMNS))
-    ckpt_cnn_cfg = checkpoint.get("cnn_cfg", {})
+    ckpt_model_cfg = checkpoint.get("model_cfg", {})
 
-    model = CNN1D(
+    model = CNNBiLSTMAM(
         window_size=ckpt_window_size,
         n_features=ckpt_n_features,
-        **ckpt_cnn_cfg,
+        **ckpt_model_cfg,
     ).to(device)
     model.load_state_dict(checkpoint["model_state"])
     model.eval()
@@ -63,7 +63,7 @@ def evaluate(
     timeframe: str = DEFAULT_TIMEFRAME,
     model_path: str | None = None,
 ):
-    """Évalue le modèle CNN1D et génère les graphiques.
+    """Évalue le modèle CNN-BiLSTM-AM et génère les graphiques.
 
     Args:
         symbol: Symbole évalué (ex: "BTC"). None = toutes les cryptos.
@@ -81,7 +81,7 @@ def evaluate(
     device = torch.device("mps" if torch.mps.is_available() else "cpu")
 
     print(f"\n{'=' * 60}")
-    print(f"  ÉVALUATION CNN1D")
+    print(f"  ÉVALUATION CNN-BiLSTM-AM")
     print(f"  Timeframe: {timeframe}")
     print(f"  Model: {model_path}")
     print(f"{'=' * 60}\n")
@@ -112,7 +112,7 @@ def evaluate(
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Évaluation CNN1D")
+    parser = argparse.ArgumentParser(description="Évaluation CNN-BiLSTM-AM")
     parser.add_argument("--symbol", type=str, default=None, help="Symbole (ex: BTC)")
     parser.add_argument("--timeframe", type=str, default=DEFAULT_TIMEFRAME,
                         help=f"Timeframe (défaut: {DEFAULT_TIMEFRAME})")
