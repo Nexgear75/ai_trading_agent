@@ -20,6 +20,9 @@ from models.rl.environment import TradingEnv
 
 
 INITIAL_CAPITAL = 1000.0  # € per crypto
+SIMULATION_DAYS = 252
+CANDLES_PER_DAY = 4  # 6h candles
+SIMULATION_STEPS = SIMULATION_DAYS * CANDLES_PER_DAY  # 1008 candles ≈ 252 days
 
 
 def simulate_symbol(agent, symbol, use_finetuned=False, checkpoint_dir="models/rl/checkpoints"):
@@ -39,6 +42,7 @@ def simulate_symbol(agent, symbol, use_finetuned=False, checkpoint_dir="models/r
         feature_scaler=scaler,
         clip_bounds=clip_bounds,
         initial_cash=INITIAL_CAPITAL,
+        max_steps=SIMULATION_STEPS,
         randomize_start=False,
         noise_std=0.0,
     )
@@ -63,7 +67,7 @@ def simulate_symbol(agent, symbol, use_finetuned=False, checkpoint_dir="models/r
     # --- Buy & Hold simulation ---
     # Always use full 252-day window, regardless of when the agent's episode ended
     start_price = env.close_prices[env._start_idx]
-    bnh_end_idx = min(env._start_idx + 252, len(env.close_prices) - 1)
+    bnh_end_idx = min(env._start_idx + SIMULATION_STEPS, len(env.close_prices) - 1)
     end_price = env.close_prices[bnh_end_idx]
     units_bought = INITIAL_CAPITAL / start_price
     bnh_final = units_bought * end_price

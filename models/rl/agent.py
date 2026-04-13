@@ -15,11 +15,11 @@ class PPOConfig:
     gamma: float = 0.99
     gae_lambda: float = 0.95
     clip_epsilon: float = 0.2
-    entropy_coeff: float = 0.05
+    entropy_coeff: float = 0.10  # higher to prevent policy collapse
     value_coeff: float = 0.5
     max_grad_norm: float = 0.5
     n_epochs_per_update: int = 4
-    minibatch_size: int = 64
+    minibatch_size: int = 256
     weight_decay: float = 1e-5
 
 
@@ -169,6 +169,14 @@ class PPOAgent:
             {"params": self.value.value_head.parameters(), "lr": self.config.lr_value},
         ], weight_decay=self.config.weight_decay)
 
+        # Cosine annealing LR schedulers
+        self.policy_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+            self.policy_optimizer, T_max=2000, eta_min=1e-6
+        )
+        self.value_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+            self.value_optimizer, T_max=2000, eta_min=1e-6
+        )
+
         self.buffer = RolloutBuffer()
 
         # Training stats
@@ -298,6 +306,9 @@ class PPOAgent:
         self.buffer.clear()
         self.update_count += 1
 
+        self.policy_scheduler.step()
+        self.value_scheduler.step()
+
         return {
             "policy_loss": total_policy_loss / max(n_updates, 1),
             "value_loss": total_value_loss / max(n_updates, 1),
@@ -322,6 +333,8 @@ class PPOAgent:
             "value": self.value.state_dict(),
             "policy_optimizer": self.policy_optimizer.state_dict(),
             "value_optimizer": self.value_optimizer.state_dict(),
+            "policy_scheduler": self.policy_scheduler.state_dict(),
+            "value_scheduler": self.value_scheduler.state_dict(),
             "total_steps": self.total_steps,
             "update_count": self.update_count,
             "config": self.config,
@@ -336,6 +349,9 @@ class PPOAgent:
         self.value.load_state_dict(checkpoint["value"])
         self.policy_optimizer.load_state_dict(checkpoint["policy_optimizer"])
         self.value_optimizer.load_state_dict(checkpoint["value_optimizer"])
+        if "policy_scheduler" in checkpoint:
+            self.policy_scheduler.load_state_dict(checkpoint["policy_scheduler"])
+            self.value_scheduler.load_state_dict(checkpoint["value_scheduler"])
         self.total_steps = checkpoint["total_steps"]
         self.update_count = checkpoint["update_count"]
         if verbose:

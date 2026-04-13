@@ -11,7 +11,7 @@ from models.rl.risk_manager import RiskManager, RiskConfig, N_ACTIONS
 
 N_FEATURES = len(FEATURE_COLUMNS)
 PORTFOLIO_STATE_DIM = 7
-MAX_EPISODE_STEPS = 252  # ~1 year of daily data
+MAX_EPISODE_STEPS = 336  # ~12 weeks of 6h data (4 candles/day * 7d * 12w)
 
 
 class TradingEnv(gym.Env):
@@ -79,8 +79,9 @@ class TradingEnv(gym.Env):
         # Compute rolling volatility for portfolio state
         returns = np.diff(self.close_prices) / self.close_prices[:-1]
         self.rolling_vol = np.zeros(len(self.close_prices), dtype=np.float32)
-        for i in range(20, len(returns)):
-            self.rolling_vol[i + 1] = np.std(returns[i - 20 : i])
+        vol_window = 28  # 7 days of 6h data (4 candles/day * 7d)
+        for i in range(vol_window, len(returns)):
+            self.rolling_vol[i + 1] = np.std(returns[i - vol_window : i])
 
         self.reward_calculator = RewardCalculator(mode=reward_mode)
         self.risk_manager = RiskManager(risk_config)
@@ -108,6 +109,7 @@ class TradingEnv(gym.Env):
         self._episode_step = 0
         self._time_in_position = 0
         self._prev_portfolio_return = 0.0
+        self._consecutive_buys = 0
 
     def _precompute_scaled_features(self):
         """Apply clipping and scaling to all features upfront."""
@@ -155,7 +157,7 @@ class TradingEnv(gym.Env):
             position_value / total,                                     # position fraction
             unrealized_pnl,                                             # unrealized P&L
             self._cash / total,                                         # cash ratio
-            min(self._time_in_position / 30.0, 1.0),                    # normalized time in position
+            min(self._time_in_position / 120.0, 1.0),                   # normalized time in position (~30 days in 6h candles)
             drawdown,                                                   # drawdown from peak
             portfolio_return,                                           # cumulative return
             self.rolling_vol[self._current_step],                       # volatility regime
@@ -200,11 +202,13 @@ class TradingEnv(gym.Env):
         self._episode_step = 0
         self._time_in_position = 0
         self._prev_portfolio_return = 0.0
+        self._consecutive_buys = 0
 
         return self._get_obs(), {}
 
     def step(self, action: int):
-        price = self.close_prices[self._current_step]
+        prev_price = self.close_prices[self._current_step]
+        price = prev_price
         position_value = self._position_units * price
         portfolio_value_before = self._cash + position_value
 
@@ -213,10 +217,12 @@ class TradingEnv(gym.Env):
         unrealized_pnl = ((price - self._entry_price) / self._entry_price) if self._position_units > 0 and self._entry_price > 0 else 0.0
         drawdown = (portfolio_value_before - self._peak_value) / self._peak_value if self._peak_value > 0 else 0.0
 
-        # Risk manager may override the action (with adaptive stop-loss)
+        # Risk manager may override the action (with adaptive stop-loss + buy cooldown)
         current_vol = self.rolling_vol[self._current_step]
         validated_action = self.risk_manager.validate_action(
-            action, position_frac, unrealized_pnl, drawdown, volatility=current_vol
+            action, position_frac, unrealized_pnl, drawdown,
+            volatility=current_vol,
+            consecutive_buys=self._consecutive_buys,
         )
 
         # Execute trade
@@ -238,6 +244,7 @@ class TradingEnv(gym.Env):
                     )
                 self._position_units = total_units
                 self._time_in_position = 0
+                self._consecutive_buys += 1
             else:
                 # Selling
                 sell_units = min(abs(trade_units), self._position_units)
@@ -248,6 +255,7 @@ class TradingEnv(gym.Env):
                     self._position_units = 0.0
                     self._entry_price = 0.0
                     self._time_in_position = 0
+                self._consecutive_buys = 0  # selling resets buy streak
         else:
             cost = 0.0
 
@@ -256,6 +264,10 @@ class TradingEnv(gym.Env):
         self._episode_step += 1
         if self._position_units > 0:
             self._time_in_position += 1
+
+        # Compute asset return for opportunity-cost penalty
+        new_price = self.close_prices[self._current_step]
+        asset_return = (new_price - prev_price) / max(prev_price, 1e-8)
 
         # Update peak portfolio value
         new_portfolio_value = self._portfolio_value
@@ -271,6 +283,8 @@ class TradingEnv(gym.Env):
             drawdown=new_drawdown,
             transaction_cost=cost / max(new_portfolio_value, 1e-8),
             has_position=self._position_units > 0,
+            asset_return=asset_return,
+            action=validated_action,
         )
         self._prev_portfolio_return = portfolio_return
 

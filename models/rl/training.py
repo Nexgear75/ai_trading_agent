@@ -54,7 +54,7 @@ def evaluate_agent(agent, env, n_episodes=5):
         # Compute Sharpe from step returns
         if len(episode_returns) > 1:
             step_returns = np.diff([0.0] + episode_returns)
-            sharpe = np.mean(step_returns) / (np.std(step_returns) + 1e-8) * np.sqrt(252)
+            sharpe = np.mean(step_returns) / (np.std(step_returns) + 1e-8) * np.sqrt(1460)  # annualized for 6h candles
         else:
             sharpe = 0.0
         sharpe_values.append(sharpe)
@@ -77,7 +77,7 @@ def train(
     curriculum: bool = True,
     eval_interval: int = 50_000,
     eval_episodes: int = 5,
-    rollout_length: int = 252,
+    rollout_length: int = 336,
 ):
     """Main training loop.
 
@@ -265,7 +265,7 @@ def finetune(
     timesteps_per_symbol: int = 200_000,
     reward_mode: str = "log_return",
     eval_interval: int = 25_000,
-    rollout_length: int = 252,
+    rollout_length: int = 336,
 ):
     """Fine-tune the base multi-asset agent on each symbol individually.
 
@@ -301,7 +301,7 @@ def finetune(
         config.lr_policy = 1e-4
         config.lr_value = 3e-4
         config.lr_backbone = 1e-5
-        config.entropy_coeff = 0.03  # Slightly less exploration than base training
+        config.entropy_coeff = 0.15  # High entropy to escape per-symbol policy collapse
 
         agent = PPOAgent(config=config)
         agent.load(base_model_path)
@@ -386,7 +386,7 @@ if __name__ == "__main__":
     parser.add_argument("--pretrained", type=str, default=None, help="Path to pretrained CNN1D checkpoint.")
     parser.add_argument("--no-curriculum", action="store_true", help="Disable curriculum learning.")
     parser.add_argument("--eval-interval", type=int, default=50_000, help="Steps between evaluations.")
-    parser.add_argument("--rollout-length", type=int, default=252, help="Steps per rollout.")
+    parser.add_argument("--rollout-length", type=int, default=336, help="Steps per rollout.")
     parser.add_argument("--finetune", action="store_true", help="Fine-tune base agent on each symbol individually.")
     parser.add_argument("--finetune-steps", type=int, default=200_000, help="Steps per symbol during fine-tuning.")
     parser.add_argument("--base-model", type=str, default="models/rl/checkpoints/best_agent.pth", help="Base model for fine-tuning.")

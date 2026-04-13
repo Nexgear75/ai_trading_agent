@@ -8,6 +8,12 @@ class RewardCalculator:
         - "dsr"        : Differential Sharpe Ratio (default)
         - "log_return" : Simple log-return of portfolio
         - "sortino"    : Differential Sortino Ratio
+
+    Reward components (all subtracted from base):
+        - Drawdown penalty (above threshold)
+        - Churn penalty (transaction costs, heavily weighted)
+        - Action-flip penalty (penalize switching action between steps)
+        - Opportunity-cost penalty (penalize HOLD-cash when asset is rising)
     """
 
     def __init__(
@@ -16,8 +22,10 @@ class RewardCalculator:
         eta: float = 0.01,
         drawdown_threshold: float = 0.10,
         drawdown_penalty_coeff: float = 2.0,
-        churn_penalty_coeff: float = 0.1,
-        inactivity_penalty: float = 0.0005,
+        churn_penalty_coeff: float = 2.0,        # punish over-trading without killing all trades
+        action_flip_penalty: float = 0.001,      # penalty for changing buy/sell stance each step
+        opportunity_cost_coeff: float = 1.5,     # strongly penalize missing upside while in cash
+        position_bonus_coeff: float = 0.5,       # reward holding a position while asset rises
         reward_scale: float = 1.0,
     ):
         self.mode = mode
@@ -25,21 +33,23 @@ class RewardCalculator:
         self.drawdown_threshold = drawdown_threshold
         self.drawdown_penalty_coeff = drawdown_penalty_coeff
         self.churn_penalty_coeff = churn_penalty_coeff
-        self.inactivity_penalty = inactivity_penalty
+        self.action_flip_penalty = action_flip_penalty
+        self.opportunity_cost_coeff = opportunity_cost_coeff
+        self.position_bonus_coeff = position_bonus_coeff
         self.reward_scale = reward_scale
 
         # Running statistics for differential Sharpe / Sortino
         self._running_mean = 0.0
         self._running_var = 0.0
         self._running_downside_var = 0.0
-        self._steps_without_position = 0
+        self._prev_action_side = 0  # -1 sell, 0 hold, +1 buy
 
     def reset(self):
         """Reset running statistics at the start of a new episode."""
         self._running_mean = 0.0
         self._running_var = 0.0
         self._running_downside_var = 0.0
-        self._steps_without_position = 0
+        self._prev_action_side = 0
 
     def compute(
         self,
@@ -48,6 +58,8 @@ class RewardCalculator:
         drawdown: float,
         transaction_cost: float,
         has_position: bool = False,
+        asset_return: float = 0.0,
+        action: int = 0,
     ) -> float:
         """Compute the reward for the current step.
 
@@ -57,6 +69,8 @@ class RewardCalculator:
             drawdown: Current drawdown from peak (negative value, e.g. -0.15).
             transaction_cost: Transaction cost incurred this step (positive).
             has_position: Whether the agent currently holds a position.
+            asset_return: Return of the underlying asset this step (for opportunity cost).
+            action: Action taken this step (0=hold, 1-3=buy, 4-6=sell).
 
         Returns:
             Scalar reward value.
@@ -75,19 +89,44 @@ class RewardCalculator:
         # Drawdown penalty (kicks in above threshold)
         dd_penalty = max(0.0, abs(drawdown) - self.drawdown_threshold) * self.drawdown_penalty_coeff
 
-        # Churn penalty to discourage excessive trading
+        # Churn penalty: heavily punishes excessive trading
         churn_penalty = transaction_cost * self.churn_penalty_coeff
 
-        # Inactivity penalty: penalize sitting in cash while the market moves
-        if not has_position:
-            self._steps_without_position += 1
-            # Ramp up: gets worse the longer you sit idle
-            inactivity = self.inactivity_penalty * min(self._steps_without_position / 10.0, 1.0)
-        else:
-            self._steps_without_position = 0
-            inactivity = 0.0
+        # Action-flip penalty: discourage switching buy/sell stance every step
+        action_side = self._action_to_side(action)
+        flip_penalty = 0.0
+        if action_side != 0 and self._prev_action_side != 0 and action_side != self._prev_action_side:
+            flip_penalty = self.action_flip_penalty
+        if action_side != 0:
+            self._prev_action_side = action_side
 
-        return (base_reward - dd_penalty - churn_penalty - inactivity) * self.reward_scale
+        # Opportunity-cost penalty: only penalize cash-holding when asset is rising
+        # (no penalty if asset is flat or falling — cash is correct then)
+        if not has_position and asset_return > 0:
+            opp_penalty = self.opportunity_cost_coeff * asset_return
+        else:
+            opp_penalty = 0.0
+
+        # Position bonus: reward holding a position while the asset is rising.
+        # This is the *positive* counterpart to opportunity cost — together they
+        # create a strong gradient toward "be in position when market is up".
+        if has_position and asset_return > 0:
+            position_bonus = self.position_bonus_coeff * asset_return
+        else:
+            position_bonus = 0.0
+
+        return (
+            base_reward - dd_penalty - churn_penalty - flip_penalty - opp_penalty + position_bonus
+        ) * self.reward_scale
+
+    @staticmethod
+    def _action_to_side(action: int) -> int:
+        """Map discrete action to side: -1 sell, 0 hold, +1 buy."""
+        if action == 0:
+            return 0
+        if action in (1, 2, 3):
+            return 1
+        return -1
 
     def _differential_sharpe(self, delta_return: float) -> float:
         """Differential Sharpe Ratio (Moody & Saffell, 2001).

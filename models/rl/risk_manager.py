@@ -38,12 +38,14 @@ class RiskConfig:
     """Configuration for risk management limits."""
     max_position: float = 1.0       # Maximum position as fraction of portfolio
     max_drawdown: float = 0.25      # 25% max drawdown before forced liquidation
-    take_profit: float = 0.10       # 10% unrealized gain triggers take-profit
+    take_profit: float = 0.30       # 30% unrealized gain triggers take-profit (let winners run)
     trade_cost: float = TOTAL_TRADE_COST
     # Adaptive stop-loss parameters
     stop_loss_atr_mult: float = 2.0     # Stop-loss = ATR * this multiplier
     stop_loss_min: float = 0.02         # Minimum stop-loss (2%)
     stop_loss_max: float = 0.10         # Maximum stop-loss (10%)
+    # Buy cooldown: max consecutive buys without an intervening sell
+    max_consecutive_buys: int = 3
 
 
 class RiskManager:
@@ -77,6 +79,7 @@ class RiskManager:
         unrealized_pnl: float,
         drawdown: float,
         volatility: float = 0.02,
+        consecutive_buys: int = 0,
     ) -> int:
         """Override agent action if risk limits are breached.
 
@@ -86,6 +89,7 @@ class RiskManager:
             unrealized_pnl: Unrealized P&L of current position (fractional).
             drawdown: Current drawdown from peak (negative, e.g. -0.20).
             volatility: Current rolling volatility for adaptive stop-loss.
+            consecutive_buys: How many buy actions executed since last sell.
 
         Returns:
             Validated action (may differ from input).
@@ -105,6 +109,10 @@ class RiskManager:
 
         # Prevent buying when already at max position
         if action in BUY_ACTIONS and position >= self.config.max_position:
+            return ACTION_HOLD
+
+        # Buy cooldown: cap consecutive buys without an intervening sell
+        if action in BUY_ACTIONS and consecutive_buys >= self.config.max_consecutive_buys:
             return ACTION_HOLD
 
         # Prevent selling when no position

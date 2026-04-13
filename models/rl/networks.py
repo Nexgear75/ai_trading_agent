@@ -7,65 +7,124 @@ from models.rl.risk_manager import N_ACTIONS
 
 PORTFOLIO_STATE_DIM = 7
 
-POOL_SIZE = 5  # Must divide WINDOW_SIZE (30)
+
+class ResidualConvBlock(nn.Module):
+    """Conv1d block with residual connection and LayerNorm."""
+
+    def __init__(self, in_channels, out_channels, kernel_size=3):
+        super().__init__()
+        self.conv1 = nn.Conv1d(in_channels, out_channels, kernel_size, padding="same")
+        self.conv2 = nn.Conv1d(out_channels, out_channels, kernel_size, padding="same")
+        self.norm1 = nn.GroupNorm(1, out_channels)  # equivalent to LayerNorm for Conv1d
+        self.norm2 = nn.GroupNorm(1, out_channels)
+        self.act = nn.GELU()
+        self.dropout = nn.Dropout1d(0.1)
+
+        # Project residual if channel mismatch
+        self.residual = nn.Conv1d(in_channels, out_channels, 1) if in_channels != out_channels else nn.Identity()
+
+    def forward(self, x):
+        residual = self.residual(x)
+        x = self.act(self.norm1(self.conv1(x)))
+        x = self.dropout(self.norm2(self.conv2(x)))
+        return self.act(x + residual)
+
+
+class SelfAttention(nn.Module):
+    """Multi-head self-attention with residual connection."""
+
+    def __init__(self, embed_dim, n_heads=4, dropout=0.1):
+        super().__init__()
+        self.attn = nn.MultiheadAttention(embed_dim, n_heads, dropout=dropout, batch_first=True)
+        self.norm = nn.LayerNorm(embed_dim)
+        self.dropout = nn.Dropout(dropout)
+
+    def forward(self, x):
+        # x: (batch, seq_len, embed_dim)
+        attn_out, _ = self.attn(x, x, x)
+        return self.norm(x + self.dropout(attn_out))
 
 
 class FeatureExtractor(nn.Module):
-    """Shared CNN backbone for processing market observation windows.
+    """CNN-LSTM-Attention backbone for processing market observation windows.
 
-    Architecture mirrors models/cnn/CNN.py conv_blocks + pool, with
-    lower dropout (0.1) for RL stability.
+    Architecture:
+        1. Residual CNN blocks (local pattern extraction): 64→128→256
+        2. Temporal pooling: 120 → 30 timesteps (4x reduction)
+        3. Bidirectional LSTM (sequential dependencies)
+        4. Multi-head self-attention (selective focus on key moments)
+        5. Global average pooling → feature vector
     """
 
-    def __init__(self, window_size: int = 30, n_features: int = len(FEATURE_COLUMNS)):
+    def __init__(self, window_size: int = 120, n_features: int = len(FEATURE_COLUMNS)):
         super().__init__()
+        self._window_size = window_size
 
+        # CNN blocks with increasing channels
         self.conv_blocks = nn.Sequential(
-            # Block 1
-            nn.Conv1d(n_features, 32, kernel_size=3, padding="same"),
-            nn.BatchNorm1d(32),
-            nn.ReLU(),
-            nn.Dropout1d(0.1),
-            # Block 2
-            nn.Conv1d(32, 64, kernel_size=3, padding="same"),
-            nn.BatchNorm1d(64),
-            nn.ReLU(),
-            nn.Dropout1d(0.1),
-            # Block 3
-            nn.Conv1d(64, 128, kernel_size=3, padding="same"),
-            nn.BatchNorm1d(128),
-            nn.ReLU(),
-            nn.Dropout1d(0.1),
+            ResidualConvBlock(n_features, 64, kernel_size=3),
+            ResidualConvBlock(64, 128, kernel_size=3),
+            ResidualConvBlock(128, 256, kernel_size=5),
         )
 
-        self.pool = nn.AdaptiveAvgPool1d(POOL_SIZE)
-        self.output_dim = 128 * POOL_SIZE  # 640
+        # Temporal pooling: reduce sequence length (120 → 30)
+        self.temporal_pool = nn.AvgPool1d(kernel_size=4, stride=4)
+
+        # Bidirectional LSTM
+        lstm_input_dim = 256
+        self.lstm_hidden = 128
+        self.lstm = nn.LSTM(
+            input_size=lstm_input_dim,
+            hidden_size=self.lstm_hidden,
+            num_layers=2,
+            batch_first=True,
+            bidirectional=True,
+            dropout=0.1,
+        )
+
+        # Self-attention on LSTM output
+        lstm_out_dim = self.lstm_hidden * 2  # bidirectional
+        self.attention = SelfAttention(lstm_out_dim, n_heads=4, dropout=0.1)
+
+        self.output_dim = lstm_out_dim  # 256
 
     def forward(self, market_obs: torch.Tensor) -> torch.Tensor:
         """
         Args:
             market_obs: (batch, window_size, n_features)
         Returns:
-            (batch, 640)
+            (batch, 256) feature vector
         """
         x = market_obs.transpose(1, 2)   # (batch, n_features, window_size)
-        x = self.conv_blocks(x)
-        x = self.pool(x)                 # (batch, 128, POOL_SIZE)
-        return x.flatten(1)              # (batch, 640)
+        x = self.conv_blocks(x)          # (batch, 256, window_size)
+        x = self.temporal_pool(x)        # (batch, 256, window_size//4)
+        x = x.transpose(1, 2)           # (batch, seq_len, 256)
+
+        # LSTM
+        x, _ = self.lstm(x)             # (batch, seq_len, 256)
+
+        # Self-attention
+        x = self.attention(x)           # (batch, seq_len, 256)
+
+        # Global average pooling over time
+        x = x.mean(dim=1)              # (batch, 256)
+
+        return x
 
     @classmethod
     def from_pretrained_cnn(cls, checkpoint_path: str, **kwargs):
         """Initialize from a pretrained CNN1D checkpoint.
 
-        Loads conv_blocks and pool weights from the supervised model.
+        Loads compatible conv weights from the supervised model where possible.
         """
         extractor = cls(**kwargs)
         state_dict = torch.load(checkpoint_path, map_location="cpu", weights_only=True)
 
-        # Filter to only conv_blocks and pool keys
+        # Try to load matching keys
         filtered = {}
+        own_state = extractor.state_dict()
         for key, value in state_dict.items():
-            if key.startswith("conv_blocks.") or key.startswith("pool."):
+            if key in own_state and own_state[key].shape == value.shape:
                 filtered[key] = value
 
         if filtered:
@@ -86,35 +145,24 @@ class PolicyNetwork(nn.Module):
     ):
         super().__init__()
         self.feature_extractor = feature_extractor
-        combined_dim = feature_extractor.output_dim + portfolio_dim  # 647
+        combined_dim = feature_extractor.output_dim + portfolio_dim
 
         self.policy_head = nn.Sequential(
             nn.Linear(combined_dim, 256),
-            nn.ReLU(),
+            nn.GELU(),
+            nn.Dropout(0.1),
             nn.Linear(256, 128),
-            nn.ReLU(),
+            nn.GELU(),
             nn.Linear(128, n_actions),
         )
 
     def forward(self, market_obs: torch.Tensor, portfolio_obs: torch.Tensor) -> Categorical:
-        """
-        Args:
-            market_obs: (batch, window_size, n_features)
-            portfolio_obs: (batch, portfolio_dim)
-        Returns:
-            Categorical distribution over actions.
-        """
         features = self.feature_extractor(market_obs)
         combined = torch.cat([features, portfolio_obs], dim=-1)
         logits = self.policy_head(combined)
         return Categorical(logits=logits)
 
     def get_action(self, market_obs: torch.Tensor, portfolio_obs: torch.Tensor, deterministic: bool = False):
-        """Sample an action and return (action, log_prob).
-
-        Args:
-            deterministic: If True, return argmax instead of sampling.
-        """
         dist = self.forward(market_obs, portfolio_obs)
         if deterministic:
             action = dist.probs.argmax(dim=-1)
@@ -132,25 +180,19 @@ class ValueNetwork(nn.Module):
         portfolio_dim: int = PORTFOLIO_STATE_DIM,
     ):
         super().__init__()
-        self.feature_extractor = feature_extractor  # Shared with PolicyNetwork
+        self.feature_extractor = feature_extractor
         combined_dim = feature_extractor.output_dim + portfolio_dim
 
         self.value_head = nn.Sequential(
             nn.Linear(combined_dim, 256),
-            nn.ReLU(),
+            nn.GELU(),
+            nn.Dropout(0.1),
             nn.Linear(256, 128),
-            nn.ReLU(),
+            nn.GELU(),
             nn.Linear(128, 1),
         )
 
     def forward(self, market_obs: torch.Tensor, portfolio_obs: torch.Tensor) -> torch.Tensor:
-        """
-        Args:
-            market_obs: (batch, window_size, n_features)
-            portfolio_obs: (batch, portfolio_dim)
-        Returns:
-            (batch,) scalar state values.
-        """
         features = self.feature_extractor(market_obs)
         combined = torch.cat([features, portfolio_obs], dim=-1)
         return self.value_head(combined).squeeze(-1)
