@@ -38,7 +38,7 @@ class RiskConfig:
     """Configuration for risk management limits."""
     max_position: float = 1.0       # Maximum position as fraction of portfolio
     max_drawdown: float = 0.25      # 25% max drawdown before forced liquidation
-    take_profit: float = 0.30       # 30% unrealized gain triggers take-profit (let winners run)
+    take_profit: float = 0.08       # 8% unrealized gain triggers take-profit (tuned for 6h dynamics)
     trade_cost: float = TOTAL_TRADE_COST
     # Adaptive stop-loss parameters
     stop_loss_atr_mult: float = 2.0     # Stop-loss = ATR * this multiplier

@@ -10,14 +10,14 @@ update_global_config("6h")
 from models.rl.agent import PPOAgent, PPOConfig
 from models.rl.data_preparator import prepare_multi_symbol_data, prepare_rl_data
 from models.rl.environment import TradingEnv
-from models.rl.risk_manager import RiskConfig
+from models.rl.risk_manager import RiskConfig, N_ACTIONS
 
 
 CHECKPOINT_DIR = "models/rl/checkpoints"
 RESULTS_DIR = "models/rl/results"
 
 
-def make_env(df, feature_scaler, clip_bounds, reward_mode="dsr", noise_std=0.0, randomize_start=True):
+def make_env(df, feature_scaler, clip_bounds, reward_mode="dsr", noise_std=0.0, randomize_start=True, risk_config=None):
     """Create a TradingEnv from prepared data."""
     return TradingEnv(
         df=df,
@@ -26,6 +26,26 @@ def make_env(df, feature_scaler, clip_bounds, reward_mode="dsr", noise_std=0.0, 
         reward_mode=reward_mode,
         noise_std=noise_std,
         randomize_start=randomize_start,
+        risk_config=risk_config,
+    )
+
+
+def _make_training_risk_config() -> RiskConfig:
+    """Permissive RiskConfig for training: disables the auto-exit overrides
+    (take-profit, adaptive stop-loss, buy cooldown) so the agent gets honest
+    credit assignment for its own buy/sell decisions. Keeps only structural
+    constraints (can't buy beyond max_position, can't sell without one) and
+    a loose drawdown safety net.
+
+    The predictor uses its own default RiskConfig at inference time, so this
+    only affects the training environment.
+    """
+    return RiskConfig(
+        take_profit=999.0,
+        stop_loss_min=999.0,
+        stop_loss_max=999.0,
+        max_drawdown=0.50,
+        max_consecutive_buys=999,
     )
 
 
@@ -97,21 +117,23 @@ def train(
     os.makedirs(RESULTS_DIR, exist_ok=True)
 
     # Prepare data
+    train_risk = _make_training_risk_config()
+
     if symbol:
         df_train, df_val, scaler, clip_bounds = prepare_rl_data(symbol)
-        train_envs = [make_env(df_train, scaler, clip_bounds, reward_mode, noise_std=0.02)]
-        val_env = make_env(df_val, scaler, clip_bounds, reward_mode, noise_std=0.0, randomize_start=False)
+        train_envs = [make_env(df_train, scaler, clip_bounds, reward_mode, noise_std=0.02, risk_config=train_risk)]
+        val_env = make_env(df_val, scaler, clip_bounds, reward_mode, noise_std=0.0, randomize_start=False, risk_config=train_risk)
     else:
         data = prepare_multi_symbol_data()
         scaler = data["feature_scaler"]
         clip_bounds = data["clip_bounds"]
         train_envs = [
-            make_env(df, scaler, clip_bounds, reward_mode, noise_std=0.02)
+            make_env(df, scaler, clip_bounds, reward_mode, noise_std=0.02, risk_config=train_risk)
             for df in data["train_dfs"].values()
         ]
         # Use BTC validation as primary eval
         btc_key = next((k for k in data["val_dfs"] if "BTC" in k), list(data["val_dfs"].keys())[0])
-        val_env = make_env(data["val_dfs"][btc_key], scaler, clip_bounds, reward_mode, noise_std=0.0, randomize_start=False)
+        val_env = make_env(data["val_dfs"][btc_key], scaler, clip_bounds, reward_mode, noise_std=0.0, randomize_start=False, risk_config=train_risk)
 
     # Build agent
     config = PPOConfig()
@@ -205,7 +227,7 @@ def train(
                 from collections import Counter
                 action_dist = Counter(episode_actions)
                 avg_reward = np.mean(episode_rewards)
-                act_short = " ".join(f"{a}:{action_dist.get(a,0)}" for a in range(5))
+                act_short = " ".join(f"{a}:{action_dist.get(a,0)}" for a in range(N_ACTIONS))
                 pct = global_step / total_timesteps * 100
                 print(
                     f"    [{pct:5.1f}%] step {global_step:>8d} | "
@@ -220,7 +242,7 @@ def train(
             # Periodic evaluation
             if global_step % eval_interval < rollout_length:
                 eval_metrics = evaluate_agent(agent, val_env, n_episodes=eval_episodes)
-                act_str = " ".join(f"{a}:{action_dist.get(a,0)}" for a in range(5))
+                act_str = " ".join(f"{a}:{action_dist.get(a,0)}" for a in range(N_ACTIONS))
                 print(
                     f"  Step {global_step:>8d} | "
                     f"Return: {eval_metrics['avg_return']:+.4f} | "
@@ -295,8 +317,9 @@ def finetune(
 
         # Prepare single-symbol data
         df_train, df_val, scaler, clip_bounds = prepare_rl_data(short)
-        train_env = make_env(df_train, scaler, clip_bounds, reward_mode, noise_std=0.02)
-        val_env = make_env(df_val, scaler, clip_bounds, reward_mode, noise_std=0.0, randomize_start=False)
+        train_risk = _make_training_risk_config()
+        train_env = make_env(df_train, scaler, clip_bounds, reward_mode, noise_std=0.02, risk_config=train_risk)
+        val_env = make_env(df_val, scaler, clip_bounds, reward_mode, noise_std=0.0, randomize_start=False, risk_config=train_risk)
 
         # Load base agent (fresh copy each symbol)
         config = PPOConfig()
@@ -348,7 +371,7 @@ def finetune(
                 from collections import Counter
                 action_dist = Counter(episode_actions)
                 avg_reward = np.mean(episode_rewards)
-                act_short = " ".join(f"{a}:{action_dist.get(a,0)}" for a in range(7))
+                act_short = " ".join(f"{a}:{action_dist.get(a,0)}" for a in range(N_ACTIONS))
                 pct = global_step / timesteps_per_symbol * 100
                 print(
                     f"    [{pct:5.1f}%] step {global_step:>7d} | "

@@ -143,12 +143,19 @@ def _make_portfolio_encoder(portfolio_dim: int) -> nn.Sequential:
     Without this encoder, the 7-dim portfolio vector is drowned out by the
     256-dim market feature vector (~2.7% of the fused input), and the policy
     head learns to ignore it. Expanding to 64 dims raises its weight to ~20%.
+
+    Input LayerNorm standardizes the raw portfolio features (position_frac,
+    drawdown, volatility, …) so wildly different natural scales all enter
+    the MLP on equal footing. Output LayerNorm ensures the encoder output
+    sits at the same scale (~std 1) as the market features after the CNN-LSTM
+    pipeline; otherwise the portfolio branch gets swamped at the concat step.
     """
     return nn.Sequential(
+        nn.LayerNorm(portfolio_dim),
         nn.Linear(portfolio_dim, 32),
         nn.GELU(),
         nn.Linear(32, PORTFOLIO_ENCODED_DIM),
-        nn.GELU(),
+        nn.LayerNorm(PORTFOLIO_ENCODED_DIM),
     )
 
 

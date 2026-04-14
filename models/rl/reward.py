@@ -24,7 +24,7 @@ class RewardCalculator:
         drawdown_penalty_coeff: float = 2.0,
         churn_penalty_coeff: float = 2.0,        # punish over-trading without killing all trades
         action_flip_penalty: float = 0.001,      # penalty for changing buy/sell stance each step
-        opportunity_cost_coeff: float = 1.5,     # strongly penalize missing upside while in cash
+        opportunity_cost_coeff: float = 0.5,     # symmetric with position_bonus — avoid biasing toward perma-long
         position_bonus_coeff: float = 0.5,       # reward holding a position while asset rises
         reward_scale: float = 1.0,
     ):
