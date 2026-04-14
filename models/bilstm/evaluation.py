@@ -1,4 +1,4 @@
-"""LSTM evaluation script."""
+"""BiLSTM evaluation script."""
 import argparse
 import os
 
@@ -7,15 +7,15 @@ import torch
 
 from config import DEFAULT_TIMEFRAME, get_timeframe_config
 from data.features.pipeline import get_feature_columns
-from models.lstm.LSTM import LSTMModel
-from models.lstm.data_preparator import prepare_data
+from models.bilstm.BiLSTM import BiLSTMModel
+from models.bilstm.data_preparator import prepare_data
 from utils.evaluation import run_evaluation
 
-RESULTS_BASE = "models/lstm/results"
+RESULTS_BASE = "models/bilstm/results"
 
 
 def _get_checkpoint_paths(timeframe: str) -> dict:
-    checkpoint_dir = f"models/lstm/checkpoints/{timeframe}"
+    checkpoint_dir = f"models/bilstm/checkpoints/{timeframe}"
     return {
         "model": os.path.join(checkpoint_dir, "best_model.pth"),
         "scalers": os.path.join(checkpoint_dir, "scalers.joblib"),
@@ -23,13 +23,13 @@ def _get_checkpoint_paths(timeframe: str) -> dict:
     }
 
 
-def load_model(model_path: str, device: torch.device) -> tuple[LSTMModel, dict]:
-    """Charge le modèle LSTM et son historique depuis un checkpoint.
+def load_model(model_path: str, device: torch.device) -> tuple[BiLSTMModel, dict]:
+    """Charge le modèle BiLSTM et son historique depuis un checkpoint.
 
     L'architecture est lue directement depuis le checkpoint.
     """
     checkpoint = torch.load(model_path, weights_only=False, map_location=device)
-    model = LSTMModel(
+    model = BiLSTMModel(
         n_features=checkpoint.get("n_features", len(get_feature_columns())),
         hidden=checkpoint.get("hidden", 128),
         layers=checkpoint.get("layers", 2),
@@ -44,7 +44,7 @@ def evaluate(
     timeframe: str = DEFAULT_TIMEFRAME,
     model_path: str | None = None,
 ):
-    """Évalue le modèle LSTM et génère les graphiques.
+    """Évalue le modèle BiLSTM et génère les graphiques.
 
     Args:
         symbol: Symbole évalué (ex: "BTC"). None = toutes les cryptos.
@@ -59,7 +59,7 @@ def evaluate(
     device = torch.device("mps" if torch.mps.is_available() else "cpu")
 
     print(f"\n{'=' * 60}")
-    print(f"  ÉVALUATION LSTM")
+    print(f"  ÉVALUATION BiLSTM")
     print(f"  Timeframe: {timeframe}")
     print(f"  Model: {model_path}")
     print(f"{'=' * 60}\n")
@@ -85,7 +85,7 @@ def evaluate(
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Évaluation LSTM")
+    parser = argparse.ArgumentParser(description="Évaluation BiLSTM")
     parser.add_argument("--symbol", type=str, default=None)
     parser.add_argument("--timeframe", type=str, default=DEFAULT_TIMEFRAME)
     parser.add_argument("--model-path", type=str, default=None)

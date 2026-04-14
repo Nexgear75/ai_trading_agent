@@ -1,8 +1,8 @@
-"""LSTM training script."""
+"""BiLSTM training script."""
 import argparse
 import gc
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import joblib
 import torch
@@ -11,8 +11,8 @@ from tqdm import tqdm
 
 from config import DEFAULT_TIMEFRAME, get_timeframe_config
 from data.features.pipeline import get_feature_columns
-from models.lstm.LSTM import LSTMModel
-from models.lstm.data_preparator import prepare_data
+from models.bilstm.BiLSTM import BiLSTMModel
+from models.bilstm.data_preparator import prepare_data
 
 
 @dataclass
@@ -20,13 +20,13 @@ class TrainCfg:
     epochs: int = 200
     batch_size: int = 32
     lr: float = 1e-3
-    patience: int = 10
+    patience: int = 15
     hidden: int = 128
     layers: int = 2
 
 
 def _get_checkpoint_paths(timeframe: str) -> dict:
-    checkpoint_dir = f"models/lstm/checkpoints/{timeframe}"
+    checkpoint_dir = f"models/bilstm/checkpoints/{timeframe}"
     return {
         "dir": checkpoint_dir,
         "model": os.path.join(checkpoint_dir, "best_model.pth"),
@@ -73,7 +73,7 @@ def train(
     timeframe: str = DEFAULT_TIMEFRAME,
     cfg: TrainCfg | None = None,
 ):
-    """Entraîne le modèle LSTM avec early stopping."""
+    """Entraîne le modèle BiLSTM avec early stopping."""
     if cfg is None:
         cfg = TrainCfg()
 
@@ -84,7 +84,7 @@ def train(
     os.makedirs(paths["dir"], exist_ok=True)
 
     print(f"\n{'=' * 60}")
-    print(f"  ENTRAÎNEMENT LSTM  |  Timeframe: {timeframe}")
+    print(f"  ENTRAÎNEMENT BiLSTM  |  Timeframe: {timeframe}")
     print(f"  Window: {window_size}  |  Features: {len(feature_cols)}")
     print(f"  Hidden: {cfg.hidden}  |  Layers: {cfg.layers}")
     print(f"{'=' * 60}\n")
@@ -96,12 +96,12 @@ def train(
         symbol=symbol, timeframe=timeframe, batch_size=cfg.batch_size
     )
 
-    model = LSTMModel(n_features=len(feature_cols), hidden=cfg.hidden, layers=cfg.layers).to(device)
-    print(f"LSTM parameters: {sum(p.numel() for p in model.parameters() if p.requires_grad):,}")
+    model = BiLSTMModel(n_features=len(feature_cols), hidden=cfg.hidden, layers=cfg.layers).to(device)
+    print(f"BiLSTM parameters: {sum(p.numel() for p in model.parameters() if p.requires_grad):,}")
 
     criterion = nn.HuberLoss(delta=1.0)
-    optimizer = torch.optim.Adam(model.parameters(), lr=cfg.lr, weight_decay=1e-4)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.5, patience=5)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=cfg.lr, weight_decay=1e-4)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=20, T_mult=2)
 
     best_val_loss = float("inf")
     no_improve = 0
@@ -113,7 +113,7 @@ def train(
 
         history["train_loss"].append(train_loss)
         history["val_loss"].append(val_loss)
-        scheduler.step(val_loss)
+        scheduler.step()
 
         if epoch % 5 == 0:
             gc.collect()
@@ -153,13 +153,13 @@ def train(
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Entraînement LSTM")
+    parser = argparse.ArgumentParser(description="Entraînement BiLSTM")
     parser.add_argument("--symbol", type=str, default=None)
     parser.add_argument("--timeframe", type=str, default=DEFAULT_TIMEFRAME)
     parser.add_argument("--epochs", type=int, default=200)
     parser.add_argument("--batch-size", type=int, default=32)
     parser.add_argument("--lr", type=float, default=1e-3)
-    parser.add_argument("--patience", type=int, default=10)
+    parser.add_argument("--patience", type=int, default=15)
     parser.add_argument("--hidden", type=int, default=128)
     parser.add_argument("--layers", type=int, default=2)
     a = parser.parse_args()
