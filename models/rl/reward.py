@@ -101,15 +101,12 @@ class RewardCalculator:
             self._prev_action_side = action_side
 
         # Opportunity-cost penalty: only penalize cash-holding when asset is rising
-        # (no penalty if asset is flat or falling — cash is correct then)
         if not has_position and asset_return > 0:
             opp_penalty = self.opportunity_cost_coeff * asset_return
         else:
             opp_penalty = 0.0
 
         # Position bonus: reward holding a position while the asset is rising.
-        # This is the *positive* counterpart to opportunity cost — together they
-        # create a strong gradient toward "be in position when market is up".
         if has_position and asset_return > 0:
             position_bonus = self.position_bonus_coeff * asset_return
         else:

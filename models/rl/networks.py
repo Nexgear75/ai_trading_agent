@@ -134,6 +134,24 @@ class FeatureExtractor(nn.Module):
         return extractor
 
 
+PORTFOLIO_ENCODED_DIM = 64  # portfolio state projected to this before fusion
+
+
+def _make_portfolio_encoder(portfolio_dim: int) -> nn.Sequential:
+    """MLP that expands the raw portfolio state to a richer representation.
+
+    Without this encoder, the 7-dim portfolio vector is drowned out by the
+    256-dim market feature vector (~2.7% of the fused input), and the policy
+    head learns to ignore it. Expanding to 64 dims raises its weight to ~20%.
+    """
+    return nn.Sequential(
+        nn.Linear(portfolio_dim, 32),
+        nn.GELU(),
+        nn.Linear(32, PORTFOLIO_ENCODED_DIM),
+        nn.GELU(),
+    )
+
+
 class PolicyNetwork(nn.Module):
     """Actor network: outputs action distribution given market + portfolio state."""
 
@@ -145,7 +163,8 @@ class PolicyNetwork(nn.Module):
     ):
         super().__init__()
         self.feature_extractor = feature_extractor
-        combined_dim = feature_extractor.output_dim + portfolio_dim
+        self.portfolio_encoder = _make_portfolio_encoder(portfolio_dim)
+        combined_dim = feature_extractor.output_dim + PORTFOLIO_ENCODED_DIM
 
         self.policy_head = nn.Sequential(
             nn.Linear(combined_dim, 256),
@@ -158,7 +177,8 @@ class PolicyNetwork(nn.Module):
 
     def forward(self, market_obs: torch.Tensor, portfolio_obs: torch.Tensor) -> Categorical:
         features = self.feature_extractor(market_obs)
-        combined = torch.cat([features, portfolio_obs], dim=-1)
+        portfolio_encoded = self.portfolio_encoder(portfolio_obs)
+        combined = torch.cat([features, portfolio_encoded], dim=-1)
         logits = self.policy_head(combined)
         return Categorical(logits=logits)
 
@@ -181,7 +201,8 @@ class ValueNetwork(nn.Module):
     ):
         super().__init__()
         self.feature_extractor = feature_extractor
-        combined_dim = feature_extractor.output_dim + portfolio_dim
+        self.portfolio_encoder = _make_portfolio_encoder(portfolio_dim)
+        combined_dim = feature_extractor.output_dim + PORTFOLIO_ENCODED_DIM
 
         self.value_head = nn.Sequential(
             nn.Linear(combined_dim, 256),
@@ -194,5 +215,6 @@ class ValueNetwork(nn.Module):
 
     def forward(self, market_obs: torch.Tensor, portfolio_obs: torch.Tensor) -> torch.Tensor:
         features = self.feature_extractor(market_obs)
-        combined = torch.cat([features, portfolio_obs], dim=-1)
+        portfolio_encoded = self.portfolio_encoder(portfolio_obs)
+        combined = torch.cat([features, portfolio_encoded], dim=-1)
         return self.value_head(combined).squeeze(-1)

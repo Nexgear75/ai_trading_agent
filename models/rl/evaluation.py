@@ -6,6 +6,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 
+from config import update_global_config
+
+# RL agent is 6h-only; switch global config before any downstream import reads it
+update_global_config("6h")
+
 from models.rl.agent import PPOAgent
 from models.rl.data_preparator import prepare_rl_data
 from models.rl.environment import TradingEnv

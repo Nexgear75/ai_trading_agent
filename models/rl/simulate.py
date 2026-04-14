@@ -13,11 +13,13 @@ import os
 
 import numpy as np
 
-from config import SYMBOLS
+from config import SYMBOLS, update_global_config
+
+update_global_config("6h")
+
 from models.rl.agent import PPOAgent
 from models.rl.data_preparator import prepare_rl_data
 from models.rl.environment import TradingEnv
-
 
 INITIAL_CAPITAL = 1000.0  # € per crypto
 SIMULATION_DAYS = 252
@@ -47,7 +49,6 @@ def simulate_symbol(agent, symbol, use_finetuned=False, checkpoint_dir="models/r
         noise_std=0.0,
     )
 
-    # --- RL Agent simulation ---
     obs, _ = env.reset()
     done = False
     n_buys, n_sells = 0, 0
@@ -64,7 +65,6 @@ def simulate_symbol(agent, symbol, use_finetuned=False, checkpoint_dir="models/r
 
     agent_final = info["portfolio_value"]
 
-    # --- Buy & Hold simulation ---
     # Always use full 252-day window, regardless of when the agent's episode ended
     start_price = env.close_prices[env._start_idx]
     bnh_end_idx = min(env._start_idx + SIMULATION_STEPS, len(env.close_prices) - 1)
@@ -87,10 +87,10 @@ def main(model_path, use_finetuned=False):
     agent = PPOAgent()
     agent.load(model_path, verbose=False)
 
-    print(f"\n{'='*80}")
+    print(f"\n{'=' * 80}")
     print(f"  1-YEAR SIMULATION — {INITIAL_CAPITAL:.0f}€ per crypto ({len(SYMBOLS)} cryptos)")
     print(f"  Total portfolio: {INITIAL_CAPITAL * len(SYMBOLS):.0f}€")
-    print(f"{'='*80}")
+    print(f"{'=' * 80}")
     print(f"  Loading data...\n")
 
     total_agent = 0.0
@@ -142,23 +142,24 @@ def main(model_path, use_finetuned=False):
 
     print("-" * 80)
     print(f"\n{'PORTFOLIO SUMMARY':^80}")
-    print(f"{'='*80}")
+    print(f"{'=' * 80}")
     print(f"  Initial Investment:      {initial_total:>10.2f}€")
     print()
     print(f"  RL Agent Final Value:    {total_agent:>10.2f}€")
-    print(f"  RL Agent Profit/Loss:    {agent_profit:>+10.2f}€  ({agent_profit/initial_total:>+.2%})")
+    print(f"  RL Agent Profit/Loss:    {agent_profit:>+10.2f}€  ({agent_profit / initial_total:>+.2%})")
     print()
     print(f"  Buy & Hold Final Value:  {total_bnh:>10.2f}€")
-    print(f"  Buy & Hold Profit/Loss:  {bnh_profit:>+10.2f}€  ({bnh_profit/initial_total:>+.2%})")
+    print(f"  Buy & Hold Profit/Loss:  {bnh_profit:>+10.2f}€  ({bnh_profit / initial_total:>+.2%})")
     print()
     edge = total_agent - total_bnh
-    print(f"  Agent Edge over B&H:     {edge:>+10.2f}€  ({edge/initial_total:>+.2%})")
-    print(f"{'='*80}")
+    print(f"  Agent Edge over B&H:     {edge:>+10.2f}€  ({edge / initial_total:>+.2%})")
+    print(f"{'=' * 80}")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Simulate 1 year of trading with 1000€ per crypto")
-    parser.add_argument("--model", type=str, default="models/rl/checkpoints/best_agent.pth", help="Path to agent checkpoint.")
+    parser.add_argument("--model", type=str, default="models/rl/checkpoints/best_agent.pth",
+                        help="Path to agent checkpoint.")
     parser.add_argument("--finetuned", action="store_true", help="Use per-symbol fine-tuned models.")
     args = parser.parse_args()
 

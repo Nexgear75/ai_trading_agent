@@ -4,7 +4,9 @@ import time
 
 import numpy as np
 
-from config import SYMBOLS
+from config import SYMBOLS, update_global_config
+
+update_global_config("6h")
 from models.rl.agent import PPOAgent, PPOConfig
 from models.rl.data_preparator import prepare_multi_symbol_data, prepare_rl_data
 from models.rl.environment import TradingEnv
@@ -211,6 +213,7 @@ def train(
                     f"PLoss: {metrics.get('policy_loss', 0):+.4f} | "
                     f"VLoss: {metrics.get('value_loss', 0):.4f} | "
                     f"Ent: {metrics.get('entropy', 0):.3f} | "
+                    f"EntC: {agent.entropy_coeff:.4f} | "
                     f"Act: [{act_short}]"
                 )
 
@@ -301,7 +304,10 @@ def finetune(
         config.lr_policy = 1e-4
         config.lr_value = 3e-4
         config.lr_backbone = 1e-5
-        config.entropy_coeff = 0.15  # High entropy to escape per-symbol policy collapse
+        # Start with moderate entropy to explore
+        config.entropy_coeff_start = 0.03
+        config.entropy_coeff_end = 0.010
+        config.entropy_anneal_steps = timesteps_per_symbol // 2  # anneal over first half
 
         agent = PPOAgent(config=config)
         agent.load(base_model_path)
@@ -349,6 +355,7 @@ def finetune(
                     f"avgR: {avg_reward:+.5f} | "
                     f"PLoss: {metrics.get('policy_loss', 0):+.4f} | "
                     f"Ent: {metrics.get('entropy', 0):.3f} | "
+                    f"EntC: {agent.entropy_coeff:.4f} | "
                     f"Act: [{act_short}]"
                 )
 

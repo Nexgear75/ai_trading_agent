@@ -15,7 +15,9 @@ class PPOConfig:
     gamma: float = 0.99
     gae_lambda: float = 0.95
     clip_epsilon: float = 0.2
-    entropy_coeff: float = 0.10  # higher to prevent policy collapse
+    entropy_coeff_start: float = 0.05   # initial entropy (exploration phase)
+    entropy_coeff_end: float = 0.015    # final entropy (exploitation phase)
+    entropy_anneal_steps: int = 1_000_000  # linear decay over this many steps
     value_coeff: float = 0.5
     max_grad_norm: float = 0.5
     n_epochs_per_update: int = 4
@@ -142,9 +144,6 @@ class PPOAgent:
         else:
             self.device = torch.device("cpu")
 
-        # Build networks with SEPARATE backbones
-        # Sharing a backbone caused value loss (~50k) to dominate and
-        # prevent policy learning. Separate backbones let each learn independently.
         if pretrained_backbone_path:
             self.policy_backbone = FeatureExtractor.from_pretrained_cnn(pretrained_backbone_path)
             self.value_backbone = FeatureExtractor.from_pretrained_cnn(pretrained_backbone_path)
@@ -158,7 +157,6 @@ class PPOAgent:
         self.policy.to(self.device)
         self.value.to(self.device)
 
-        # Separate optimizers so value updates can't affect policy backbone
         self.policy_optimizer = torch.optim.Adam([
             {"params": self.policy_backbone.parameters(), "lr": self.config.lr_backbone},
             {"params": self.policy.policy_head.parameters(), "lr": self.config.lr_policy},
@@ -169,7 +167,6 @@ class PPOAgent:
             {"params": self.value.value_head.parameters(), "lr": self.config.lr_value},
         ], weight_decay=self.config.weight_decay)
 
-        # Cosine annealing LR schedulers
         self.policy_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
             self.policy_optimizer, T_max=2000, eta_min=1e-6
         )
@@ -179,9 +176,16 @@ class PPOAgent:
 
         self.buffer = RolloutBuffer()
 
-        # Training stats
         self.total_steps = 0
         self.update_count = 0
+
+    @property
+    def entropy_coeff(self) -> float:
+        """Current entropy coefficient, linearly annealed from start to end."""
+        progress = min(self.total_steps / max(self.config.entropy_anneal_steps, 1), 1.0)
+        return self.config.entropy_coeff_start + progress * (
+            self.config.entropy_coeff_end - self.config.entropy_coeff_start
+        )
 
     @torch.no_grad()
     def select_action(self, obs: dict, deterministic: bool = False) -> tuple[int, float, float]:
@@ -234,23 +238,18 @@ class PPOAgent:
         if len(self.buffer) == 0:
             return {}
 
-        # Bootstrap value for the last state
         next_value = self.estimate_value(next_obs)
 
-        # Convert buffer to tensors
         data = self.buffer.to_tensors(self.device)
 
-        # Compute GAE
         advantages, returns = compute_gae(
             data["rewards"], data["values"], data["dones"],
             next_value, self.config.gamma, self.config.gae_lambda,
         )
 
-        # Normalize advantages
         if len(advantages) > 1:
             advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
 
-        # PPO epochs
         T = len(self.buffer)
         indices = np.arange(T)
         total_policy_loss = 0.0
@@ -275,7 +274,6 @@ class PPOAgent:
                 mb_advantages = advantages[mb_idx]
                 mb_returns = returns[mb_idx]
 
-                # --- Policy update ---
                 dist = self.policy(mb_market, mb_portfolio)
                 new_log_probs = dist.log_prob(mb_actions)
                 entropy = dist.entropy().mean()
@@ -283,7 +281,7 @@ class PPOAgent:
                 ratio = torch.exp(new_log_probs - mb_old_log_probs)
                 surr1 = ratio * mb_advantages
                 surr2 = torch.clamp(ratio, 1.0 - self.config.clip_epsilon, 1.0 + self.config.clip_epsilon) * mb_advantages
-                policy_loss = -torch.min(surr1, surr2).mean() - self.config.entropy_coeff * entropy
+                policy_loss = -torch.min(surr1, surr2).mean() - self.entropy_coeff * entropy
 
                 self.policy_optimizer.zero_grad()
                 policy_loss.backward()
