@@ -211,6 +211,122 @@ def plot_direction_accuracy(
     plt.close(fig)
 
 
+# ----- Per-crypto plotting functions ----- #
+
+
+def plot_metrics_by_crypto(metrics_by_symbol: dict, save_path: str):
+    """Bar chart des métriques par crypto."""
+    symbols = list(metrics_by_symbol.keys())
+    metric_names = ["RMSE", "MAE", "R²", "Direction Accuracy"]
+
+    fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+    axes = axes.flatten()
+
+    for idx, metric in enumerate(metric_names):
+        values = [metrics_by_symbol[s][metric] for s in symbols]
+        colors = plt.cm.tab10(np.linspace(0, 1, len(symbols)))
+        axes[idx].bar(symbols, values, color=colors)
+        axes[idx].set_ylabel(metric)
+        axes[idx].set_title(f"{metric} par Crypto")
+        axes[idx].tick_params(axis="x", rotation=45)
+        axes[idx].grid(True, alpha=0.3, axis="y")
+
+    fig.tight_layout()
+    fig.savefig(os.path.join(save_path, "metrics_by_crypto.png"), dpi=150)
+    plt.close(fig)
+
+
+def plot_predictions_by_crypto(
+    y_true: np.ndarray,
+    y_pred: np.ndarray,
+    symbols: np.ndarray,
+    save_path: str,
+):
+    """Graphique predictions vs actual pour chaque crypto (subplots)."""
+    unique_symbols = np.unique(symbols)
+    n_symbols = len(unique_symbols)
+    n_cols = 2
+    n_rows = (n_symbols + 1) // 2
+
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(14, 4 * n_rows))
+    axes = axes.flatten() if n_symbols > 1 else [axes]
+
+    for idx, sym in enumerate(unique_symbols):
+        mask = symbols == sym
+        ax = axes[idx]
+        ax.plot(y_true[mask], label="Actual", linewidth=1, alpha=0.8)
+        ax.plot(y_pred[mask], label="Predicted", linewidth=1, alpha=0.7)
+        ax.set_title(f"{sym}")
+        ax.set_xlabel("Sample")
+        ax.set_ylabel("Forward Return")
+        ax.legend(loc="upper right", fontsize=8)
+        ax.grid(True, alpha=0.3)
+
+    # Masquer les axes vides
+    for idx in range(n_symbols, len(axes)):
+        axes[idx].set_visible(False)
+
+    fig.tight_layout()
+    fig.savefig(os.path.join(save_path, "predictions_by_crypto.png"), dpi=150)
+    plt.close(fig)
+
+
+def plot_scatter_by_crypto(
+    y_true: np.ndarray,
+    y_pred: np.ndarray,
+    symbols: np.ndarray,
+    save_path: str,
+):
+    """Scatter plot par crypto avec couleurs différentes."""
+    unique_symbols = np.unique(symbols)
+    colors = plt.cm.tab10(np.linspace(0, 1, len(unique_symbols)))
+
+    fig, ax = plt.subplots(figsize=(10, 10))
+
+    for idx, sym in enumerate(unique_symbols):
+        mask = symbols == sym
+        ax.scatter(y_true[mask], y_pred[mask], alpha=0.3, s=10, c=[colors[idx]], label=sym)
+
+    limits = [min(y_true.min(), y_pred.min()), max(y_true.max(), y_pred.max())]
+    ax.plot(limits, limits, "r--", linewidth=1, label="Perfect")
+    ax.set_xlabel("Actual")
+    ax.set_ylabel("Predicted")
+    ax.set_title("Scatter par Crypto")
+    ax.legend(loc="upper left", fontsize=8)
+    ax.grid(True, alpha=0.3)
+    ax.set_aspect("equal")
+
+    fig.tight_layout()
+    fig.savefig(os.path.join(save_path, "scatter_by_crypto.png"), dpi=150)
+    plt.close(fig)
+
+
+def plot_direction_accuracy_by_crypto(metrics_by_symbol: dict, save_path: str):
+    """Bar chart de la direction accuracy par crypto avec ligne 50%."""
+    symbols = list(metrics_by_symbol.keys())
+    values = [metrics_by_symbol[s]["Direction Accuracy"] for s in symbols]
+    colors = plt.cm.tab10(np.linspace(0, 1, len(symbols)))
+
+    fig, ax = plt.subplots(figsize=(12, 6))
+    bars = ax.bar(symbols, values, color=colors)
+    ax.axhline(0.5, color="r", linestyle="--", linewidth=2, label="Random (50%)")
+    ax.set_ylabel("Direction Accuracy")
+    ax.set_title("Direction Accuracy par Crypto")
+    ax.set_ylim(0, 1)
+    ax.tick_params(axis="x", rotation=45)
+    ax.legend()
+    ax.grid(True, alpha=0.3, axis="y")
+
+    # Ajouter les valeurs sur les barres
+    for bar, val in zip(bars, values):
+        ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.02,
+                f"{val:.1%}", ha="center", va="bottom", fontsize=9)
+
+    fig.tight_layout()
+    fig.savefig(os.path.join(save_path, "direction_accuracy_by_crypto.png"), dpi=150)
+    plt.close(fig)
+
+
 # ----- Orchestrateur ----- #
 
 
@@ -268,3 +384,55 @@ def run_evaluation(
     print(f"\nGraphiques sauvegardés dans {results_dir}/")
 
     return metrics
+
+
+def run_evaluation_by_crypto(
+    model: nn.Module,
+    dataloader: torch.utils.data.DataLoader,
+    target_scaler,
+    symbols: np.ndarray,
+    results_dir: str,
+    device: torch.device,
+) -> dict:
+    """Évalue un modèle par crypto et génère les graphiques par symbole.
+
+    Args:
+        model: Modèle PyTorch déjà chargé et en mode eval.
+        dataloader: DataLoader de validation.
+        target_scaler: Scaler pour inverse-transformer les prédictions.
+        symbols: Array des symboles correspondant à chaque sample.
+        results_dir: Dossier où sauvegarder les graphiques.
+        device: Device (mps, cuda, cpu).
+
+    Returns:
+        Dict des métriques par symbole.
+    """
+    os.makedirs(results_dir, exist_ok=True)
+
+    # Prédictions globales
+    y_pred_scaled, y_true_scaled = predict(model, dataloader, device)
+    y_pred = target_scaler.inverse_transform(y_pred_scaled.reshape(-1, 1)).ravel()
+    y_true = target_scaler.inverse_transform(y_true_scaled.reshape(-1, 1)).ravel()
+
+    # Métriques par crypto
+    metrics_by_symbol = {}
+    unique_symbols = np.unique(symbols)
+
+    print("\n===== Metrics par Crypto =====")
+    for sym in unique_symbols:
+        mask = symbols == sym
+        sym_metrics = compute_metrics(y_true[mask], y_pred[mask])
+        metrics_by_symbol[sym] = sym_metrics
+        print(f"\n  {sym}:")
+        for name, value in sym_metrics.items():
+            print(f"    {name:>20s}: {value:.4f}")
+
+    # Graphiques par crypto
+    plot_metrics_by_crypto(metrics_by_symbol, results_dir)
+    plot_predictions_by_crypto(y_true, y_pred, symbols, results_dir)
+    plot_scatter_by_crypto(y_true, y_pred, symbols, results_dir)
+    plot_direction_accuracy_by_crypto(metrics_by_symbol, results_dir)
+
+    print(f"\nGraphiques par crypto sauvegardés dans {results_dir}/")
+
+    return metrics_by_symbol
