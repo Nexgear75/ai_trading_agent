@@ -41,6 +41,7 @@ WINDOW_SIZES: dict = {
     "1d": 30,   # 30 jours
     "1h": 72,   # 3 jours
     "4h": 120,  # 20 jours
+    "6h": 120,  # 30 jours (contexte utilisé par l'agent RL PPO)
     "1w": 20,   # 20 semaines
 }
 
@@ -52,6 +53,7 @@ PREDICTION_HORIZONS: dict = {
     "1d": 3,    # prédire le rendement 3 jours plus tard
     "1h": 6,    # prédire le rendement 6 heures plus tard
     "4h": 1,    # prédire le rendement de la prochaine bougie 4h
+    "6h": 4,    # prédire le rendement 24 heures plus tard
     "1w": 1,    # prédire le rendement de la semaine suivante
 }
 START_DATE = "2020-01-01"
@@ -64,6 +66,7 @@ SIGNAL_THRESHOLDS: dict = {
     "1d": 0.010,   # 1.0%  sur 3 jours
     "1h": 0.003,   # 0.3%  sur 6 heures
     "4h": 0.005,   # 0.5%  sur 4 heures
+    "6h": 0.005,   # 0.5%  sur 24 heures (non utilisé par RL)
     "1w": 0.020,   # 2.0%  sur 1 semaine
 }
 
@@ -74,6 +77,7 @@ RISK_PCTS: dict = {
     "1d": 0.025,   # 2.5%  SL / 5.0% TP (rrr=2)
     "1h": 0.008,   # 0.8%  SL / 1.6% TP (rrr=2)  ← 1 ATR sur 6h
     "4h": 0.015,   # 1.5%  SL / 3.0% TP (rrr=2)
+    "6h": 0.012,   # 1.2%  SL / 2.4% TP (rrr=2) — entre 4h et 1d
     "1w": 0.040,   # 4.0%  SL / 8.0% TP (rrr=2)
 }
 
