@@ -28,7 +28,7 @@ def prepare_rl_data(
             - feature_scaler: Fitted RobustScaler for features.
             - clip_bounds: Dict of {column: (lo, hi)} for winsorization.
     """
-    df = load_symbol(symbol) if symbol else load_all()
+    df = load_symbol(symbol, timeframe="6h") if symbol else load_all(timeframe="6h")
 
     # Ensure we have required columns
     required = set(FEATURE_COLUMNS) | {"close"}
@@ -99,7 +99,7 @@ def prepare_multi_symbol_data(
     all_train_feats = []
 
     for sym in symbols:
-        df = load_symbol(sym)
+        df = load_symbol(sym, timeframe="6h")
         if "symbol" not in df.columns:
             df["symbol"] = sym.upper().replace("/", "_")
         df = df.sort_index()
