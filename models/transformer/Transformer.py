@@ -29,7 +29,7 @@ class PositionalEncoding(nn.Module):
         return self.dropout(x)
 
 
-class CNN1D(nn.Module):
+class Transformer(nn.Module):
     """
     Transformer encoder pour la prédiction de retours financiers.
 
