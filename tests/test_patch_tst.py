@@ -327,7 +327,7 @@ class TestEvaluation:
             "n_layers": 1, "d_ff": 32, "dropout": 0.0, "dropout_fc": 0.0,
         }
         # Préparer données et model
-        train_loader, val_loader, feat_scaler, tgt_scaler, clip_bounds, target_clip_bounds, close_val = (
+        train_loader, val_loader, feat_scaler, tgt_scaler, clip_bounds, target_clip_bounds, _ = (
             prepare_data(symbol="BTC", timeframe="1d", batch_size=32)
         )
 

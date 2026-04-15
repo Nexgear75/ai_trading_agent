@@ -58,7 +58,7 @@ def prepare_data(
     # que train < val en chronologie (même avec multi-symbole)
     train_X, val_X, train_y, val_y, val_close = [], [], [], [], []
     skipped = 0
-    for sym_name, group in df.groupby("symbol"):
+    for _, group in df.groupby("symbol"):
         X_sym, y_sym, _ = build_windows(
             group, window_size=window_size, feature_columns=feature_cols
         )

@@ -62,7 +62,7 @@ def prepare_data(
     train_X, val_X, train_y, val_y = [], [], [], []
     val_close_list = []
     skipped = 0
-    for sym_name, group in df.groupby("symbol"):
+    for _, group in df.groupby("symbol"):
         X_sym, y_sym, _ = build_windows(group, window_size=window_size,
                                         feature_columns=feature_cols)
         if len(X_sym) == 0:

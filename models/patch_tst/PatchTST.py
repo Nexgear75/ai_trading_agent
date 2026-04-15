@@ -108,9 +108,9 @@ class PatchTST(nn.Module):
 
         # ----- Patching -----
         # Unfold sur la dimension temporelle (dim=1)
-        # (batch, window_size, n_features) → (batch, num_patches, n_features, patch_len)
-        patches = x.unfold(1, self.patch_len, self.stride)  # (B, num_patches, n_feat, patch_len)
-        patches = patches.permute(0, 1, 3, 2)               # (B, num_patches, patch_len, n_feat)
+        # (batch, window_size, n_features) → (batch, num_patches, patch_len, n_features)
+        patches = x.unfold(1, self.patch_len, self.stride)  # (B, num_patches, patch_len, n_feat)
+        patches = patches.permute(0, 1, 3, 2)               # (B, num_patches, n_feat, patch_len)
         patches = patches.reshape(batch_size, self.num_patches, -1)  # (B, num_patches, patch_dim)
 
         # ----- Projection + positional embedding -----

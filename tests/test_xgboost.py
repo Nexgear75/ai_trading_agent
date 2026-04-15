@@ -63,7 +63,7 @@ class TestDataPreparator:
         """X_train et X_val doivent être 2D [n, window × n_features]."""
         from models.xgboost.data_preparator import prepare_data
 
-        X_train, X_val, y_train, y_val, _, _, _, _, close_val = prepare_data(
+        X_train, X_val, y_train, y_val, _, _, _, _, _ = prepare_data(
             symbol="BTC", timeframe="1d", train_ratio=0.8
         )
         tf_config = get_timeframe_config("1d")
@@ -260,7 +260,7 @@ class TestEvaluation:
         # Préparer un faux modèle entraîné sur les données synthétiques
         from models.xgboost.data_preparator import prepare_data
 
-        X_train, X_val, y_train, y_val, feat_scaler, tgt_scaler, clip_bounds, target_clip_bounds, close_val = (
+        X_train, X_val, y_train, y_val, feat_scaler, tgt_scaler, clip_bounds, target_clip_bounds, _ = (
             prepare_data(symbol="BTC", timeframe="1d")
         )
 
@@ -313,7 +313,7 @@ class TestEvaluation:
         """evaluate() génère les fichiers PNG attendus."""
         from models.xgboost.data_preparator import prepare_data
 
-        X_train, X_val, y_train, y_val, feat_scaler, tgt_scaler, clip_bounds, target_clip_bounds, close_val = (
+        X_train, X_val, y_train, y_val, feat_scaler, tgt_scaler, clip_bounds, target_clip_bounds, _ = (
             prepare_data(symbol="BTC", timeframe="1d")
         )
 
