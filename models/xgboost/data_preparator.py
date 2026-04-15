@@ -44,7 +44,7 @@ def prepare_data(
     print(f"  [Data Prep] Timeframe: {timeframe}, Window size: {window_size}, "
           f"Horizon: {prediction_horizon}, Features: {len(feature_cols)}")
 
-    df = load_symbol(symbol, timeframe=timeframe) if symbol else load_all(timeframe=timeframe)
+    df = load_symbol(symbol, timeframe=timeframe) if symbol is not None else load_all(timeframe=timeframe)
 
     # Calcul du forward return PAR SYMBOLE pour éviter la contamination
     # entre cryptos aux frontières du DataFrame concaténé
@@ -86,7 +86,7 @@ def prepare_data(
     X_val_3d = np.concatenate(val_X)
     y_train = np.concatenate(train_y)
     y_val = np.concatenate(val_y)
-    close_val = np.concatenate(val_close)
+    close_val = np.concatenate(val_close) if symbol is not None else None
 
     # Aplatir les fenêtres → [n, window × n_features]
     X_train = X_train_3d.reshape(X_train_3d.shape[0], -1)

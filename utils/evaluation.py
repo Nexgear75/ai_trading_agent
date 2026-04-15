@@ -337,7 +337,7 @@ def build_val_from_checkpoint(
     timeframe: str,
     tf_config: dict,
     symbol: str | None = None,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, dict, int]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray | None, dict, int]:
     """Validate checkpoint metadata and build raw validation arrays.
 
     Loads scalers from checkpoint, validates consistency (timeframe,
@@ -439,7 +439,7 @@ def build_val_from_checkpoint(
             )
 
     # Load raw data and compute forward returns
-    df = load_symbol(symbol, timeframe=timeframe) if symbol else load_all(timeframe=timeframe)
+    df = load_symbol(symbol, timeframe=timeframe) if symbol is not None else load_all(timeframe=timeframe)
     df["label"] = df.groupby("symbol")["close"].transform(
         lambda c: c.shift(-prediction_horizon) / c - 1
     )
@@ -466,7 +466,6 @@ def build_val_from_checkpoint(
         if len(X_sym) == 0:
             skipped += 1
             continue
-        close_sym = group["close"].values[window_size:]
         n = len(X_sym)
         split = int(train_ratio * n)
         if split == 0 or split == n:
@@ -474,7 +473,9 @@ def build_val_from_checkpoint(
             continue
         val_X.append(X_sym[split:])
         val_y.append(y_sym[split:])
-        val_close.append(close_sym[split:])
+        if symbol is not None:
+            close_sym = group["close"].values[window_size:]
+            val_close.append(close_sym[split:])
 
     if skipped:
         logging.warning("%d symbole(s) ignoré(s) (historique insuffisant)", skipped)
@@ -498,7 +499,7 @@ def build_val_from_checkpoint(
 
     # close_val is only meaningful for single-symbol evaluation;
     # mixing prices from different symbols produces a misleading series.
-    close_val = np.concatenate(val_close) if symbol else None
+    close_val = np.concatenate(val_close) if symbol is not None else None
 
     return X_val, y_val, close_val, scalers, prediction_horizon
 

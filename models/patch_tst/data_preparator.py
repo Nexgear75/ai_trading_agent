@@ -47,7 +47,7 @@ def prepare_data(
     print(f"  [Data Prep] Timeframe: {timeframe}, Window size: {window_size}, "
           f"Horizon: {prediction_horizon}, Features: {len(feature_cols)}")
 
-    df = load_symbol(symbol, timeframe=timeframe) if symbol else load_all(timeframe=timeframe)
+    df = load_symbol(symbol, timeframe=timeframe) if symbol is not None else load_all(timeframe=timeframe)
 
     # Calcul du forward return PAR SYMBOLE pour éviter la contamination
     # entre cryptos aux frontières du DataFrame concaténé
@@ -89,7 +89,7 @@ def prepare_data(
     X_val = np.concatenate(val_X)
     y_train = np.concatenate(train_y)
     y_val = np.concatenate(val_y)
-    close_val = np.concatenate(val_close_list)
+    close_val = np.concatenate(val_close_list) if symbol is not None else None
 
     # Clipping des outliers sur les targets (winsorize 1er/99e percentile)
     # Fitté sur train uniquement, appliqué à train et val
