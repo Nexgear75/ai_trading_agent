@@ -6,6 +6,8 @@ et un orchestrateur `run_evaluation` réutilisable par n'importe quel
 modèle (CNN, LSTM, GRU, Transformer, etc.).
 """
 
+from __future__ import annotations
+
 import os
 
 import matplotlib.pyplot as plt
@@ -325,6 +327,181 @@ def plot_direction_accuracy_by_crypto(metrics_by_symbol: dict, save_path: str):
     fig.tight_layout()
     fig.savefig(os.path.join(save_path, "direction_accuracy_by_crypto.png"), dpi=150)
     plt.close(fig)
+
+
+# ----- Checkpoint validation ----- #
+
+
+def build_val_from_checkpoint(
+    scalers_path: str,
+    timeframe: str,
+    tf_config: dict,
+    symbol: str | None = None,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray | None, dict, int]:
+    """Validate checkpoint metadata and build raw validation arrays.
+
+    Loads scalers from checkpoint, validates consistency (timeframe,
+    window_size, prediction_horizon), then rebuilds validation windows
+    from raw data WITHOUT refitting any scaler.
+
+    Args:
+        scalers_path: Path to the scalers.joblib checkpoint file.
+        timeframe: Requested timeframe (must match checkpoint).
+        tf_config: Timeframe config dict (from get_timeframe_config).
+        symbol: Symbol to evaluate (e.g. "BTC"). None = all symbols.
+
+    Returns:
+        (X_val, y_val, close_val, scalers, prediction_horizon) where
+        X_val has shape (n_val, window_size, n_features) — raw, NOT
+        clipped or scaled. scalers dict contains all checkpoint artifacts.
+    """
+    import joblib
+    import logging
+
+    from data.features.pipeline import get_feature_columns
+    from data.preprocessing.builder import build_windows
+    from utils.dataset_loader import load_symbol, load_all
+
+    scalers = joblib.load(scalers_path)
+
+    # Validate checkpoint structure
+    if not hasattr(scalers, "get"):
+        raise TypeError(
+            "Invalid checkpoint format: expected a dict-like object containing "
+            "preprocessing artifacts. Re-train the model to generate a compatible "
+            "checkpoint."
+        )
+
+    required_artifacts = (
+        "feature_scaler",
+        "target_scaler",
+        "clip_bounds",
+        "target_clip_bounds",
+    )
+    missing_artifacts = [key for key in required_artifacts if scalers.get(key) is None]
+    if missing_artifacts:
+        missing_str = ", ".join(f"'{k}'" for k in missing_artifacts)
+        raise KeyError(
+            f"Checkpoint missing required preprocessing artifact(s): {missing_str}. "
+            "Re-train the model to generate a compatible checkpoint."
+        )
+
+    # Validate required metadata
+    required_metadata = ("timeframe", "window_size", "prediction_horizon")
+    missing_metadata = [key for key in required_metadata if key not in scalers]
+    if missing_metadata:
+        missing_str = ", ".join(f"'{key}'" for key in missing_metadata)
+        raise KeyError(
+            f"Checkpoint missing required metadata: {missing_str}. "
+            "Re-train the model to generate a compatible checkpoint."
+        )
+
+    persisted_timeframe = scalers["timeframe"]
+    persisted_window_size = scalers["window_size"]
+    persisted_horizon = scalers["prediction_horizon"]
+
+    # Validate timeframe consistency
+    if persisted_timeframe != timeframe:
+        raise ValueError(
+            f"Timeframe mismatch: checkpoint trained with '{persisted_timeframe}' "
+            f"but evaluation requested with '{timeframe}'"
+        )
+
+    # Validate window_size consistency
+    config_window_size = tf_config["window_size"]
+    if persisted_window_size != config_window_size:
+        raise ValueError(
+            f"Window size mismatch: checkpoint trained with "
+            f"window_size={persisted_window_size} but config uses "
+            f"window_size={config_window_size} for timeframe '{timeframe}'."
+        )
+    window_size = persisted_window_size
+
+    # Validate prediction_horizon consistency
+    prediction_horizon = tf_config["prediction_horizon"]
+    if persisted_horizon != prediction_horizon:
+        raise ValueError(
+            f"Prediction horizon mismatch: checkpoint trained with "
+            f"prediction_horizon={persisted_horizon} but config uses "
+            f"prediction_horizon={prediction_horizon} for timeframe '{timeframe}'."
+        )
+
+    feature_cols = get_feature_columns(timeframe)
+
+    # Validate feature schema if persisted in checkpoint
+    if "feature_columns" in scalers:
+        persisted_cols = scalers["feature_columns"]
+        if list(persisted_cols) != list(feature_cols):
+            raise ValueError(
+                f"Feature columns mismatch: checkpoint was trained with "
+                f"{persisted_cols} but current pipeline produces {list(feature_cols)}. "
+                "Re-train the model or align the feature pipeline."
+            )
+
+    # Load raw data and compute forward returns
+    df = load_symbol(symbol, timeframe=timeframe) if symbol is not None else load_all(timeframe=timeframe)
+    df["label"] = df.groupby("symbol")["close"].transform(
+        lambda c: c.shift(-prediction_horizon) / c - 1
+    )
+    df = df.dropna(subset=["label"])
+
+    # Build validation windows per symbol
+    if "train_ratio" not in scalers:
+        raise KeyError(
+            "Checkpoint missing 'train_ratio'. "
+            "Re-train the model to generate a compatible checkpoint."
+        )
+    train_ratio = scalers["train_ratio"]
+    if not (0 < train_ratio < 1):
+        raise ValueError(
+            f"Invalid train_ratio={train_ratio} in checkpoint. "
+            "Expected a value strictly between 0 and 1."
+        )
+    val_X, val_y, val_close = [], [], []
+    skipped = 0
+    for _, group in df.groupby("symbol"):
+        X_sym, y_sym, _ = build_windows(
+            group, window_size=window_size, feature_columns=feature_cols
+        )
+        if len(X_sym) == 0:
+            skipped += 1
+            continue
+        n = len(X_sym)
+        split = int(train_ratio * n)
+        if split == 0 or split == n:
+            skipped += 1
+            continue
+        val_X.append(X_sym[split:])
+        val_y.append(y_sym[split:])
+        if symbol is not None:
+            close_sym = group["close"].values[window_size:]
+            val_close.append(close_sym[split:])
+
+    if skipped:
+        logging.warning("%d symbole(s) ignoré(s) (historique insuffisant)", skipped)
+    if not val_X:
+        raise ValueError("No validation samples after windowing. Check data availability.")
+
+    X_val = np.concatenate(val_X)
+    y_val = np.concatenate(val_y)
+
+    # Validate dataset consistency against checkpoint fingerprint
+    if "n_val_samples" in scalers:
+        expected = scalers["n_val_samples"]
+        actual = len(X_val)
+        if actual != expected:
+            raise ValueError(
+                f"Validation set size mismatch: checkpoint expected {expected} "
+                f"samples but current data produces {actual}. "
+                "The underlying data may have changed since training. "
+                "Re-train the model to generate a consistent checkpoint."
+            )
+
+    # close_val is only meaningful for single-symbol evaluation;
+    # mixing prices from different symbols produces a misleading series.
+    close_val = np.concatenate(val_close) if symbol is not None else None
+
+    return X_val, y_val, close_val, scalers, prediction_horizon
 
 
 # ----- Orchestrateur ----- #

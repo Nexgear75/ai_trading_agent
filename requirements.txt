@@ -3,6 +3,7 @@ pandas
 numpy
 torch
 scikit-learn
+xgboost
 joblib
 matplotlib
 seaborn

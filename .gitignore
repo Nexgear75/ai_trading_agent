@@ -6,3 +6,5 @@ raw/
 *.pth
 *.joblib
 runs/
+.DS_Store
+*.bak
