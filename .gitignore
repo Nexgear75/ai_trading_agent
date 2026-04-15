@@ -6,3 +6,4 @@ raw/
 *.pth
 *.joblib
 runs/
+shell.nix
