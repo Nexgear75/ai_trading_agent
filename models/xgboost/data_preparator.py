@@ -14,7 +14,7 @@ def prepare_data(
     timeframe: str = DEFAULT_TIMEFRAME,
     train_ratio: float = 0.8,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray,
-           RobustScaler, StandardScaler, np.ndarray, np.ndarray, np.ndarray]:
+           RobustScaler, StandardScaler, np.ndarray, np.ndarray, np.ndarray | None]:
     """Prépare les données tabulaires pour XGBoost.
 
     Même pipeline que CNN (fenêtres glissantes, clipping, scaling)
@@ -65,7 +65,6 @@ def prepare_data(
         if len(X_sym) == 0:
             skipped += 1
             continue
-        close_sym = group["close"].values[window_size:]
         n = len(X_sym)
         split = int(train_ratio * n)
         if split == 0 or split == n:
@@ -75,7 +74,9 @@ def prepare_data(
         val_X.append(X_sym[split:])
         train_y.append(y_sym[:split])
         val_y.append(y_sym[split:])
-        val_close.append(close_sym[split:])
+        if symbol is not None:
+            close_sym = group["close"].values[window_size:]
+            val_close.append(close_sym[split:])
 
     if skipped:
         print(f"  {skipped} symbole(s) ignoré(s) (historique insuffisant)")
