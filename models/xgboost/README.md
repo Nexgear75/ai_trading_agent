@@ -36,8 +36,8 @@ Input (batch, window_size, n_features)
 
 | Timeframe | window_size | n_features | Flat dimension |
 |---|---|---|---|
-| 1d | 30 | 20 | 600 |
-| 1h | 72 | 20 | 1440 |
+| 1d | 30 | 16 | 480 |
+| 1h | 72 | 24 | 1728 |
 
 ### Hyperparameters (from `config.py`)
 

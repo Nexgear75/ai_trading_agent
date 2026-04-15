@@ -44,10 +44,10 @@ The input sequence is split into overlapping patches using `torch.Tensor.unfold(
 
 | Timeframe | window_size | patch_len | stride | num_patches | patch_dim |
 |---|---|---|---|---|---|
-| 1d | 30 | 6 | 3 | 9 | 120 (6 × 20) |
-| 1h | 72 | 12 | 6 | 11 | 240 (12 × 20) |
+| 1d | 30 | 6 | 3 | 9 | 96 (6 × 16) |
+| 1h | 72 | 12 | 6 | 11 | 288 (12 × 24) |
 
-Each patch captures `patch_len` consecutive timesteps with all features, and adjacent patches overlap by `patch_len - stride` timesteps. This overlap ensures no information is lost at patch boundaries.
+Each patch captures `patch_len` consecutive timesteps with all features for the selected timeframe (`n_features=16` in `1d`, `n_features=24` in `1h`), and adjacent patches overlap by `patch_len - stride` timesteps. This overlap ensures no information is lost at patch boundaries.
 
 ### Projection + positional embedding
 
