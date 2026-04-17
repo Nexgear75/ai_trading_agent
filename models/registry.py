@@ -3,9 +3,13 @@ import importlib
 from models.base_predictor import BasePredictor
 
 # Map model name -> (module_path, class_name)
-# Each branch adds its own models here when merged.
 AVAILABLE_MODELS: dict[str, tuple[str, str]] = {
     "rl": ("models.rl.predictor", "RLPredictor"),
+    "cnn": ("models.cnn.predictor", "CNNPredictor"),
+    "bilstm": ("models.bilstm.predictor", "BiLSTMPredictor"),
+    "cnn_bilstm_am": ("models.cnn_bilstm_am.predictor", "CnnBiLstmAmPredictor"),
+    "patch_tst": ("models.patch_tst.predictor", "PatchTSTPredictor"),
+    "xgboost": ("models.xgboost.predictor", "XGBoostPredictor"),
 }
 
 

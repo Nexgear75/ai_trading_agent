@@ -166,6 +166,41 @@ def load_scalers(model_type: str, timeframe: str = DEFAULT_TIMEFRAME) -> dict:
 # ----- Préparation des données ----- #
 
 
+def prepare_raw_windows(
+    symbol: str,
+    timeframe: str = DEFAULT_TIMEFRAME,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, pd.DataFrame]:
+    """Prépare les fenêtres brutes (non scalées) pour le backtesting ensemble.
+
+    Contrairement à prepare_backtest_data, aucun scaler n'est appliqué.
+    Chaque modèle de l'ensemble applique ses propres scalers en interne.
+
+    Args:
+        symbol: Symbole de la crypto (ex: "BTC").
+        timeframe: Timeframe du dataset (ex: "1d", "1h", "4h").
+
+    Returns:
+        (X_raw, y, timestamps, df_prices) où X_raw est non-scalé.
+    """
+    tf_config = get_timeframe_config(timeframe)
+    window_size = tf_config["window_size"]
+    prediction_horizon = tf_config["prediction_horizon"]
+
+    df = load_symbol(symbol, timeframe=timeframe).copy()
+    df_prices = df[["close"]].copy()
+    df["label"] = df["close"].shift(-prediction_horizon) / df["close"] - 1
+    df = df.dropna(subset=["label"])
+
+    feature_cols = get_feature_columns(timeframe)
+    X, y, timestamps = build_windows(df, window_size=window_size, feature_columns=feature_cols)
+
+    if len(X) == 0:
+        raise ValueError(f"Pas assez de données pour construire des fenêtres pour {symbol}")
+
+    print(f"Fenêtres brutes préparées : {len(X)} fenêtres, window_size={window_size}, {X.shape[2]} features")
+    return X, y, timestamps, df_prices
+
+
 def prepare_backtest_data(
     symbol: str,
     feature_scaler,
@@ -1212,6 +1247,114 @@ def run_backtest(
     return result
 
 
+def run_ensemble_backtest(
+    model_types: list[str],
+    symbol: str,
+    strategy: str = "weighted_average",
+    weights: list[float] | None = None,
+    capital: float = 10_000.0,
+    threshold: float = 0.0,
+    allow_short: bool = False,
+    timeframe: str = DEFAULT_TIMEFRAME,
+    entry_fee_pct: Optional[float] = None,
+    exit_fee_pct: Optional[float] = None,
+) -> BacktestResult:
+    """Backtest an ensemble of models that vote on each trading signal.
+
+    Each model in ``model_types`` must have a trained checkpoint at the
+    standard path ``models/<type>/checkpoints/<timeframe>/best_model.pth``.
+    Raw (unscaled) windows are fed to every model; each predictor applies
+    its own scalers internally.
+
+    Args:
+        model_types: List of model keys, e.g. ["cnn", "bilstm", "cnn_bilstm_am"].
+        symbol: Crypto symbol, e.g. "BTC".
+        strategy: Aggregation strategy — one of:
+            "majority_vote", "weighted_average", "confidence_weighted", "unanimous".
+        weights: Per-model weights for "weighted_average" (defaults to equal).
+        capital: Starting capital.
+        threshold: Signal threshold; overrides config default when > 0.
+        allow_short: Allow short positions.
+        timeframe: Shared timeframe for all models.
+        entry_fee_pct / exit_fee_pct: Fee rates (defaults to config values).
+
+    Returns:
+        BacktestResult with ensemble predictions.
+    """
+    from models.registry import get_predictor
+    from models.ensemble.ensemble_predictor import EnsemblePredictor
+    from config import SIGNAL_THRESHOLDS
+
+    tf_config = get_timeframe_config(timeframe)
+    prediction_horizon = tf_config["prediction_horizon"]
+    timeframe_minutes = tf_config["minutes_per_bar"]
+
+    if entry_fee_pct is None:
+        entry_fee_pct = DEFAULT_ENTRY_FEE
+    if exit_fee_pct is None:
+        exit_fee_pct = DEFAULT_EXIT_FEE
+    if threshold == 0.0:
+        threshold = SIGNAL_THRESHOLDS.get(timeframe, 0.01)
+
+    print(f"\n{'=' * 60}")
+    print(f"ENSEMBLE BACKTEST sur {symbol} [{timeframe}]")
+    print(f"Modèles : {', '.join(model_types)}")
+    print(f"Stratégie : {strategy}")
+    print(f"{'=' * 60}")
+
+    # Build and load each predictor
+    predictors = []
+    for mt in model_types:
+        predictor = get_predictor(mt)
+        # Override timeframe if predictor supports it
+        if hasattr(predictor, '_timeframe'):
+            predictor._timeframe = timeframe
+        ckpt_ext = "json" if mt == "xgboost" else "pth"
+        ckpt_path = f"models/{mt}/checkpoints/{timeframe}/best_model.{ckpt_ext}"
+        print(f"  Chargement {mt} depuis {ckpt_path}...")
+        predictor.load(ckpt_path)
+        predictors.append(predictor)
+
+    ensemble = EnsemblePredictor(
+        models=predictors,
+        strategy=strategy,
+        weights=weights,
+        timeframe=timeframe,
+    )
+
+    # Prepare raw (unscaled) windows — each model scales internally
+    print(f"\nPréparation des données brutes pour {symbol} [{timeframe}]...")
+    X_raw, y, timestamps, df_prices = prepare_raw_windows(symbol, timeframe)
+
+    # Generate ensemble predictions (vectorised)
+    print(f"Génération des prédictions ensemble ({len(X_raw)} fenêtres)...")
+    predictions = ensemble.predict_batch(X_raw)
+
+    # Simulate trading
+    print(f"Simulation (threshold={threshold:.4f}, strategy={strategy})...")
+    result = simulate_trading(
+        predictions, timestamps, df_prices, capital, threshold, allow_short,
+        entry_fee_pct, exit_fee_pct, prediction_horizon, timeframe_minutes,
+    )
+
+    oracle_result = simulate_oracle(
+        y, timestamps, df_prices, capital, allow_short,
+        entry_fee_pct, exit_fee_pct, prediction_horizon, timeframe_minutes,
+    )
+
+    compute_backtest_metrics(result, capital, df_prices, timestamps)
+    compute_backtest_metrics(oracle_result, capital, df_prices, timestamps)
+
+    label = f"ensemble[{'+'.join(model_types)}]/{strategy}"
+    print_summary(result, symbol, label, capital, oracle_result=oracle_result)
+
+    results_dir = f"models/ensemble/results/{timeframe}"
+    plot_equity_curve(result, results_dir, symbol, label, capital, df_prices, timestamps,
+                      oracle_result=oracle_result)
+
+    return result
+
+
 def run_backtest_all_symbols(
     model_type: str,
     capital_per_symbol: float = 1_000.0,
@@ -1484,6 +1627,25 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Tester sur tous les symboles définis dans SYMBOLS (capital par symbole: --capital)",
     )
+    parser.add_argument(
+        "--ensemble-models",
+        type=str,
+        default=None,
+        help="Modèles ensemble séparés par virgule (ex: cnn,bilstm,cnn_bilstm_am). Requis si --model ensemble.",
+    )
+    parser.add_argument(
+        "--ensemble-strategy",
+        type=str,
+        default="weighted_average",
+        choices=["majority_vote", "weighted_average", "confidence_weighted", "unanimous"],
+        help="Stratégie d'agrégation ensemble (défaut: weighted_average)",
+    )
+    parser.add_argument(
+        "--ensemble-weights",
+        type=str,
+        default=None,
+        help="Poids par modèle séparés par virgule (ex: 0.5,0.3,0.2). Défaut: poids égaux.",
+    )
     return parser.parse_args()
 
 
@@ -1495,8 +1657,31 @@ if __name__ == "__main__":
         print("Erreur: Vous devez specifier --symbol ou utiliser --all-symbols")
         exit(1)
 
-    if args.all_symbols:
-        # Mode multi-symboles
+    if args.model == "ensemble":
+        if args.ensemble_models is None:
+            print("Erreur: --ensemble-models requis avec --model ensemble (ex: cnn,bilstm)")
+            exit(1)
+        if args.symbol is None:
+            print("Erreur: --symbol requis avec --model ensemble")
+            exit(1)
+        model_types = [m.strip() for m in args.ensemble_models.split(",")]
+        weights = (
+            [float(w) for w in args.ensemble_weights.split(",")]
+            if args.ensemble_weights else None
+        )
+        run_ensemble_backtest(
+            model_types=model_types,
+            symbol=args.symbol,
+            strategy=args.ensemble_strategy,
+            weights=weights,
+            capital=args.capital,
+            threshold=args.threshold,
+            allow_short=args.allow_short,
+            timeframe=args.timeframe,
+            entry_fee_pct=args.entry_fee,
+            exit_fee_pct=args.exit_fee,
+        )
+    elif args.all_symbols:
         run_backtest_all_symbols(
             model_type=args.model,
             capital_per_symbol=args.capital,
@@ -1510,7 +1695,6 @@ if __name__ == "__main__":
             test_start_date=args.test_start_date,
         )
     else:
-        # Mode single symbole
         run_backtest(
             model_type=args.model,
             symbol=args.symbol,
