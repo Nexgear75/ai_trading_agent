@@ -2,14 +2,14 @@
 import argparse
 import gc
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import joblib
 import torch
 import torch.nn as nn
 from tqdm import tqdm
 
-from config import DEFAULT_TIMEFRAME, get_timeframe_config
+from config import get_timeframe_config
 from data.features.pipeline import get_feature_columns
 from models.lstm.LSTM import LSTMModel
 from models.lstm.data_preparator import prepare_data
@@ -19,60 +19,104 @@ from models.lstm.data_preparator import prepare_data
 class TrainCfg:
     epochs: int = 200
     batch_size: int = 32
-    lr: float = 1e-3
-    patience: int = 10
-    hidden: int = 128
-    layers: int = 2
+    lr: float = 5e-4
+    patience: int = 15
+    hidden: int = 32
+    layers: int = 1
+
+
+@dataclass
+class _Ctx:
+    """Bundles model, criterion, optimizer, device, and run-time artefacts."""
+    model: nn.Module
+    criterion: nn.Module
+    optimizer: torch.optim.Optimizer
+    device: torch.device
+    paths: dict
+    meta: dict
+    scalers: dict
 
 
 def _get_checkpoint_paths(timeframe: str) -> dict:
-    checkpoint_dir = f"models/lstm/checkpoints/{timeframe}"
-    return {
-        "dir": checkpoint_dir,
-        "model": os.path.join(checkpoint_dir, "best_model.pth"),
-        "scalers": os.path.join(checkpoint_dir, "scalers.joblib"),
-    }
+    d = f"models/lstm/checkpoints/{timeframe}"
+    return {"dir": d, "model": os.path.join(d, "best_model.pth"), "scalers": os.path.join(d, "scalers.joblib")}
 
 
-def _run_train_epoch(model, loader, criterion, optimizer, device, epoch, total):
-    model.train()
+def _run_train_epoch(ctx: _Ctx, loader, epoch: int, total: int) -> float:
+    ctx.model.train()
     total_loss = 0.0
     pbar = tqdm(loader, desc=f"Epoch {epoch:3d}/{total} [Train]", leave=False)
     for X, y in pbar:
-        X, y = X.to(device), y.to(device)
-        optimizer.zero_grad()
-        preds = model(X)
-        loss = criterion(preds, y)
+        X, y = X.to(ctx.device), y.to(ctx.device)
+        ctx.optimizer.zero_grad()
+        preds = ctx.model(X)
+        loss = ctx.criterion(preds, y)
         loss.backward()
-        nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-        optimizer.step()
+        nn.utils.clip_grad_norm_(ctx.model.parameters(), 1.0)
+        ctx.optimizer.step()
         total_loss += loss.item() * len(X)
         pbar.set_postfix(loss=f"{loss.item():.5f}")
         del preds, loss
-        if device.type == "mps":
+        if ctx.device.type == "mps":
             torch.mps.empty_cache()
     return total_loss / len(loader.dataset)
 
 
-def _run_val_epoch(model, loader, criterion, device):
-    model.eval()
+def _run_val_epoch(ctx: _Ctx, loader) -> tuple[float, float]:
+    ctx.model.eval()
     total_loss, correct_dir = 0.0, 0
     with torch.no_grad():
         for X, y in loader:
-            X, y = X.to(device), y.to(device)
-            preds = model(X)
-            total_loss += criterion(preds, y).item() * len(X)
+            X, y = X.to(ctx.device), y.to(ctx.device)
+            preds = ctx.model(X)
+            total_loss += ctx.criterion(preds, y).item() * len(X)
             correct_dir += ((preds > 0) == (y > 0)).sum().item()
-            if device.type == "mps":
+            if ctx.device.type == "mps":
                 torch.mps.empty_cache()
     return total_loss / len(loader.dataset), correct_dir / len(loader.dataset)
 
 
-def train(
-    symbol: str | None = None,
-    timeframe: str = "1h",
-    cfg: TrainCfg | None = None,
-):
+def _save_checkpoint(ctx: _Ctx, history: dict) -> None:
+    torch.save({**ctx.meta, "model_state": ctx.model.state_dict(), "history": history}, ctx.paths["model"])
+    joblib.dump(ctx.scalers, ctx.paths["scalers"])
+    print(f"  [SAVE] Checkpoint saved → {ctx.paths['model']}")
+
+
+def _run_loop(ctx: _Ctx, train_loader, val_loader, cfg: TrainCfg) -> float:
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(ctx.optimizer, factor=0.5, patience=7, min_lr=1e-6)
+    history = {"train_loss": [], "val_loss": []}
+    best_val, no_improve = float("inf"), 0
+
+    for epoch in range(1, cfg.epochs + 1):
+        train_loss = _run_train_epoch(ctx, train_loader, epoch, cfg.epochs)
+        val_loss, dir_acc = _run_val_epoch(ctx, val_loader)
+        history["train_loss"].append(train_loss)
+        history["val_loss"].append(val_loss)
+        scheduler.step(val_loss)
+
+        if epoch % 5 == 0:
+            gc.collect()
+            if ctx.device.type == "mps":
+                torch.mps.empty_cache()
+
+        tqdm.write(
+            f"Epoch {epoch:3d}/{cfg.epochs} | Train: {train_loss:.6f} | "
+            f"Val: {val_loss:.6f} | Dir Acc: {dir_acc:.1%} | LR: {ctx.optimizer.param_groups[0]['lr']:.1e}"
+        )
+
+        if val_loss < best_val:
+            best_val, no_improve = val_loss, 0
+            _save_checkpoint(ctx, history)
+        else:
+            no_improve += 1
+            if no_improve >= cfg.patience:
+                print(f"Early stopping at epoch {epoch}")
+                break
+
+    return best_val
+
+
+def train(symbol: str | None = None, timeframe: str = "1h", cfg: TrainCfg | None = None):
     """Entraîne le modèle LSTM avec early stopping."""
     if cfg is None:
         cfg = TrainCfg()
@@ -83,11 +127,9 @@ def train(
     paths = _get_checkpoint_paths(timeframe)
     os.makedirs(paths["dir"], exist_ok=True)
 
-    print(f"\n{'=' * 60}")
-    print(f"  ENTRAÎNEMENT LSTM  |  Timeframe: {timeframe}")
+    print(f"\n{'=' * 60}\n  ENTRAÎNEMENT LSTM  |  Timeframe: {timeframe}")
     print(f"  Window: {window_size}  |  Features: {len(feature_cols)}")
-    print(f"  Hidden: {cfg.hidden}  |  Layers: {cfg.layers}")
-    print(f"{'=' * 60}\n")
+    print(f"  Hidden: {cfg.hidden}  |  Layers: {cfg.layers}\n{'=' * 60}\n")
 
     device = torch.device("mps" if torch.mps.is_available() else "cpu")
     print(f"Device: {device}")
@@ -99,57 +141,25 @@ def train(
     model = LSTMModel(n_features=len(feature_cols), hidden=cfg.hidden, layers=cfg.layers).to(device)
     print(f"LSTM parameters: {sum(p.numel() for p in model.parameters() if p.requires_grad):,}")
 
-    criterion = nn.HuberLoss(delta=1.0)
-    optimizer = torch.optim.Adam(model.parameters(), lr=cfg.lr, weight_decay=1e-4)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.5, patience=5)
-
-    best_val_loss = float("inf")
-    no_improve = 0
-    history = {"train_loss": [], "val_loss": []}
-
-    for epoch in range(1, cfg.epochs + 1):
-        train_loss = _run_train_epoch(model, train_loader, criterion, optimizer, device, epoch, cfg.epochs)
-        val_loss, dir_acc = _run_val_epoch(model, val_loader, criterion, device)
-
-        history["train_loss"].append(train_loss)
-        history["val_loss"].append(val_loss)
-        scheduler.step(val_loss)
-
-        if epoch % 5 == 0:
-            gc.collect()
-            if device.type == "mps":
-                torch.mps.empty_cache()
-
-        tqdm.write(
-            f"Epoch {epoch:3d}/{cfg.epochs} | Train: {train_loss:.6f} | "
-            f"Val: {val_loss:.6f} | Dir Acc: {dir_acc:.1%} | LR: {optimizer.param_groups[0]['lr']:.1e}"
-        )
-
-        if val_loss < best_val_loss:
-            best_val_loss, no_improve = val_loss, 0
-            torch.save(
-                {"model_state": model.state_dict(), "history": history,
-                 "timeframe": timeframe, "window_size": window_size,
-                 "n_features": len(feature_cols), "hidden": cfg.hidden, "layers": cfg.layers},
-                paths["model"],
-            )
-            joblib.dump(
-                {"feature_scaler": feature_scaler, "target_scaler": target_scaler,
+    ctx = _Ctx(
+        model=model,
+        criterion=nn.HuberLoss(delta=1.0),
+        optimizer=torch.optim.AdamW(model.parameters(), lr=cfg.lr, weight_decay=5e-3),
+        device=device,
+        paths=paths,
+        meta={"timeframe": timeframe, "window_size": window_size, "n_features": len(feature_cols),
+              "hidden": cfg.hidden, "layers": cfg.layers},
+        scalers={"feature_scaler": feature_scaler, "target_scaler": target_scaler,
                  "clip_bounds": clip_bounds, "timeframe": timeframe, "window_size": window_size},
-                paths["scalers"],
-            )
-            print(f"  [SAVE] Checkpoint saved → {paths['model']}")
-        else:
-            no_improve += 1
-            if no_improve >= cfg.patience:
-                print(f"Early stopping at epoch {epoch}")
-                break
+    )
+
+    best_val = _run_loop(ctx, train_loader, val_loader, cfg)
 
     checkpoint = torch.load(paths["model"], weights_only=False)
     model.load_state_dict(checkpoint["model_state"])
-    scalers = joblib.load(paths["scalers"])
-    print(f"\nTraining terminé. Best val loss: {best_val_loss:.6f}")
-    return model, scalers["feature_scaler"], scalers["target_scaler"]
+    saved = joblib.load(paths["scalers"])
+    print(f"\nTraining terminé. Best val loss: {best_val:.6f}")
+    return model, saved["feature_scaler"], saved["target_scaler"]
 
 
 if __name__ == "__main__":
@@ -158,14 +168,10 @@ if __name__ == "__main__":
     parser.add_argument("--timeframe", type=str, default="1h")
     parser.add_argument("--epochs", type=int, default=200)
     parser.add_argument("--batch-size", type=int, default=32)
-    parser.add_argument("--lr", type=float, default=1e-3)
-    parser.add_argument("--patience", type=int, default=10)
-    parser.add_argument("--hidden", type=int, default=128)
-    parser.add_argument("--layers", type=int, default=2)
+    parser.add_argument("--lr", type=float, default=5e-4)
+    parser.add_argument("--patience", type=int, default=15)
+    parser.add_argument("--hidden", type=int, default=32)
+    parser.add_argument("--layers", type=int, default=1)
     a = parser.parse_args()
-
-    train(
-        symbol=a.symbol,
-        timeframe=a.timeframe,
-        cfg=TrainCfg(a.epochs, a.batch_size, a.lr, a.patience, a.hidden, a.layers),
-    )
+    train(symbol=a.symbol, timeframe=a.timeframe,
+          cfg=TrainCfg(a.epochs, a.batch_size, a.lr, a.patience, a.hidden, a.layers))
