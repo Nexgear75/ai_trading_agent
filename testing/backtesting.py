@@ -1105,6 +1105,221 @@ def plot_equity_curve(
     print(f"Courbe d'équité sauvegardée : {filepath}")
 
 
+def plot_ensemble_model_predictions(
+    per_model_preds: dict[str, np.ndarray],
+    ensemble_preds: np.ndarray,
+    oracle_preds: np.ndarray,
+    timestamps: np.ndarray,
+    save_path: str,
+    symbol: str,
+    strategy: str,
+    threshold: float,
+) -> None:
+    """Graphique comparant les prédictions individuelles, l'ensemble, et l'oracle.
+
+    Panneau supérieur : retours prédits (%) par modèle + ensemble + oracle.
+    Panneau inférieur : signal discret (buy/sell/hold) par modèle — heatmap.
+
+    Args:
+        per_model_preds: {nom_modèle: array (N,) de retours prédits}.
+        ensemble_preds: Array (N,) de prédictions agrégées.
+        oracle_preds: Array (N,) de retours futurs réels (ground truth).
+        timestamps: Array (N,) de timestamps.
+        save_path: Dossier de destination.
+        symbol: Symbole crypto (pour le titre).
+        strategy: Nom de la stratégie d'agrégation.
+        threshold: Seuil de signal (pour colorer buy/sell/hold).
+    """
+    os.makedirs(save_path, exist_ok=True)
+
+    n_models = len(per_model_preds)
+    ts = [pd.Timestamp(t) for t in timestamps]
+
+    # Downsample to ≤2000 points so lines stay readable
+    step = max(1, len(ts) // 2000)
+    xs = np.arange(0, len(ts), step)           # integer x-axis shared by both panels
+    ts_s = [ts[i] for i in xs]                 # corresponding timestamps for labels
+
+    # Distinct colours: tab10 for models, fixed for ensemble/oracle
+    tab10 = plt.cm.tab10.colors
+    model_colors = [tab10[i % 10] for i in range(n_models)]
+    ensemble_color = "#7c3aed"
+    oracle_color = "#dc2626"
+
+    fig, axes = plt.subplots(2, 1, figsize=(16, 10), height_ratios=[3, 1])
+
+    # ----- Panneau 1 : prédictions continues -----
+    ax1 = axes[0]
+
+    for i, (name, preds) in enumerate(per_model_preds.items()):
+        ax1.plot(xs, preds[xs], linewidth=1.2, alpha=0.75,
+                 color=model_colors[i], label=name)
+
+    ax1.plot(xs, ensemble_preds[xs], linewidth=2.2, color=ensemble_color,
+             label=f"Ensemble ({strategy})", zorder=5)
+    ax1.plot(xs, oracle_preds[xs], linewidth=1.4, color=oracle_color,
+             linestyle="--", alpha=0.85, label="Oracle (actual return)", zorder=4)
+
+    ax1.axhline(threshold, color="gray", linewidth=0.8, linestyle=":",
+                label=f"±threshold ({threshold:.3%})")
+    ax1.axhline(-threshold, color="gray", linewidth=0.8, linestyle=":")
+    ax1.axhline(0, color="black", linewidth=0.5, alpha=0.35)
+
+    # Clip y-axis to 2nd–98th percentile so model lines aren't dwarfed by
+    # oracle return spikes
+    all_vals = np.concatenate(
+        [preds[xs] for preds in per_model_preds.values()]
+        + [ensemble_preds[xs], oracle_preds[xs]]
+    )
+    lo = float(np.nanpercentile(all_vals, 2))
+    hi = float(np.nanpercentile(all_vals, 98))
+    pad = max((hi - lo) * 0.12, threshold * 3)
+    ax1.set_ylim(lo - pad, hi + pad)
+
+    ax1.set_xlim(xs[0], xs[-1])
+    ax1.set_ylabel("Predicted return (%)")
+    ax1.set_title(f"Ensemble prediction breakdown — {symbol} | strategy: {strategy}")
+    ax1.legend(loc="upper left", fontsize=8, ncol=2)
+    ax1.grid(True, alpha=0.2)
+    ax1.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: f"{x*100:.2f}%"))
+
+    # Shared x-tick labels (dates) on top panel
+    n_ticks = 6
+    tick_idx = np.linspace(0, len(xs) - 1, n_ticks, dtype=int)
+    ax1.set_xticks([xs[i] for i in tick_idx])
+    ax1.set_xticklabels([ts_s[i].strftime("%Y-%m-%d") for i in tick_idx],
+                        rotation=20, ha="right", fontsize=8)
+
+    # ----- Panneau 2 : signal direction heatmap -----
+    ax2 = axes[1]
+
+    rows = list(per_model_preds.keys()) + ["Ensemble"]
+    all_sampled = [preds[xs] for preds in per_model_preds.values()] + [ensemble_preds[xs]]
+
+    signal_matrix = np.zeros((len(rows), len(xs)))
+    for r, row_preds in enumerate(all_sampled):
+        signal_matrix[r] = np.where(
+            row_preds > threshold, 1.0,
+            np.where(row_preds < -threshold, -1.0, 0.0),
+        )
+
+    # Use integer extent matching the top panel's x-axis
+    ax2.imshow(
+        signal_matrix, aspect="auto", cmap=plt.cm.RdYlGn, vmin=-1, vmax=1,
+        extent=[xs[0], xs[-1], -0.5, len(rows) - 0.5],
+        interpolation="nearest",
+    )
+    ax2.set_yticks(range(len(rows)))
+    ax2.set_yticklabels(rows, fontsize=8)
+    ax2.set_xlim(xs[0], xs[-1])
+    ax2.set_xlabel("Time")
+    ax2.set_title("Signal direction  (green = buy · yellow = hold · red = sell)")
+    ax2.set_xticks([xs[i] for i in tick_idx])
+    ax2.set_xticklabels([ts_s[i].strftime("%Y-%m-%d") for i in tick_idx],
+                        rotation=20, ha="right", fontsize=8)
+
+    plt.tight_layout()
+    filename = f"ensemble_predictions_{symbol.replace('/', '_')}.png"
+    filepath = os.path.join(save_path, filename)
+    fig.savefig(filepath, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    print(f"Graphique des prédictions ensemble sauvegardé : {filepath}")
+
+
+def plot_ensemble_equity_comparison(
+    per_model_results: dict[str, BacktestResult],
+    ensemble_result: BacktestResult,
+    oracle_result: BacktestResult,
+    df_prices: pd.DataFrame,
+    timestamps: np.ndarray,
+    capital: float,
+    save_path: str,
+    symbol: str,
+    strategy: str,
+) -> None:
+    """Equity curve comparing each individual model, the ensemble, and the oracle.
+
+    Every model is shown as if it were trading alone (same capital, same threshold).
+    The ensemble and oracle lines provide upper/lower context.
+
+    Args:
+        per_model_results: {model_name: BacktestResult} for each constituent model.
+        ensemble_result: BacktestResult for the ensemble.
+        oracle_result: BacktestResult with perfect-foresight predictions.
+        df_prices: DataFrame with 'close' column for the buy-and-hold benchmark.
+        timestamps: Array of backtest timestamps (for x-axis anchoring).
+        capital: Initial capital.
+        save_path: Directory to write the PNG.
+        symbol: Crypto symbol (used in title and filename).
+        strategy: Ensemble strategy name (used in title).
+    """
+    os.makedirs(save_path, exist_ok=True)
+
+    tab10 = plt.cm.tab10.colors
+    model_names = list(per_model_results.keys())
+
+    fig, axes = plt.subplots(2, 1, figsize=(14, 10), height_ratios=[3, 1])
+    ax1, ax2 = axes
+
+    # Buy-and-hold benchmark
+    first_ts = pd.Timestamp(timestamps[0])
+    last_ts = pd.Timestamp(timestamps[-1])
+    bh = df_prices.loc[first_ts:last_ts, "close"]
+    bh_norm = bh / bh.iloc[0] * capital
+
+    ax1.plot(bh_norm.index, bh_norm.values,
+             color="silver", linewidth=1.2, linestyle="--", alpha=0.7, label="Buy & Hold")
+
+    # Individual models
+    for i, (name, res) in enumerate(per_model_results.items()):
+        if len(res.portfolio_values) == 0:
+            continue
+        ret_label = f"{res.total_return:+.1f}%"
+        ax1.plot(res.portfolio_values.index, res.portfolio_values.values,
+                 color=tab10[i % 10], linewidth=1.4, alpha=0.8,
+                 label=f"{name}  ({ret_label})")
+
+    # Ensemble
+    if len(ensemble_result.portfolio_values) > 0:
+        ens_label = f"{ensemble_result.total_return:+.1f}%"
+        ax1.plot(ensemble_result.portfolio_values.index, ensemble_result.portfolio_values.values,
+                 color="#7c3aed", linewidth=2.4, zorder=5,
+                 label=f"Ensemble/{strategy}  ({ens_label})")
+
+    # Oracle
+    if len(oracle_result.portfolio_values) > 0:
+        ora_label = f"{oracle_result.total_return:+.1f}%"
+        ax1.plot(oracle_result.portfolio_values.index, oracle_result.portfolio_values.values,
+                 color="#16a34a", linewidth=1.6, linestyle="-.", alpha=0.85, zorder=4,
+                 label=f"Oracle (perfect foresight)  ({ora_label})")
+
+    ax1.axhline(capital, color="black", linewidth=0.6, linestyle=":", alpha=0.4,
+                label="Initial capital")
+    ax1.set_ylabel("Portfolio value ($)")
+    ax1.set_title(f"Model comparison — {symbol} | ensemble strategy: {strategy}")
+    ax1.legend(loc="upper left", fontsize=8)
+    ax1.grid(True, alpha=0.25)
+    ax1.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: f"${x:,.0f}"))
+
+    # Drawdown panel: ensemble only (cleaner than stacking all)
+    if len(ensemble_result.portfolio_values) > 0:
+        pv = ensemble_result.portfolio_values
+        dd = (pv - pv.cummax()) / pv.cummax() * 100
+        ax2.fill_between(dd.index, dd.values, 0, color="#7c3aed", alpha=0.25)
+        ax2.plot(dd.index, dd.values, color="#7c3aed", linewidth=1, label="Ensemble drawdown")
+        ax2.set_ylabel("Drawdown (%)")
+        ax2.set_xlabel("Date")
+        ax2.legend(fontsize=8, loc="lower left")
+        ax2.grid(True, alpha=0.25)
+
+    plt.tight_layout()
+    filename = f"ensemble_equity_comparison_{symbol.replace('/', '_')}.png"
+    filepath = os.path.join(save_path, filename)
+    fig.savefig(filepath, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    print(f"Graphique de comparaison des équités sauvegardé : {filepath}")
+
+
 # ----- Point d'entrée principal ----- #
 
 
@@ -1247,6 +1462,31 @@ def run_backtest(
     return result
 
 
+def _build_ensemble(
+    model_types: list[str],
+    strategy: str,
+    weights: list[float] | None,
+    timeframe: str,
+) -> "EnsemblePredictor":
+    """Load all constituent models and return a ready EnsemblePredictor."""
+    from models.registry import get_predictor
+    from models.ensemble.ensemble_predictor import EnsemblePredictor
+
+    predictors = []
+    for mt in model_types:
+        predictor = get_predictor(mt)
+        if hasattr(predictor, "_timeframe"):
+            predictor._timeframe = timeframe
+        ckpt_ext = "json" if mt == "xgboost" else "pth"
+        ckpt_path = f"models/{mt}/checkpoints/{timeframe}/best_model.{ckpt_ext}"
+        print(f"  Chargement {mt} depuis {ckpt_path}...")
+        predictor.load(ckpt_path)
+        predictors.append(predictor)
+
+    return EnsemblePredictor(models=predictors, strategy=strategy,
+                             weights=weights, timeframe=timeframe)
+
+
 def run_ensemble_backtest(
     model_types: list[str],
     symbol: str,
@@ -1258,6 +1498,7 @@ def run_ensemble_backtest(
     timeframe: str = DEFAULT_TIMEFRAME,
     entry_fee_pct: Optional[float] = None,
     exit_fee_pct: Optional[float] = None,
+    _ensemble=None,
 ) -> BacktestResult:
     """Backtest an ensemble of models that vote on each trading signal.
 
@@ -1277,12 +1518,11 @@ def run_ensemble_backtest(
         allow_short: Allow short positions.
         timeframe: Shared timeframe for all models.
         entry_fee_pct / exit_fee_pct: Fee rates (defaults to config values).
+        _ensemble: Pre-loaded EnsemblePredictor (skips loading when provided).
 
     Returns:
         BacktestResult with ensemble predictions.
     """
-    from models.registry import get_predictor
-    from models.ensemble.ensemble_predictor import EnsemblePredictor
     from config import SIGNAL_THRESHOLDS
 
     tf_config = get_timeframe_config(timeframe)
@@ -1302,33 +1542,16 @@ def run_ensemble_backtest(
     print(f"Stratégie : {strategy}")
     print(f"{'=' * 60}")
 
-    # Build and load each predictor
-    predictors = []
-    for mt in model_types:
-        predictor = get_predictor(mt)
-        # Override timeframe if predictor supports it
-        if hasattr(predictor, '_timeframe'):
-            predictor._timeframe = timeframe
-        ckpt_ext = "json" if mt == "xgboost" else "pth"
-        ckpt_path = f"models/{mt}/checkpoints/{timeframe}/best_model.{ckpt_ext}"
-        print(f"  Chargement {mt} depuis {ckpt_path}...")
-        predictor.load(ckpt_path)
-        predictors.append(predictor)
-
-    ensemble = EnsemblePredictor(
-        models=predictors,
-        strategy=strategy,
-        weights=weights,
-        timeframe=timeframe,
-    )
+    # Build and load models only when not pre-supplied (multi-symbol reuse)
+    ensemble = _ensemble or _build_ensemble(model_types, strategy, weights, timeframe)
 
     # Prepare raw (unscaled) windows — each model scales internally
     print(f"\nPréparation des données brutes pour {symbol} [{timeframe}]...")
     X_raw, y, timestamps, df_prices = prepare_raw_windows(symbol, timeframe)
 
-    # Generate ensemble predictions (vectorised)
+    # Generate per-model AND ensemble predictions in a single pass
     print(f"Génération des prédictions ensemble ({len(X_raw)} fenêtres)...")
-    predictions = ensemble.predict_batch(X_raw)
+    predictions, per_model_preds = ensemble.predict_batch_full(X_raw)
 
     # Simulate trading
     print(f"Simulation (threshold={threshold:.4f}, strategy={strategy})...")
@@ -1342,6 +1565,16 @@ def run_ensemble_backtest(
         entry_fee_pct, exit_fee_pct, prediction_horizon, timeframe_minutes,
     )
 
+    # Backtest each model individually (same params) for the comparison chart
+    per_model_results: dict[str, BacktestResult] = {}
+    for model_name, model_preds in per_model_preds.items():
+        m_result = simulate_trading(
+            model_preds, timestamps, df_prices, capital, threshold, allow_short,
+            entry_fee_pct, exit_fee_pct, prediction_horizon, timeframe_minutes,
+        )
+        compute_backtest_metrics(m_result, capital, df_prices, timestamps)
+        per_model_results[model_name] = m_result
+
     compute_backtest_metrics(result, capital, df_prices, timestamps)
     compute_backtest_metrics(oracle_result, capital, df_prices, timestamps)
 
@@ -1349,10 +1582,168 @@ def run_ensemble_backtest(
     print_summary(result, symbol, label, capital, oracle_result=oracle_result)
 
     results_dir = f"models/ensemble/results/{timeframe}"
-    plot_equity_curve(result, results_dir, symbol, label, capital, df_prices, timestamps,
-                      oracle_result=oracle_result)
+
+    print("Génération du graphique de comparaison des équités...")
+    plot_ensemble_equity_comparison(
+        per_model_results=per_model_results,
+        ensemble_result=result,
+        oracle_result=oracle_result,
+        df_prices=df_prices,
+        timestamps=timestamps,
+        capital=capital,
+        save_path=results_dir,
+        symbol=symbol,
+        strategy=strategy,
+    )
+
+    print("Génération du graphique des prédictions par modèle...")
+    plot_ensemble_model_predictions(
+        per_model_preds=per_model_preds,
+        ensemble_preds=predictions,
+        oracle_preds=y,
+        timestamps=timestamps,
+        save_path=results_dir,
+        symbol=symbol,
+        strategy=strategy,
+        threshold=threshold,
+    )
 
     return result
+
+
+def run_ensemble_backtest_all_symbols(
+    model_types: list[str],
+    strategy: str = "weighted_average",
+    weights: list[float] | None = None,
+    capital_per_symbol: float = 1_000.0,
+    threshold: float = 0.0,
+    allow_short: bool = False,
+    timeframe: str = DEFAULT_TIMEFRAME,
+    entry_fee_pct: Optional[float] = None,
+    exit_fee_pct: Optional[float] = None,
+) -> dict[str, BacktestResult]:
+    """Run ensemble backtest on every symbol in config.SYMBOLS.
+
+    Models are loaded once and reused across all symbols.
+    One equity-comparison chart is saved per symbol plus a global summary table.
+
+    Args:
+        model_types: Model keys, e.g. ["cnn", "bilstm", "cnn_bilstm_am"].
+        strategy: Aggregation strategy.
+        weights: Per-model weights (equal if None).
+        capital_per_symbol: Starting capital for each symbol.
+        threshold: Signal threshold (0 = use timeframe default).
+        allow_short: Allow short positions.
+        timeframe: Shared timeframe for all models.
+        entry_fee_pct / exit_fee_pct: Fee rates.
+
+    Returns:
+        Dict mapping symbol → BacktestResult (ensemble).
+    """
+    from config import SIGNAL_THRESHOLDS
+
+    if entry_fee_pct is None:
+        entry_fee_pct = DEFAULT_ENTRY_FEE
+    if exit_fee_pct is None:
+        exit_fee_pct = DEFAULT_EXIT_FEE
+    if threshold == 0.0:
+        threshold = SIGNAL_THRESHOLDS.get(timeframe, 0.01)
+
+    print(f"\n{'=' * 70}")
+    print(f"ENSEMBLE BACKTEST MULTI-SYMBOLES [{timeframe}]")
+    print(f"Modèles : {', '.join(model_types)}  |  Stratégie : {strategy}")
+    print(f"Symboles : {len(SYMBOLS)}  |  Capital/symbole : ${capital_per_symbol:,.0f}")
+    print(f"{'=' * 70}")
+
+    # Load models once for all symbols
+    print("\nChargement des modèles (une seule fois)...")
+    ensemble = _build_ensemble(model_types, strategy, weights, timeframe)
+
+    results: dict[str, BacktestResult] = {}
+    failed: list[str] = []
+
+    for sym_full in SYMBOLS:
+        sym = sym_full.replace("/USDT", "")
+        try:
+            result = run_ensemble_backtest(
+                model_types=model_types,
+                symbol=sym,
+                strategy=strategy,
+                weights=weights,
+                capital=capital_per_symbol,
+                threshold=threshold,
+                allow_short=allow_short,
+                timeframe=timeframe,
+                entry_fee_pct=entry_fee_pct,
+                exit_fee_pct=exit_fee_pct,
+                _ensemble=ensemble,
+            )
+            results[sym] = result
+        except Exception as exc:
+            print(f"  ⚠ {sym} ignoré : {exc}")
+            failed.append(sym)
+
+    _print_ensemble_multi_symbol_summary(results, capital_per_symbol, model_types, strategy, timeframe)
+
+    if failed:
+        print(f"\nSymboles en échec : {', '.join(failed)}")
+
+    return results
+
+
+def _print_ensemble_multi_symbol_summary(
+    results: dict[str, BacktestResult],
+    capital_per_symbol: float,
+    model_types: list[str],
+    strategy: str,
+    timeframe: str,
+) -> None:
+    """Print a ranked summary table for all symbols."""
+    label = f"Ensemble [{'+'.join(model_types)}] / {strategy}"
+    print(f"\n{'=' * 90}")
+    print(f"RÉSUMÉ GLOBAL — {label} [{timeframe}]")
+    print(f"{'=' * 90}")
+
+    rows = [
+        {
+            "symbol": sym,
+            "return": r.total_return,
+            "final": capital_per_symbol * (1 + r.total_return / 100),
+            "trades": r.n_trades,
+            "win_rate": r.win_rate,
+            "sharpe": r.sharpe_ratio,
+            "drawdown": r.max_drawdown,
+        }
+        for sym, r in results.items()
+        if r.n_trades > 0
+    ]
+
+    if not rows:
+        print("Aucun trade exécuté.")
+        return
+
+    rows.sort(key=lambda x: x["return"], reverse=True)
+
+    header = (f"{'Symbol':<8} {'Return %':>10} {'Final $':>12} "
+              f"{'Trades':>8} {'Win %':>7} {'Sharpe':>8} {'MaxDD %':>9}")
+    print(header)
+    print("─" * 90)
+    for row in rows:
+        print(f"{row['symbol']:<8} "
+              f"{row['return']:>+9.2f}% "
+              f"${row['final']:>10,.0f} "
+              f"{row['trades']:>8} "
+              f"{row['win_rate']:>6.1f}% "
+              f"{row['sharpe']:>8.2f} "
+              f"{row['drawdown']:>8.2f}%")
+    print("─" * 90)
+
+    avg_return = sum(r["return"] for r in rows) / len(rows)
+    total_final = sum(r["final"] for r in rows)
+    global_return = (total_final - capital_per_symbol * len(rows)) / (capital_per_symbol * len(rows)) * 100
+    print(f"{'AVERAGE':<8} {avg_return:>+9.2f}%   "
+          f"{'TOTAL':>20} ${total_final:>10,.0f}   Global: {global_return:+.2f}%")
+    print(f"{'=' * 90}\n")
 
 
 def run_backtest_all_symbols(
@@ -1661,26 +2052,39 @@ if __name__ == "__main__":
         if args.ensemble_models is None:
             print("Erreur: --ensemble-models requis avec --model ensemble (ex: cnn,bilstm)")
             exit(1)
-        if args.symbol is None:
-            print("Erreur: --symbol requis avec --model ensemble")
-            exit(1)
         model_types = [m.strip() for m in args.ensemble_models.split(",")]
         weights = (
             [float(w) for w in args.ensemble_weights.split(",")]
             if args.ensemble_weights else None
         )
-        run_ensemble_backtest(
-            model_types=model_types,
-            symbol=args.symbol,
-            strategy=args.ensemble_strategy,
-            weights=weights,
-            capital=args.capital,
-            threshold=args.threshold,
-            allow_short=args.allow_short,
-            timeframe=args.timeframe,
-            entry_fee_pct=args.entry_fee,
-            exit_fee_pct=args.exit_fee,
-        )
+        if args.all_symbols:
+            run_ensemble_backtest_all_symbols(
+                model_types=model_types,
+                strategy=args.ensemble_strategy,
+                weights=weights,
+                capital_per_symbol=args.capital,
+                threshold=args.threshold,
+                allow_short=args.allow_short,
+                timeframe=args.timeframe,
+                entry_fee_pct=args.entry_fee,
+                exit_fee_pct=args.exit_fee,
+            )
+        else:
+            if args.symbol is None:
+                print("Erreur: --symbol requis avec --model ensemble (ou utiliser --all-symbols)")
+                exit(1)
+            run_ensemble_backtest(
+                model_types=model_types,
+                symbol=args.symbol,
+                strategy=args.ensemble_strategy,
+                weights=weights,
+                capital=args.capital,
+                threshold=args.threshold,
+                allow_short=args.allow_short,
+                timeframe=args.timeframe,
+                entry_fee_pct=args.entry_fee,
+                exit_fee_pct=args.exit_fee,
+            )
     elif args.all_symbols:
         run_backtest_all_symbols(
             model_type=args.model,

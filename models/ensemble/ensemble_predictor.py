@@ -143,6 +143,26 @@ class EnsemblePredictor(BasePredictor):
         ensemble = self._aggregate(predictions)
         return ensemble, breakdown
 
+    def predict_batch_per_model(self, X_raw: np.ndarray) -> dict[str, np.ndarray]:
+        """Return per-model raw return predictions without aggregation.
+
+        Args:
+            X_raw: Raw feature windows, shape (N, window_size, n_features).
+
+        Returns:
+            Dict mapping model.name → array of predicted returns (%), shape (N,).
+        """
+        from models.supervised_predictor import SupervisedPredictor
+
+        result = {}
+        for model in self._models:
+            if isinstance(model, SupervisedPredictor):
+                preds = model.predict_batch(X_raw)
+            else:
+                preds = np.array([model.predict(X_raw[i]).raw_value for i in range(len(X_raw))])
+            result[model.name] = preds
+        return result
+
     def predict_batch(self, X_raw: np.ndarray) -> np.ndarray:
         """Vectorised ensemble prediction over N raw windows.
 
@@ -152,40 +172,45 @@ class EnsemblePredictor(BasePredictor):
         Returns:
             Array of predicted returns (%) after aggregation, shape (N,).
         """
-        from models.supervised_predictor import SupervisedPredictor
+        ensemble_preds, _ = self.predict_batch_full(X_raw)
+        return ensemble_preds
 
+    def predict_batch_full(
+        self, X_raw: np.ndarray
+    ) -> tuple[np.ndarray, dict[str, np.ndarray]]:
+        """Single-pass prediction returning ensemble array AND per-model breakdown.
+
+        Runs each model exactly once.
+
+        Args:
+            X_raw: Raw feature windows, shape (N, window_size, n_features).
+
+        Returns:
+            (ensemble_preds, per_model_preds) where:
+              - ensemble_preds: (N,) aggregated predictions
+              - per_model_preds: {model_name: (N,) predictions}
+        """
         threshold = SIGNAL_THRESHOLDS.get(self._timeframe, 0.01)
-
-        # Collect raw return predictions from each model: shape (n_models, N)
-        all_preds = []
-        for model, weight in zip(self._models, self._weights):
-            if isinstance(model, SupervisedPredictor):
-                preds = model.predict_batch(X_raw)
-            else:
-                preds = np.array([model.predict(X_raw[i]).raw_value for i in range(len(X_raw))])
-            all_preds.append(preds)
-
-        preds_matrix = np.array(all_preds)  # (n_models, N)
+        per_model = self.predict_batch_per_model(X_raw)
+        preds_matrix = np.array(list(per_model.values()))  # (n_models, N)
 
         if self._strategy == "majority_vote":
-            # Discretize each model, then vote
-            return self._majority_vote_batch(preds_matrix, threshold)
+            ensemble = self._majority_vote_batch(preds_matrix, threshold)
         elif self._strategy == "unanimous":
-            return self._unanimous_batch(preds_matrix, threshold)
+            ensemble = self._unanimous_batch(preds_matrix, threshold)
         else:
-            # weighted_average and confidence_weighted both reduce to a weighted mean
             weights = np.array(self._weights)
             if self._strategy == "confidence_weighted":
                 confidences = np.clip(
                     np.abs(preds_matrix) / max(threshold * 2, 1e-9), 0.0, 1.0
                 )
-                row_sums = confidences.sum(axis=0)
-                row_sums = np.where(row_sums == 0, 1.0, row_sums)
-                weights_matrix = confidences / row_sums
-                return (preds_matrix * weights_matrix).sum(axis=0)
+                row_sums = np.where(confidences.sum(axis=0) == 0, 1.0, confidences.sum(axis=0))
+                ensemble = (preds_matrix * (confidences / row_sums)).sum(axis=0)
             else:
                 weights = weights / weights.sum()
-                return (preds_matrix * weights[:, None]).sum(axis=0)
+                ensemble = (preds_matrix * weights[:, None]).sum(axis=0)
+
+        return ensemble, per_model
 
     # ----- Private helpers -----
 

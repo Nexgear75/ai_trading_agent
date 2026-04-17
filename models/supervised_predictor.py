@@ -154,8 +154,9 @@ class SupervisedPredictor(BasePredictor):
         # Truncate extra features produced by a newer pipeline
         X_flat = X_raw.reshape(-1, n_raw)[:, :n_model].astype(np.float32)
 
+        actual_n = X_flat.shape[1]
         if self._clip_bounds is not None:
-            for i in range(n_model):
+            for i in range(actual_n):
                 X_flat[:, i] = np.clip(
                     X_flat[:, i], self._clip_bounds[i, 0], self._clip_bounds[i, 1]
                 )
