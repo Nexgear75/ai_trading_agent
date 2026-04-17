@@ -30,4 +30,8 @@ def add_candle_features(df: pd.DataFrame) -> pd.DataFrame:
     df["lower_wick"] = (low_open - df["low"]) / df["open"]
     df["range"] = (df["high"] - df["low"]) / df["open"]
 
+    # ----- Green candle ratio (% de bougies haussières sur N périodes) -----
+    is_green = (df["close"] > df["open"]).astype(float)
+    df["green_ratio"] = is_green.rolling(14).mean()
+
     return df

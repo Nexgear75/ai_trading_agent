@@ -63,4 +63,13 @@ def add_oscillator_features(
     df["macd_signal"] = df["macd"].ewm(span=macd_sig, adjust=False).mean()
     df["macd_hist"] = df["macd"] - df["macd_signal"]
 
+    # ----- Bollinger Bands position (0-1 scale) -----
+    bb_period = rsi_period  # même période que le RSI
+    sma = df["close"].rolling(bb_period).mean()
+    std = df["close"].rolling(bb_period).std()
+    bb_upper = sma + 2 * std
+    bb_lower = sma - 2 * std
+    bb_range = bb_upper - bb_lower
+    df["bollinger_position"] = (df["close"] - bb_lower) / (bb_range + 1e-10)
+
     return df

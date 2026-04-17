@@ -32,4 +32,9 @@ def add_trend_features(df: pd.DataFrame, periods: list = None) -> pd.DataFrame:
         ema = df["close"].ewm(span=span, adjust=False).mean()
         df[f"ema{span}_ratio"] = ema / df["close"]
 
+    # ----- Price vs SMA longue (positionnement par rapport à la plus grande MA) -----
+    sma_period = max(periods)
+    sma_long = df["close"].rolling(sma_period).mean()
+    df["price_vs_ma50"] = df["close"] / sma_long - 1
+
     return df

@@ -18,6 +18,7 @@ class CNNBiLSTMAM(nn.Module):
         lstm_layers: int = 1,
         dropout_lstm: float = 0.0,
         dropout_fc: float = 0.3,
+        task: str = "regression",
     ):
         """
         Modèle hybride CNN-BiLSTM-AM pour la prédiction de retours financiers.
@@ -26,7 +27,7 @@ class CNNBiLSTMAM(nn.Module):
             1. CNN : extraction de features locales (3 blocs conv1d)
             2. BiLSTM : capture des dépendances temporelles bidirectionnelles
             3. Attention Mechanism : pondération des pas de temps pertinents
-            4. Couche de sortie : régression linéaire
+            4. Couche de sortie : régression linéaire ou classification binaire
 
         Args:
             window_size: Longueur de la séquence d'entrée.
@@ -40,8 +41,10 @@ class CNNBiLSTMAM(nn.Module):
             lstm_layers: Nombre de couches LSTM empilées.
             dropout_lstm: Dropout inter-couches LSTM (ignoré si lstm_layers=1).
             dropout_fc: Dropout appliqué au vecteur de contexte avant la sortie.
+            task: "regression" ou "classification" (binaire).
         """
         super().__init__()
+        self.task = task
 
         c1, c2, c3 = channels
         k1, k2, k3 = kernel_sizes
@@ -79,6 +82,7 @@ class CNNBiLSTMAM(nn.Module):
             bidirectional=True,
             dropout=dropout_lstm if lstm_layers > 1 else 0.0,
         )
+        self.lstm_norm = nn.LayerNorm(2 * lstm_hidden)
 
         # ----- Attention Mechanism (avec couche cachée) -----
         self.attn = nn.Sequential(
@@ -127,6 +131,7 @@ class CNNBiLSTMAM(nn.Module):
 
         # BiLSTM
         lstm_out, _ = self.bilstm(x)       # (batch, pool_size, 2*lstm_hidden)
+        lstm_out = self.lstm_norm(lstm_out)
 
         # Attention
         e = self.attn(lstm_out)                  # (batch, pool_size, 1)
