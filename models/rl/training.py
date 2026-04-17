@@ -41,6 +41,7 @@ def _make_training_risk_config() -> RiskConfig:
     only affects the training environment.
     """
     return RiskConfig(
+        max_position=0.5,
         take_profit=999.0,
         stop_loss_min=999.0,
         stop_loss_max=999.0,
@@ -76,7 +77,7 @@ def evaluate_agent(agent, env, n_episodes=5):
         # Compute Sharpe from step returns
         if len(episode_returns) > 1:
             step_returns = np.diff([0.0] + episode_returns)
-            sharpe = np.mean(step_returns) / (np.std(step_returns) + 1e-8) * np.sqrt(1460)  # annualized for 6h candles
+            sharpe = np.mean(step_returns) / (np.std(step_returns) + 1e-8) * np.sqrt(252 * 24)  # annualized for 1h candles
         else:
             sharpe = 0.0
         sharpe_values.append(sharpe)
@@ -100,6 +101,7 @@ def train(
     eval_interval: int = 50_000,
     eval_episodes: int = 5,
     rollout_length: int = 336,
+    resume: str | None = None,
 ):
     """Main training loop.
 
@@ -112,6 +114,10 @@ def train(
         eval_interval: Steps between validation evaluations.
         eval_episodes: Number of episodes per evaluation.
         rollout_length: Steps per rollout before PPO update.
+        resume: Path to a checkpoint to resume from. Restores weights,
+            optimizers, schedulers, and step counter. Phase progress is
+            inferred from the loaded step, so curriculum boundaries line
+            up with the original schedule.
     """
     os.makedirs(CHECKPOINT_DIR, exist_ok=True)
     os.makedirs(RESULTS_DIR, exist_ok=True)
@@ -139,6 +145,14 @@ def train(
     config = PPOConfig()
     agent = PPOAgent(config=config, pretrained_backbone_path=pretrained_backbone)
     print(f"Device: {agent.device}")
+
+    if resume:
+        agent.load(resume)
+        print(
+            f"Resumed from {resume} — continuing from step {agent.total_steps:,} "
+            f"(best_sharpe tracking resets; back up best_agent.pth before resume if needed)"
+        )
+
     print(f"Training with {len(train_envs)} environment(s), {total_timesteps} total steps")
 
     # Curriculum learning phases
@@ -148,6 +162,13 @@ def train(
             {"name": "Phase 2: Unfrozen backbone, 50% costs", "steps": int(total_timesteps * 0.5), "freeze": False, "cost_mult": 0.5},
             {"name": "Phase 3: Full realistic costs", "steps": int(total_timesteps * 0.4), "freeze": False, "cost_mult": 1.0},
         ]
+    elif curriculum:
+        # From-scratch: no frozen phase (nothing pretrained to preserve),
+        # just a soft-cost warmup before full realistic costs.
+        phases = [
+            {"name": "Phase 1: Soft costs (50%)", "steps": int(total_timesteps * 0.3), "freeze": False, "cost_mult": 0.5},
+            {"name": "Phase 2: Full realistic costs", "steps": int(total_timesteps * 0.7), "freeze": False, "cost_mult": 1.0},
+        ]
     else:
         phases = [
             {"name": "Training", "steps": total_timesteps, "freeze": False, "cost_mult": 1.0},
@@ -156,14 +177,29 @@ def train(
     # Training loop
     best_sharpe = -np.inf
     eval_degradation_count = 0
-    early_stop_patience = 10          # more patience before stopping
-    warmup_steps = 100_000            # no early stopping during warmup
-    global_step = 0
+    early_stop_patience = 15          # more patience before stopping
+    warmup_steps = 300_000            # no early stopping during warmup
+    global_step = agent.total_steps   # respects resume
     training_history = []
 
+    cumulative_phase_start = 0
     for phase in phases:
+        phase_end = cumulative_phase_start + phase["steps"]
+
+        # Skip phases already fully completed before the resume point
+        if global_step >= phase_end:
+            print(f"\nSkipping completed phase: {phase['name']} (ended at step {phase_end:,})")
+            cumulative_phase_start = phase_end
+            continue
+
+        already_done_in_phase = max(0, global_step - cumulative_phase_start)
+        remaining_in_phase = phase["steps"] - already_done_in_phase
+
         print(f"\n{'='*60}")
-        print(f"{phase['name']} — {phase['steps']} steps")
+        if already_done_in_phase > 0:
+            print(f"{phase['name']} — resuming with {remaining_in_phase:,} of {phase['steps']:,} steps left")
+        else:
+            print(f"{phase['name']} — {phase['steps']:,} steps")
         print(f"{'='*60}")
 
         if phase["freeze"]:
@@ -176,7 +212,7 @@ def train(
             original_cost = RiskConfig().trade_cost
             env.risk_manager.config.trade_cost = original_cost * phase["cost_mult"]
 
-        phase_steps = 0
+        phase_steps = already_done_in_phase
         env_idx = 0
 
         # Reset all environments
@@ -263,6 +299,9 @@ def train(
                     # Only count degradation after warmup
                     eval_degradation_count += 1
 
+                # Always save latest (resume point for Ctrl+C interrupts)
+                agent.save(os.path.join(CHECKPOINT_DIR, "latest_agent.pth"), verbose=False)
+
                 # Early stopping (only after warmup)
                 if eval_degradation_count >= early_stop_patience and global_step > warmup_steps:
                     print(f"\nEarly stopping: Sharpe degraded {eval_degradation_count} times. Best: {best_sharpe:.3f}")
@@ -270,6 +309,8 @@ def train(
 
         if eval_degradation_count >= early_stop_patience and global_step > warmup_steps:
             break
+
+        cumulative_phase_start = phase_end
 
     # Save final model
     agent.save(os.path.join(CHECKPOINT_DIR, "final_agent.pth"))
@@ -420,6 +461,7 @@ if __name__ == "__main__":
     parser.add_argument("--finetune", action="store_true", help="Fine-tune base agent on each symbol individually.")
     parser.add_argument("--finetune-steps", type=int, default=200_000, help="Steps per symbol during fine-tuning.")
     parser.add_argument("--base-model", type=str, default="models/rl/checkpoints/best_agent.pth", help="Base model for fine-tuning.")
+    parser.add_argument("--resume", type=str, default=None, help="Path to a checkpoint to resume training from.")
 
     args = parser.parse_args()
 
@@ -440,4 +482,5 @@ if __name__ == "__main__":
             curriculum=not args.no_curriculum,
             eval_interval=args.eval_interval,
             rollout_length=args.rollout_length,
+            resume=args.resume,
         )

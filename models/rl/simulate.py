@@ -23,8 +23,8 @@ from models.rl.environment import TradingEnv
 
 INITIAL_CAPITAL = 1000.0  # € per crypto
 SIMULATION_DAYS = 252
-CANDLES_PER_DAY = 4  # 6h candles
-SIMULATION_STEPS = SIMULATION_DAYS * CANDLES_PER_DAY  # 1008 candles ≈ 252 days
+CANDLES_PER_DAY = 24  # 1h candles
+SIMULATION_STEPS = SIMULATION_DAYS * CANDLES_PER_DAY  # 6048 candles ≈ 252 days
 
 
 def simulate_symbol(agent, symbol, use_finetuned=False, checkpoint_dir="models/rl/checkpoints"):

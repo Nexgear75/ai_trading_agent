@@ -4,73 +4,54 @@ import numpy as np
 class RewardCalculator:
     """Computes step-wise rewards for the RL trading agent.
 
-    Supports multiple reward modes:
-        - "dsr"        : Differential Sharpe Ratio (default)
-        - "log_return" : Simple log-return of portfolio
+    Supports three reward modes:
+        - "log_return" : log(1 + delta_return)  (default, cleanest signal)
+        - "dsr"        : Differential Sharpe Ratio (Moody & Saffell 2001)
         - "sortino"    : Differential Sortino Ratio
 
-    Reward components (all subtracted from base):
-        - Drawdown penalty (above threshold)
-        - Churn penalty (transaction costs, heavily weighted)
-        - Action-flip penalty (penalize switching action between steps)
-        - Opportunity-cost penalty (penalize HOLD-cash when asset is rising)
+    Transaction costs and drawdowns are already reflected in portfolio_return
+    (the environment subtracts them from cash on each trade), so there is no
+    additional reward shaping. The agent sees the same thing a real P&L curve
+    would show — and PPO's job is to maximize expected log-growth.
     """
 
     def __init__(
         self,
-        mode: str = "dsr",
+        mode: str = "log_return",
         eta: float = 0.01,
-        drawdown_threshold: float = 0.10,
-        drawdown_penalty_coeff: float = 2.0,
-        churn_penalty_coeff: float = 2.0,        # punish over-trading without killing all trades
-        action_flip_penalty: float = 0.001,      # penalty for changing buy/sell stance each step
-        opportunity_cost_coeff: float = 0.5,     # symmetric with position_bonus — avoid biasing toward perma-long
-        position_bonus_coeff: float = 0.5,       # reward holding a position while asset rises
         reward_scale: float = 1.0,
+        directional_coeff: float = 1.0,
     ):
         self.mode = mode
         self.eta = eta
-        self.drawdown_threshold = drawdown_threshold
-        self.drawdown_penalty_coeff = drawdown_penalty_coeff
-        self.churn_penalty_coeff = churn_penalty_coeff
-        self.action_flip_penalty = action_flip_penalty
-        self.opportunity_cost_coeff = opportunity_cost_coeff
-        self.position_bonus_coeff = position_bonus_coeff
         self.reward_scale = reward_scale
+        self.directional_coeff = directional_coeff
 
-        # Running statistics for differential Sharpe / Sortino
+        # Running statistics for DSR / Sortino
         self._running_mean = 0.0
         self._running_var = 0.0
         self._running_downside_var = 0.0
-        self._prev_action_side = 0  # -1 sell, 0 hold, +1 buy
 
     def reset(self):
         """Reset running statistics at the start of a new episode."""
         self._running_mean = 0.0
         self._running_var = 0.0
         self._running_downside_var = 0.0
-        self._prev_action_side = 0
 
     def compute(
         self,
         portfolio_return: float,
         prev_portfolio_return: float,
-        drawdown: float,
-        transaction_cost: float,
-        has_position: bool = False,
         asset_return: float = 0.0,
-        action: int = 0,
+        has_position: bool = False,
     ) -> float:
         """Compute the reward for the current step.
 
         Args:
             portfolio_return: Cumulative portfolio return at time t.
             prev_portfolio_return: Cumulative portfolio return at time t-1.
-            drawdown: Current drawdown from peak (negative value, e.g. -0.15).
-            transaction_cost: Transaction cost incurred this step (positive).
-            has_position: Whether the agent currently holds a position.
-            asset_return: Return of the underlying asset this step (for opportunity cost).
-            action: Action taken this step (0=hold, 1-3=buy, 4-6=sell).
+            asset_return: Single-step return of the underlying asset.
+            has_position: Whether the agent currently holds a long position.
 
         Returns:
             Scalar reward value.
@@ -86,44 +67,18 @@ class RewardCalculator:
         else:
             raise ValueError(f"Unknown reward mode: {self.mode}")
 
-        # Drawdown penalty (kicks in above threshold)
-        dd_penalty = max(0.0, abs(drawdown) - self.drawdown_threshold) * self.drawdown_penalty_coeff
+        # Directional signal: the only shaping term.
+        # Without it, HOLD = 0 reward is the only risk-free attractor and the
+        # policy collapses to do-nothing. With it, the agent has a gradient
+        # aligned with market direction on each rising candle.
+        if asset_return > 0:
+            directional = self.directional_coeff * asset_return
+            if has_position:
+                base_reward += directional   # caught the upmove
+            else:
+                base_reward -= directional   # missed the upmove
 
-        # Churn penalty: heavily punishes excessive trading
-        churn_penalty = transaction_cost * self.churn_penalty_coeff
-
-        # Action-flip penalty: discourage switching buy/sell stance every step
-        action_side = self._action_to_side(action)
-        flip_penalty = 0.0
-        if action_side != 0 and self._prev_action_side != 0 and action_side != self._prev_action_side:
-            flip_penalty = self.action_flip_penalty
-        if action_side != 0:
-            self._prev_action_side = action_side
-
-        # Opportunity-cost penalty: only penalize cash-holding when asset is rising
-        if not has_position and asset_return > 0:
-            opp_penalty = self.opportunity_cost_coeff * asset_return
-        else:
-            opp_penalty = 0.0
-
-        # Position bonus: reward holding a position while the asset is rising.
-        if has_position and asset_return > 0:
-            position_bonus = self.position_bonus_coeff * asset_return
-        else:
-            position_bonus = 0.0
-
-        return (
-            base_reward - dd_penalty - churn_penalty - flip_penalty - opp_penalty + position_bonus
-        ) * self.reward_scale
-
-    @staticmethod
-    def _action_to_side(action: int) -> int:
-        """Map discrete action to side: -1 sell, 0 hold, +1 buy."""
-        if action == 0:
-            return 0
-        if action in (1, 2, 3):
-            return 1
-        return -1
+        return base_reward * self.reward_scale
 
     def _differential_sharpe(self, delta_return: float) -> float:
         """Differential Sharpe Ratio (Moody & Saffell, 2001).

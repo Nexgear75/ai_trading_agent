@@ -2030,6 +2030,492 @@ def run_ensemble_backtest(
     return result
 
 
+# ----- Multi-model comparison (compare-all) ----- #
+
+
+def _checkpoint_path_for(model_type: str, timeframe: str) -> str:
+    """Return the standard checkpoint path for a given supervised model."""
+    ext = "json" if model_type == "xgboost" else "pth"
+    return f"models/{model_type}/checkpoints/{timeframe}/best_model.{ext}"
+
+
+def _prepare_raw_windows_oos(
+    symbol: str,
+    timeframe: str,
+    test_start_date: str | None,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, pd.DataFrame]:
+    """Like ``prepare_raw_windows`` but filtered to the out-of-sample period."""
+    tf_config = get_timeframe_config(timeframe)
+    window_size = tf_config["window_size"]
+    prediction_horizon = tf_config["prediction_horizon"]
+
+    df = load_symbol(symbol, timeframe=timeframe).copy()
+    if test_start_date is None:
+        test_start_date = TEST_START_DATE
+    df = df[df.index >= test_start_date].copy()
+    if len(df) == 0:
+        raise ValueError(
+            f"Pas de données pour {symbol} après {test_start_date}."
+        )
+
+    df_prices = df[[c for c in ("open", "high", "low", "close", "volume") if c in df.columns]].copy()
+    df["label"] = df["close"].shift(-prediction_horizon) / df["close"] - 1
+    df = df.dropna(subset=["label"])
+
+    feature_cols = get_feature_columns(timeframe)
+    X, y, timestamps = build_windows(
+        df, window_size=window_size, feature_columns=feature_cols
+    )
+    if len(X) == 0:
+        raise ValueError(f"Pas assez de données pour construire des fenêtres pour {symbol}")
+    return X, y, timestamps, df_prices
+
+
+def _run_rl_contestant(
+    symbol: str,
+    capital: float,
+    test_start_date: str | None,
+) -> tuple[BacktestResult, pd.DataFrame]:
+    """Run the PPO agent on its native 1h data, return a BacktestResult.
+
+    The RL agent owns its own env loop (fees + risk guardrails are inside
+    TradingEnv), so we don't funnel it through simulate_trading. Instead we
+    wrap the equity curve the env produces into a BacktestResult indexed by
+    real 1h timestamps so it lines up with everything else at plot time.
+    """
+    from config import update_global_config
+    update_global_config("1h")
+
+    from models.rl.agent import PPOAgent
+    from models.rl.data_preparator import prepare_rl_data
+    from models.rl.environment import TradingEnv
+    from models.rl.risk_manager import BUY_ACTIONS, SELL_ACTIONS
+
+    ckpt = "models/rl/checkpoints/best_agent.pth"
+    if not os.path.isfile(ckpt):
+        raise FileNotFoundError(ckpt)
+
+    _, df_val, scaler, clip_bounds = prepare_rl_data(symbol, verbose=False)
+
+    # Honor --test-start-date if it sits inside the RL val split.
+    if test_start_date is not None:
+        cutoff = pd.Timestamp(test_start_date)
+        if cutoff > df_val.index[0]:
+            df_val = df_val[df_val.index >= cutoff].copy()
+
+    env = TradingEnv(
+        df=df_val,
+        feature_scaler=scaler,
+        clip_bounds=clip_bounds,
+        randomize_start=False,
+        noise_std=0.0,
+        initial_cash=capital,
+        max_steps=10_000_000,
+    )
+
+    agent = PPOAgent()
+    agent.load(ckpt, verbose=False)
+    agent.policy.eval()
+    agent.value.eval()
+
+    obs, _ = env.reset()
+    done = False
+    equity_curve = [env.initial_cash]
+    was_positioned = False
+    entry_ts = None
+    entry_price = None
+    entry_value = None
+    trades: list[Trade] = []
+
+    while not done:
+        action, _, _ = agent.select_action(obs, deterministic=True)
+        obs, _, terminated, truncated, info = env.step(action)
+        done = terminated or truncated
+        equity_curve.append(info["portfolio_value"])
+
+        is_positioned = info["position"] > 1e-10
+        step_idx = min(env._current_step, len(env.close_prices) - 1)
+        ts = env.df.index[step_idx]
+        price = float(env.close_prices[step_idx])
+
+        if is_positioned and not was_positioned:
+            entry_ts = ts
+            entry_price = price
+            entry_value = info["portfolio_value"]
+        elif not is_positioned and was_positioned and entry_value is not None:
+            ret = (info["portfolio_value"] - entry_value) / entry_value
+            pnl = info["portfolio_value"] - entry_value
+            trades.append(Trade(
+                entry_date=entry_ts, exit_date=ts,
+                direction="LONG", entry_price=entry_price or price, exit_price=price,
+                predicted_return=0.0, actual_return=ret,
+                entry_fee=0.0, exit_fee=0.0, total_fees=0.0,
+                pnl_before_fees=pnl, pnl=pnl,
+                exit_reason="rl_policy",
+            ))
+            entry_ts = None
+            entry_value = None
+            entry_price = None
+        was_positioned = is_positioned
+
+    if was_positioned and entry_value is not None:
+        final_val = equity_curve[-1]
+        ret = (final_val - entry_value) / entry_value
+        pnl = final_val - entry_value
+        trades.append(Trade(
+            entry_date=entry_ts, exit_date=env.df.index[min(env._current_step, len(env.close_prices) - 1)],
+            direction="LONG", entry_price=entry_price or 0.0,
+            exit_price=float(env.close_prices[min(env._current_step, len(env.close_prices) - 1)]),
+            predicted_return=0.0, actual_return=ret,
+            entry_fee=0.0, exit_fee=0.0, total_fees=0.0,
+            pnl_before_fees=pnl, pnl=pnl,
+            exit_reason="open_at_end",
+        ))
+
+    # Equity curve timestamps: env.df.index[_start_idx .. _start_idx + len]
+    start = env._start_idx
+    idx = env.df.index[start : start + len(equity_curve)]
+    portfolio_values = pd.Series(equity_curve[: len(idx)], index=idx, dtype=float)
+
+    result = BacktestResult(
+        trades=trades,
+        portfolio_values=portfolio_values,
+        entry_fee_pct=0.0,
+        exit_fee_pct=0.0,
+    )
+    df_prices = env.df[["close"]].copy()
+    return result, df_prices
+
+
+def run_compare_all_backtest(
+    symbol: str,
+    capital: float = 10_000.0,
+    threshold: float = 0.0,
+    allow_short: bool = False,
+    timeframe: str = DEFAULT_TIMEFRAME,
+    entry_fee_pct: Optional[float] = None,
+    exit_fee_pct: Optional[float] = None,
+    test_start_date: str | None = None,
+    exclude: list[str] | None = None,
+    ensemble_strategy: str = "confidence_weighted",
+) -> dict[str, BacktestResult]:
+    """Benchmark RL + supervised ensemble + every individual supervised model.
+
+    Contestants:
+        - Every registered supervised model with a checkpoint at
+          ``models/<type>/checkpoints/<timeframe>/best_model.*``
+        - A supervised ensemble built from the available supervised models
+        - The PPO RL agent (runs on 1h regardless of --timeframe)
+
+    Missing checkpoints are soft-skipped with a warning.
+    Metrics are computed at each contestant's native frequency; the equity
+    plot resamples every curve to daily before overlaying them.
+    """
+    from config import SIGNAL_THRESHOLDS
+    from models.registry import list_models
+
+    exclude = set(exclude or [])
+
+    tf_config = get_timeframe_config(timeframe)
+    prediction_horizon = tf_config["prediction_horizon"]
+    timeframe_minutes = tf_config["minutes_per_bar"]
+    if entry_fee_pct is None:
+        entry_fee_pct = DEFAULT_ENTRY_FEE
+    if exit_fee_pct is None:
+        exit_fee_pct = DEFAULT_EXIT_FEE
+    if threshold == 0.0:
+        threshold = SIGNAL_THRESHOLDS.get(timeframe, 0.01)
+
+    print(f"\n{'=' * 70}")
+    print(f"COMPARE-ALL BACKTEST on {symbol} [{timeframe}]")
+    print(f"Contestants: supervised models + supervised ensemble + RL policy")
+    print(f"{'=' * 70}")
+
+    # Pick supervised contestants that actually have a checkpoint
+    supervised_candidates = [
+        m for m in list_models()
+        if m not in {"rl", "ensemble"} and m not in exclude
+    ]
+    available_supervised: list[str] = []
+    for mt in supervised_candidates:
+        path = _checkpoint_path_for(mt, timeframe)
+        if os.path.isfile(path):
+            available_supervised.append(mt)
+        else:
+            print(f"  ⚠ skip {mt}: no checkpoint at {path}")
+
+    results: dict[str, BacktestResult] = {}
+    df_prices_supervised: pd.DataFrame | None = None
+    timestamps_supervised: np.ndarray | None = None
+    y_supervised: np.ndarray | None = None
+
+    if available_supervised:
+        print(f"\nSupervised contestants: {', '.join(available_supervised)}")
+        print(f"Ensemble strategy: {ensemble_strategy}")
+
+        ensemble = _build_ensemble(
+            available_supervised, ensemble_strategy, None, timeframe
+        )
+
+        X_raw, y, timestamps, df_prices = _prepare_raw_windows_oos(
+            symbol, timeframe, test_start_date
+        )
+        df_prices_supervised = df_prices
+        timestamps_supervised = timestamps
+        y_supervised = y
+
+        print(f"Running {len(available_supervised) + 1} supervised backtests "
+              f"({len(X_raw)} windows)...")
+        ensemble_preds, per_model_preds = ensemble.predict_batch_full(X_raw)
+
+        for model_name, preds in per_model_preds.items():
+            res = simulate_trading(
+                preds, timestamps, df_prices, capital,
+                threshold, allow_short, entry_fee_pct, exit_fee_pct,
+                prediction_horizon, timeframe_minutes,
+            )
+            compute_backtest_metrics(res, capital, df_prices, timestamps)
+            results[model_name] = res
+
+        ens_res = simulate_trading(
+            ensemble_preds, timestamps, df_prices, capital,
+            threshold, allow_short, entry_fee_pct, exit_fee_pct,
+            prediction_horizon, timeframe_minutes,
+        )
+        compute_backtest_metrics(ens_res, capital, df_prices, timestamps)
+        results[f"ensemble/{ensemble_strategy}"] = ens_res
+    else:
+        print("  (no supervised contestants available — skipping supervised block)")
+
+    # RL contestant (separate data stream)
+    rl_df_prices: pd.DataFrame | None = None
+    if "rl" not in exclude:
+        try:
+            rl_res, rl_df_prices = _run_rl_contestant(symbol, capital, test_start_date)
+            # Use portfolio_values derived timestamps for metrics
+            rl_timestamps = np.array(rl_res.portfolio_values.index)
+            compute_backtest_metrics(rl_res, capital, rl_df_prices, rl_timestamps)
+            results["rl"] = rl_res
+        except FileNotFoundError as exc:
+            print(f"  ⚠ skip rl: missing checkpoint ({exc})")
+        except Exception as exc:
+            print(f"  ⚠ skip rl: {exc}")
+
+    # Oracle baseline — only when we have supervised data to run it on
+    oracle_result: BacktestResult | None = None
+    if y_supervised is not None and df_prices_supervised is not None and timestamps_supervised is not None:
+        oracle_result = simulate_oracle(
+            y=y_supervised,
+            timestamps=timestamps_supervised,
+            df_prices=df_prices_supervised,
+            capital=capital,
+            allow_short=allow_short,
+            entry_fee_pct=entry_fee_pct,
+            exit_fee_pct=exit_fee_pct,
+            prediction_horizon=prediction_horizon,
+            timeframe_minutes=timeframe_minutes,
+            use_atr_risk=False,
+        )
+        compute_backtest_metrics(oracle_result, capital, df_prices_supervised, timestamps_supervised)
+
+    # Output table + files
+    _print_compare_all_summary(results, capital, symbol, timeframe)
+
+    save_dir = "testing/results/compare_all"
+    os.makedirs(save_dir, exist_ok=True)
+    ts_tag = _build_date_tag(test_start_date, results)
+    csv_path = os.path.join(save_dir, f"{symbol}_{timeframe}_{ts_tag}.csv")
+    _write_compare_all_csv(results, capital, csv_path)
+
+    png_path = os.path.join(save_dir, f"{symbol}_{timeframe}_{ts_tag}.png")
+    _plot_compare_all_equity(
+        results=results,
+        oracle_result=oracle_result,
+        df_prices=df_prices_supervised if df_prices_supervised is not None else rl_df_prices,
+        capital=capital,
+        symbol=symbol,
+        save_path=png_path,
+    )
+
+    return results
+
+
+def _build_date_tag(test_start_date: str | None, results: dict[str, BacktestResult]) -> str:
+    """Produce a short 'start_end' tag from whichever result has portfolio data."""
+    for r in results.values():
+        if len(r.portfolio_values) > 0:
+            start = r.portfolio_values.index[0].strftime("%Y%m%d")
+            end = r.portfolio_values.index[-1].strftime("%Y%m%d")
+            return f"{start}_{end}"
+    if test_start_date:
+        return test_start_date.replace("-", "")
+    return "unknown"
+
+
+def _write_compare_all_csv(
+    results: dict[str, BacktestResult],
+    capital: float,
+    csv_path: str,
+) -> None:
+    """Dump a ranked metrics table sorted by Sharpe."""
+    rows = []
+    for name, r in results.items():
+        fees_pct = (r.total_fees_paid / capital * 100) if capital > 0 else 0.0
+        rows.append({
+            "model": name,
+            "total_return_pct": round(r.total_return, 3),
+            "annualized_return_pct": round(r.annualized_return, 3),
+            "sharpe": round(r.sharpe_ratio, 3),
+            "max_drawdown_pct": round(r.max_drawdown, 3),
+            "n_trades": r.n_trades,
+            "win_rate": round(r.win_rate, 2),
+            "profit_factor": round(r.profit_factor, 3) if np.isfinite(r.profit_factor) else float("inf"),
+            "fees_pct_capital": round(fees_pct, 3),
+        })
+    df = pd.DataFrame(rows).sort_values("sharpe", ascending=False)
+    df.to_csv(csv_path, index=False)
+    print(f"Metrics CSV saved: {csv_path}")
+
+
+def _print_compare_all_summary(
+    results: dict[str, BacktestResult],
+    capital: float,
+    symbol: str,
+    timeframe: str,
+) -> None:
+    """Print a ranked table (by Sharpe) covering every contestant."""
+    rows = [
+        {
+            "name": name,
+            "ret": r.total_return,
+            "ann": r.annualized_return,
+            "sharpe": r.sharpe_ratio,
+            "dd": r.max_drawdown,
+            "trades": r.n_trades,
+            "win": r.win_rate,
+            "pf": r.profit_factor,
+        }
+        for name, r in results.items()
+    ]
+    rows.sort(key=lambda x: x["sharpe"], reverse=True)
+
+    print(f"\n{'=' * 100}")
+    print(f"COMPARE-ALL RESULTS — {symbol} [{timeframe}] | Capital: ${capital:,.0f}")
+    print(f"{'=' * 100}")
+    header = (
+        f"{'Model':<32} {'Return %':>10} {'Ann. %':>10} {'Sharpe':>8} "
+        f"{'MaxDD %':>9} {'Trades':>8} {'Win %':>7} {'PF':>8}"
+    )
+    print(header)
+    print("─" * 100)
+    for r in rows:
+        pf_s = f"{r['pf']:.2f}" if np.isfinite(r["pf"]) else "inf"
+        print(
+            f"{r['name']:<32} "
+            f"{r['ret']:>+9.2f}% "
+            f"{r['ann']:>+9.2f}% "
+            f"{r['sharpe']:>8.2f} "
+            f"{r['dd']:>8.2f}% "
+            f"{r['trades']:>8} "
+            f"{r['win']:>6.1f}% "
+            f"{pf_s:>8}"
+        )
+    print(f"{'=' * 100}\n")
+
+
+def _plot_compare_all_equity(
+    results: dict[str, BacktestResult],
+    oracle_result: BacktestResult | None,
+    df_prices: pd.DataFrame | None,
+    capital: float,
+    symbol: str,
+    save_path: str,
+) -> None:
+    """Overlay every contestant's equity curve (daily-resampled) + B&H + oracle."""
+    fig, axes = plt.subplots(2, 1, figsize=(14, 10), height_ratios=[3, 1])
+    ax1, ax2 = axes
+
+    tab10 = plt.cm.tab10.colors
+
+    daily_curves: dict[str, pd.Series] = {}
+    for name, r in results.items():
+        if len(r.portfolio_values) == 0:
+            continue
+        daily = r.portfolio_values.resample("1D").last().dropna()
+        if len(daily) == 0:
+            continue
+        daily_curves[name] = daily
+
+    if not daily_curves:
+        print("No equity curves to plot — aborting plot")
+        plt.close(fig)
+        return
+
+    # Buy-and-hold over the union date range
+    all_starts = [s.index[0] for s in daily_curves.values()]
+    all_ends = [s.index[-1] for s in daily_curves.values()]
+    start_ts = min(all_starts)
+    end_ts = max(all_ends)
+
+    if df_prices is not None and "close" in df_prices.columns:
+        bh = df_prices.loc[start_ts:end_ts, "close"].resample("1D").last().dropna()
+        if len(bh) > 0:
+            bh_norm = bh / bh.iloc[0] * capital
+            ax1.plot(
+                bh_norm.index, bh_norm.values,
+                color="silver", linewidth=1.2, linestyle="--",
+                alpha=0.7, label="Buy & Hold",
+            )
+
+    for i, (name, daily) in enumerate(daily_curves.items()):
+        ret = (daily.iloc[-1] - capital) / capital * 100
+        is_rl = name == "rl"
+        is_ensemble = name.startswith("ensemble")
+        color = "#dc2626" if is_rl else ("#7c3aed" if is_ensemble else tab10[i % 10])
+        lw = 2.4 if (is_rl or is_ensemble) else 1.4
+        zorder = 5 if (is_rl or is_ensemble) else 3
+        ax1.plot(
+            daily.index, daily.values,
+            color=color, linewidth=lw, alpha=0.9, zorder=zorder,
+            label=f"{name}  ({ret:+.1f}%)",
+        )
+
+    if oracle_result is not None and len(oracle_result.portfolio_values) > 0:
+        ora_daily = oracle_result.portfolio_values.resample("1D").last().dropna()
+        if len(ora_daily) > 0:
+            ax1.plot(
+                ora_daily.index, ora_daily.values,
+                color="#16a34a", linewidth=1.6, linestyle="-.",
+                alpha=0.85, zorder=4,
+                label=f"Oracle  ({oracle_result.total_return:+.1f}%)",
+            )
+
+    ax1.axhline(capital, color="black", linewidth=0.6, linestyle=":", alpha=0.4)
+    ax1.set_ylabel("Portfolio value ($)")
+    ax1.set_title(f"Compare-all — {symbol}")
+    ax1.legend(loc="upper left", fontsize=8)
+    ax1.grid(True, alpha=0.25)
+    ax1.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: f"${x:,.0f}"))
+
+    for i, (name, daily) in enumerate(daily_curves.items()):
+        dd = (daily - daily.cummax()) / daily.cummax() * 100
+        is_rl = name == "rl"
+        is_ensemble = name.startswith("ensemble")
+        color = "#dc2626" if is_rl else ("#7c3aed" if is_ensemble else tab10[i % 10])
+        lw = 1.6 if (is_rl or is_ensemble) else 0.9
+        ax2.plot(dd.index, dd.values, color=color, linewidth=lw, alpha=0.8, label=name)
+    ax2.axhline(0, color="black", linewidth=0.5, alpha=0.4)
+    ax2.set_ylabel("Drawdown (%)")
+    ax2.set_xlabel("Date")
+    ax2.legend(fontsize=7, loc="lower left", ncol=2)
+    ax2.grid(True, alpha=0.25)
+
+    plt.tight_layout()
+    fig.savefig(save_path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    print(f"Equity comparison plot saved: {save_path}")
+
+
 def run_ensemble_backtest_all_symbols(
     model_types: list[str],
     strategy: str = "weighted_average",
@@ -2473,6 +2959,12 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Poids par modèle séparés par virgule (ex: 0.5,0.3,0.2). Défaut: poids égaux.",
     )
+    parser.add_argument(
+        "--exclude",
+        type=str,
+        default=None,
+        help="Comma-separated model names to skip in compare-all mode (ex: patch_tst,transformer).",
+    )
     return parser.parse_args()
 
 
@@ -2484,7 +2976,28 @@ if __name__ == "__main__":
         print("Erreur: Vous devez specifier --symbol ou utiliser --all-symbols")
         exit(1)
 
-    if args.model == "ensemble":
+    if args.model == "compare-all":
+        if args.symbol is None:
+            print("Erreur: --symbol requis avec --model compare-all")
+            exit(1)
+        exclude = (
+            [m.strip() for m in args.exclude.split(",") if m.strip()]
+            if args.exclude
+            else []
+        )
+        run_compare_all_backtest(
+            symbol=args.symbol,
+            capital=args.capital,
+            threshold=args.threshold,
+            allow_short=args.allow_short,
+            timeframe=args.timeframe,
+            entry_fee_pct=args.entry_fee,
+            exit_fee_pct=args.exit_fee,
+            test_start_date=args.test_start_date,
+            exclude=exclude,
+            ensemble_strategy=args.ensemble_strategy,
+        )
+    elif args.model == "ensemble":
         if args.ensemble_models is None:
             print(
                 "Erreur: --ensemble-models requis avec --model ensemble (ex: cnn,bilstm)"

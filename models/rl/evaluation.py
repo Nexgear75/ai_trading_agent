@@ -8,7 +8,7 @@ import seaborn as sns
 
 from config import update_global_config
 
-# RL agent is 6h-only; switch global config before any downstream import reads it
+# RL agent runs on 6h; switch global config before any downstream import reads it
 update_global_config("6h")
 
 from models.rl.agent import PPOAgent

@@ -15,9 +15,9 @@ class PPOConfig:
     gamma: float = 0.99
     gae_lambda: float = 0.95
     clip_epsilon: float = 0.2
-    entropy_coeff_start: float = 0.05   # initial entropy (exploration phase)
-    entropy_coeff_end: float = 0.015    # final entropy (exploitation phase)
-    entropy_anneal_steps: int = 1_000_000  # linear decay over this many steps
+    entropy_coeff_start: float = 0.03   # higher initial exploration — 1h is noisy, needs samples
+    entropy_coeff_end: float = 0.005    # final entropy (exploitation phase)
+    entropy_anneal_steps: int = 1_000_000  # slower commit — half the 2M budget
     value_coeff: float = 0.5
     max_grad_norm: float = 0.5
     n_epochs_per_update: int = 4

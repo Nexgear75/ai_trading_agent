@@ -4,14 +4,14 @@ from gymnasium import spaces
 from sklearn.preprocessing import RobustScaler
 
 from config import WINDOW_SIZE
-from data.features.pipeline import FEATURE_COLUMNS
+from models.rl.features import FEATURE_COLUMNS
 from models.rl.reward import RewardCalculator
 from models.rl.risk_manager import RiskManager, RiskConfig, N_ACTIONS
 
 
 N_FEATURES = len(FEATURE_COLUMNS)
 PORTFOLIO_STATE_DIM = 7
-MAX_EPISODE_STEPS = 336  # ~12 weeks of 6h data (4 candles/day * 7d * 12w)
+MAX_EPISODE_STEPS = 112  # ~4 weeks of 6h data (4 candles/day * 7d * 4w)
 
 
 class TradingEnv(gym.Env):
@@ -265,7 +265,7 @@ class TradingEnv(gym.Env):
         if self._position_units > 0:
             self._time_in_position += 1
 
-        # Compute asset return for opportunity-cost penalty
+        # Asset return for the directional signal
         new_price = self.close_prices[self._current_step]
         asset_return = (new_price - prev_price) / max(prev_price, 1e-8)
 
@@ -273,18 +273,16 @@ class TradingEnv(gym.Env):
         new_portfolio_value = self._portfolio_value
         self._peak_value = max(self._peak_value, new_portfolio_value)
 
-        # Compute reward
+        # Compute reward — log-return of the portfolio plus a directional
+        # signal that pulls the agent off HOLD in rising markets.
         portfolio_return = (new_portfolio_value - self.initial_cash) / self.initial_cash
         new_drawdown = (new_portfolio_value - self._peak_value) / self._peak_value if self._peak_value > 0 else 0.0
 
         reward = self.reward_calculator.compute(
             portfolio_return=portfolio_return,
             prev_portfolio_return=self._prev_portfolio_return,
-            drawdown=new_drawdown,
-            transaction_cost=cost / max(new_portfolio_value, 1e-8),
-            has_position=self._position_units > 0,
             asset_return=asset_return,
-            action=validated_action,
+            has_position=self._position_units > 0,
         )
         self._prev_portfolio_return = portfolio_return
 
@@ -292,10 +290,10 @@ class TradingEnv(gym.Env):
         terminated = False
         truncated = False
 
-        # Hard stop on max drawdown
+        # Hard stop on max drawdown — no extra reward penalty, the
+        # accumulated log-return is already deeply negative here.
         if abs(new_drawdown) >= self.risk_manager.config.max_drawdown:
             terminated = True
-            reward -= 1.0
 
         # End of data
         if self._current_step >= len(self.close_prices) - 1:

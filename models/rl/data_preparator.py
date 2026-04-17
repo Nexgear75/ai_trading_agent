@@ -1,7 +1,7 @@
 import numpy as np
 from sklearn.preprocessing import RobustScaler
 
-from data.features.pipeline import FEATURE_COLUMNS
+from models.rl.features import FEATURE_COLUMNS
 from utils.dataset_loader import load_symbol, load_all
 
 
