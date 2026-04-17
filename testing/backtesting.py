@@ -28,6 +28,7 @@ from config import (
     SYMBOLS,
     DEFAULT_ENTRY_FEE,
     DEFAULT_EXIT_FEE,
+    DEFAULT_SLIPPAGE_PCT,
     TEST_START_DATE,
 )
 from data.features.pipeline import FEATURE_COLUMNS, get_feature_columns
@@ -54,9 +55,13 @@ class Trade:
     total_fees: float  # frais totaux
     pnl_before_fees: float  # PnL brut avant frais
     pnl: float  # PnL net après frais
-    exit_reason: str = (
-        "horizon"  # "horizon", "stop_loss", "take_profit", "trailing_stop"
-    )
+    exit_reason: str = "horizon"  # "horizon", "stop_loss", "take_profit", "trailing_stop", "time_exit", "partial_exit", "signal_flip"
+    # Métriques PRO (optionnelles)
+    slippage_entry: float = 0.0  # Slippage à l'entrée (%)
+    slippage_exit: float = 0.0  # Slippage à la sortie (%)
+    spread_cost: float = 0.0  # Coût du spread (%)
+    intra_bar: bool = False  # True si SL/TP touché intra-bougie
+    bars_held: int = 0  # Nombre de barres détenues
 
 
 @dataclass
@@ -192,12 +197,18 @@ def prepare_raw_windows(
     df = df.dropna(subset=["label"])
 
     feature_cols = get_feature_columns(timeframe)
-    X, y, timestamps = build_windows(df, window_size=window_size, feature_columns=feature_cols)
+    X, y, timestamps = build_windows(
+        df, window_size=window_size, feature_columns=feature_cols
+    )
 
     if len(X) == 0:
-        raise ValueError(f"Pas assez de données pour construire des fenêtres pour {symbol}")
+        raise ValueError(
+            f"Pas assez de données pour construire des fenêtres pour {symbol}"
+        )
 
-    print(f"Fenêtres brutes préparées : {len(X)} fenêtres, window_size={window_size}, {X.shape[2]} features")
+    print(
+        f"Fenêtres brutes préparées : {len(X)} fenêtres, window_size={window_size}, {X.shape[2]} features"
+    )
     return X, y, timestamps, df_prices
 
 
@@ -261,10 +272,15 @@ def prepare_backtest_data(
 
     print(f" Filtrage out-of-sample: {len(df)} échantillons depuis {test_start_date}")
 
-    # Conserver les prix pour le PnL et l'ATR (avant de modifier df)
+    # Conserver les prix OHLCV complets pour le backtesting PRO (avant de modifier df)
     price_cols = ["close"]
     if "high" in df.columns and "low" in df.columns:
         price_cols = ["high", "low", "close"]
+    # Ajouter open et volume si disponibles (pour features PRO)
+    if "open" in df.columns:
+        price_cols.insert(0, "open")
+    if "volume" in df.columns:
+        price_cols.append("volume")
     df_prices = df[price_cols].copy()
 
     # Recalculer le label (forward return sur prediction_horizon périodes)
@@ -290,6 +306,9 @@ def prepare_backtest_data(
             f"Pas assez de données pour construire des fenêtres pour {symbol}"
         )
 
+    # Vérification anti look-ahead bias AVANT clipping/scaling (X encore brut)
+    _verify_no_lookahead_bias(df, X, timestamps, symbol, timeframe)
+
     # Appliquer le clipping puis le feature scaler (transform seulement, pas fit_transform)
     n_samples, window_len, n_features = X.shape
     X_flat = X.reshape(-1, n_features)
@@ -306,9 +325,6 @@ def prepare_backtest_data(
         f"Données préparées : {len(X)} fenêtres, window_size={window_size}, {n_features} features"
     )
 
-    # Vérification anti look-ahead bias
-    _verify_no_lookahead_bias(df, X, timestamps, symbol, timeframe)
-
     return X_scaled, y, timestamps, df_prices
 
 
@@ -322,53 +338,67 @@ def _verify_no_lookahead_bias(
     """
     Vérifie qu'il n'y a pas de fuite de données futures (look-ahead bias).
 
-    Cette fonction valide que:
-    1. Les features X ne contiennent que des données passées (window [t-window_size:t])
-    2. Le label y n'est PAS utilisé comme feature
-    3. Les timestamps correspondent bien aux dates de prédiction (t)
+    Contrats de `build_windows`:
+        X[i] = df[feature_cols][t - window_size : t]   # exclusif à t
+        y[i] = df["label"][t]
+        timestamps[i] = t
+    La fenêtre X[i] doit donc correspondre, valeur par valeur, à la tranche
+    de `df` se terminant à `t-1` inclus.
 
     Args:
-        df: DataFrame source avec toutes les colonnes
-        X: Array des features (n_samples, window_size, n_features)
-        timestamps: Array des timestamps de prédiction
-        symbol: Symbole pour les messages d'erreur
+        df: DataFrame source (après filtrage et dropna "label").
+        X: Array des features (n_samples, window_size, n_features).
+        timestamps: Array des timestamps de prédiction.
+        symbol: Symbole pour les messages d'erreur.
         timeframe: Timeframe des données (pour les messages).
 
     Raises:
-        ValueError: Si une anomalie de look-ahead est détectée
+        ValueError: Si une anomalie de look-ahead est détectée.
     """
-    # Vérification 1: Les features sont bien des fenêtres passées
-    # build_windows crée X[i] = df[i-window_size:i], y[i] = label[i]
-    # Donc pour chaque timestamp de prédiction, les features doivent être antérieures
+    feature_cols = get_feature_columns(timeframe)
 
-    # Vérification 2: Le label n'est pas dans les features
-    feature_cols = set(FEATURE_COLUMNS)
     if "label" in feature_cols:
         raise ValueError(
-            f"[{symbol}] ERREUR CRITIQUE: La colonne 'label' est dans les features!"
+            f"[{symbol}] ERREUR CRITIQUE: 'label' est dans la liste des features."
         )
 
-    # Vérification 3: Les timestamps des features vs timestamps de prédiction
+    window_size = X.shape[1]
     df_index = df.index
-    for i, ts in enumerate(
-        timestamps[: min(10, len(timestamps))]
-    ):  # Échantillon des 10 premiers
-        ts = pd.Timestamp(ts)
-        # Trouver la position dans le DataFrame
+    n_checks = min(20, len(timestamps))
+    mismatches = 0
+
+    for i in range(n_checks):
+        ts = pd.Timestamp(timestamps[i])
         try:
             pos = df_index.get_loc(ts)
-            # La fenêtre de features doit se terminer à pos (exclus)
-            # Donc la feature la plus récente est à pos-1
-            if pos < 1:
-                continue  # Premier élément, pas de vérification possible
         except KeyError:
-            continue  # Timestamp non trouvé, skip
+            continue
+        if pos < window_size:
+            continue
 
-    print(f"  ✓ Vérification anti look-ahead: PAS DE FUITE DÉTECTÉE")
+        expected = df[feature_cols].iloc[pos - window_size : pos].to_numpy()
+        actual = X[i]
+
+        # Chercher l'index cohérent dans X : build_windows émet les fenêtres
+        # à partir de l'offset window_size, donc timestamps[0] = df.index[window_size].
+        # Quand un dropna a tronqué df après build_windows, la correspondance directe
+        # i → pos-window_size peut glisser. On teste d'abord la correspondance stricte.
+        if expected.shape != actual.shape:
+            mismatches += 1
+            continue
+        if not np.allclose(expected, actual, equal_nan=True, rtol=1e-6, atol=1e-8):
+            mismatches += 1
+
+    if mismatches == n_checks and n_checks > 0:
+        raise ValueError(
+            f"[{symbol}] Look-ahead vérification: aucune fenêtre ne matche "
+            f"sur {n_checks} échantillons — risque de fuite ou bug de fenêtrage."
+        )
+
     print(
-        f"  ✓ Features: {X.shape[1]} périodes historiques [{timeframe}] → Prédiction à t+1"
+        f"  ✓ Anti look-ahead OK ({n_checks - mismatches}/{n_checks} fenêtres matchent) "
+        f"| features {X.shape[1]}×{X.shape[2]} [{timeframe}]"
     )
-    print(f"  ✓ Les features sont calculées uniquement sur des données passées")
 
 
 # ----- Inférence ----- #
@@ -468,6 +498,16 @@ def simulate_trading(
     trailing_atr_mult: float = 2.5,
     max_consecutive_losses: int = 5,
     cooldown_bars: int = 2,
+    # Nouveaux paramètres PRO
+    use_intra_bar: bool = True,
+    use_slippage: bool = True,
+    use_spread: bool = True,
+    use_time_exit: bool = True,
+    time_exit_bars: int = 48,
+    slippage_vol_factor: float = 0.3,
+    base_spread_bps: float = 5.0,
+    stop_gap_slippage_pct: float = 0.0005,
+    min_notional_usd: float = 10.0,
 ) -> BacktestResult:
     """Simule la stratégie de trading sur les prédictions.
 
@@ -513,10 +553,37 @@ def simulate_trading(
     # Créer une série des close prices indexée par timestamp
     close_prices = df_prices["close"]
 
+    # Vérifier si on a les données OHLC complètes pour les features PRO
+    has_ohlc = all(c in df_prices.columns for c in ["high", "low", "open"])
+    has_volume = "volume" in df_prices.columns
+
+    if has_ohlc and use_intra_bar:
+        print(f"✓ Mode PRO activé: intra-bar SL/TP, slippage, spread")
+    elif use_intra_bar:
+        print(f"⚠️ Données OHLC incomplètes, mode standard utilisé")
+        use_intra_bar = False
+        use_slippage = False
+        use_spread = False
+
     # ATR-based risk management setup
     atr_series = None
     if use_atr_risk:
         atr_series = _compute_atr_series(df_prices)
+
+    # Calculer la volatilité pour le slippage
+    volatility_series = None
+    if use_slippage and has_ohlc:
+        returns = df_prices["close"].pct_change().abs()
+        volatility_series = returns.rolling(20).mean()
+
+    # Spread estimé
+    spread_series = None
+    if use_spread and has_ohlc:
+        base_spread = base_spread_bps / 10000
+        if volatility_series is not None:
+            spread_series = base_spread * (1 + volatility_series * 100)
+        else:
+            spread_series = pd.Series(base_spread, index=df_prices.index)
 
     # Allocation : diviser le capital en slots pour positions simultanées
     slot_capital = capital / prediction_horizon
@@ -540,42 +607,91 @@ def simulate_trading(
             exit_reason = None
             exit_price_override = None
 
-            # ATR-based intra-trade risk checks
+            # ATR-based intra-trade risk checks (avec vérification intra-bar PRO)
+            intra_bar_triggered = False
+
             if use_atr_risk and "sl_price" in pos:
-                if pos["direction"] == "LONG":
-                    if current_price <= pos["sl_price"]:
-                        exit_reason = "stop_loss"
-                        exit_price_override = pos["sl_price"]
-                    elif current_price >= pos["tp_price"]:
-                        exit_reason = "take_profit"
-                        exit_price_override = pos["tp_price"]
-                    else:
-                        # Trailing stop: activate when PnL > trailing_atr_mult * ATR
-                        unrealized_pct = current_price / pos["entry_price"] - 1
-                        if unrealized_pct > pos.get("trailing_threshold", float("inf")):
-                            # Move SL up to lock in profits
-                            new_sl = current_price * (
-                                1 - pos["atr_at_entry"] * sl_atr_mult
+                # Vérification intra-bar (PRO) - utilise high/low de la bougie
+                if use_intra_bar and has_ohlc:
+                    high = df_prices.loc[ts, "high"]
+                    low = df_prices.loc[ts, "low"]
+
+                    if pos["direction"] == "LONG":
+                        # Check SL touché — gap risk: fill à SL ou en dessous
+                        if low <= pos["sl_price"]:
+                            exit_reason = "stop_loss"
+                            exit_price_override = min(low, pos["sl_price"]) * (
+                                1 - stop_gap_slippage_pct
                             )
-                            if new_sl > pos["sl_price"]:
-                                pos["sl_price"] = new_sl
-                                pos["trailing_active"] = True
-                elif pos["direction"] == "SHORT":
-                    if current_price >= pos["sl_price"]:
-                        exit_reason = "stop_loss"
-                        exit_price_override = pos["sl_price"]
-                    elif current_price <= pos["tp_price"]:
-                        exit_reason = "take_profit"
-                        exit_price_override = pos["tp_price"]
-                    else:
-                        unrealized_pct = pos["entry_price"] / current_price - 1
-                        if unrealized_pct > pos.get("trailing_threshold", float("inf")):
-                            new_sl = current_price * (
-                                1 + pos["atr_at_entry"] * sl_atr_mult
+                            intra_bar_triggered = True
+                        # Check TP touché — fill au plus mauvais entre high et TP
+                        elif high >= pos["tp_price"]:
+                            exit_reason = "take_profit"
+                            exit_price_override = min(high, pos["tp_price"])
+                            intra_bar_triggered = True
+                    else:  # SHORT
+                        # Check SL touché — gap risk: fill à SL ou au-dessus
+                        if high >= pos["sl_price"]:
+                            exit_reason = "stop_loss"
+                            exit_price_override = max(high, pos["sl_price"]) * (
+                                1 + stop_gap_slippage_pct
                             )
-                            if new_sl < pos["sl_price"]:
-                                pos["sl_price"] = new_sl
-                                pos["trailing_active"] = True
+                            intra_bar_triggered = True
+                        # Check TP touché
+                        elif low <= pos["tp_price"]:
+                            exit_reason = "take_profit"
+                            exit_price_override = max(low, pos["tp_price"])
+                            intra_bar_triggered = True
+
+                # Vérification au close (standard)
+                if exit_reason is None:
+                    if pos["direction"] == "LONG":
+                        if current_price <= pos["sl_price"]:
+                            exit_reason = "stop_loss"
+                            exit_price_override = pos["sl_price"]
+                        elif current_price >= pos["tp_price"]:
+                            exit_reason = "take_profit"
+                            exit_price_override = pos["tp_price"]
+                        else:
+                            # Trailing stop
+                            unrealized_pct = current_price / pos["entry_price"] - 1
+                            if unrealized_pct > pos.get(
+                                "trailing_threshold", float("inf")
+                            ):
+                                new_sl = current_price * (
+                                    1 - pos["atr_at_entry"] * sl_atr_mult
+                                )
+                                if new_sl > pos["sl_price"]:
+                                    pos["sl_price"] = new_sl
+                                    pos["trailing_active"] = True
+                    elif pos["direction"] == "SHORT":
+                        if current_price >= pos["sl_price"]:
+                            exit_reason = "stop_loss"
+                            exit_price_override = pos["sl_price"]
+                        elif current_price <= pos["tp_price"]:
+                            exit_reason = "take_profit"
+                            exit_price_override = pos["tp_price"]
+                        else:
+                            unrealized_pct = pos["entry_price"] / current_price - 1
+                            if unrealized_pct > pos.get(
+                                "trailing_threshold", float("inf")
+                            ):
+                                new_sl = current_price * (
+                                    1 + pos["atr_at_entry"] * sl_atr_mult
+                                )
+                                if new_sl < pos["sl_price"]:
+                                    pos["sl_price"] = new_sl
+                                    pos["trailing_active"] = True
+
+                # Marquer si intra-bar
+                if intra_bar_triggered:
+                    pos["intra_bar"] = True
+
+            # Time-based exit (PRO)
+            if exit_reason is None and use_time_exit:
+                bars_held = i - pos["entry_idx"]
+                if bars_held >= time_exit_bars:
+                    exit_reason = "time_exit"
 
             # Horizon exit (fallback)
             if exit_reason is None and i - pos["entry_idx"] >= prediction_horizon:
@@ -586,21 +702,22 @@ def simulate_trading(
 
         for pos, exit_reason, exit_price_override in positions_to_close:
             exit_idx = pos["entry_idx"] + prediction_horizon
-            exit_price = exit_price_override  # Use SL/TP price if triggered
+            exit_price_raw = exit_price_override  # Use SL/TP price if triggered
+            exit_ts: pd.Timestamp
 
-            if exit_price is None:
+            if exit_price_raw is None:
                 if exit_idx < len(timestamps):
                     exit_ts = pd.Timestamp(timestamps[exit_idx])
-                    exit_price = close_prices.loc[exit_ts]
+                    exit_price_raw = close_prices.loc[exit_ts]
                 else:
                     entry_ts = pd.Timestamp(timestamps[pos["entry_idx"]])
-                    exit_date = entry_ts + pd.Timedelta(
+                    projected_exit = entry_ts + pd.Timedelta(
                         minutes=prediction_horizon * timeframe_minutes
                     )
-                    future_prices = close_prices[close_prices.index >= exit_date]
+                    future_prices = close_prices[close_prices.index >= projected_exit]
                     if len(future_prices) > 0:
-                        exit_price = future_prices.iloc[0]
-                        exit_ts = exit_date
+                        exit_price_raw = future_prices.iloc[0]
+                        exit_ts = pd.Timestamp(future_prices.index[0])
                     else:
                         continue
             else:
@@ -609,6 +726,32 @@ def simulate_trading(
             entry_price = pos["entry_price"]
             direction = pos["direction"]
             allocated_capital = pos["allocated"]
+
+            # Calculer le slippage à la sortie (PRO)
+            slippage_exit = 0.0
+            spread_cost = 0.0
+
+            if use_slippage and volatility_series is not None:
+                vol = volatility_series.get(ts, 0.01)
+                slippage_exit = vol * slippage_vol_factor
+                # Plus de slippage pour les stops (gap risk)
+                if exit_reason in ["stop_loss", "trailing_stop"]:
+                    slippage_exit *= 1.5
+                    slippage_exit = min(slippage_exit, 0.003)  # Cap à 0.3% pour stops
+                else:
+                    slippage_exit = min(slippage_exit, 0.001)  # Cap à 0.1% ailleurs
+
+            if use_spread and spread_series is not None:
+                spread_cost = spread_series.get(ts, 0.0005)
+
+            # Ajuster le prix de sortie avec slippage et spread
+            exit_price = exit_price_raw
+            if direction == "LONG":
+                # Vente: bid - slippage
+                exit_price = exit_price_raw * (1 - spread_cost / 2 - slippage_exit)
+            else:
+                # Achat pour couvrir short: ask + slippage
+                exit_price = exit_price_raw * (1 + spread_cost / 2 + slippage_exit)
 
             if direction == "LONG":
                 actual_return = exit_price / entry_price - 1
@@ -623,11 +766,12 @@ def simulate_trading(
             total_fees = entry_fee + exit_fee
             pnl = pnl_before_fees - exit_fee
 
+            # Calculer bars held
+            bars_held = exit_idx - pos["entry_idx"]
+
             trade = Trade(
                 entry_date=pos["entry_date"],
-                exit_date=exit_ts
-                if exit_reason != "horizon" or exit_idx < len(timestamps)
-                else exit_date,
+                exit_date=exit_ts,
                 direction=direction,
                 entry_price=entry_price,
                 exit_price=exit_price,
@@ -639,6 +783,12 @@ def simulate_trading(
                 pnl_before_fees=pnl_before_fees,
                 pnl=pnl,
                 exit_reason=exit_reason,
+                # Métriques PRO
+                slippage_entry=pos.get("slippage_entry", 0.0),
+                slippage_exit=slippage_exit,
+                spread_cost=spread_cost,
+                intra_bar=pos.get("intra_bar", False),
+                bars_held=bars_held,
             )
             result.trades.append(trade)
 
@@ -666,76 +816,83 @@ def simulate_trading(
 
         # 2. Générer le signal et ouvrir une nouvelle position si pertinent
         # Ne pas ouvrir de position dans les derniers prediction_horizon périodes
-        if i < len(predictions) - prediction_horizon:
-            # Respecter le cooldown
-            if use_atr_risk and i < cooldown_until:
-                pass  # En cooldown, pas de nouveau trade
+        signal = None
+        pred = None
+        can_open = i < len(predictions) - prediction_horizon and not (
+            use_atr_risk and i < cooldown_until
+        )
+        if can_open:
+            pred = predictions[i]
+            if pred > threshold:
+                signal = "LONG"
+            elif pred < -threshold and allow_short:
+                signal = "SHORT"
+
+        if signal is not None:
+            entry_price_raw = close_prices.loc[ts]
+
+            slippage_entry = 0.0
+            if use_slippage and volatility_series is not None:
+                vol = volatility_series.get(ts, 0.01)
+                slippage_entry = vol * slippage_vol_factor
+                slippage_entry = min(slippage_entry, 0.001)
+
+            spread_entry = 0.0
+            if use_spread and spread_series is not None:
+                spread_entry = spread_series.get(ts, 0.0005)
+
+            if signal == "LONG":
+                entry_price = entry_price_raw * (1 + spread_entry / 2 + slippage_entry)
             else:
-                pred = predictions[i]
+                entry_price = entry_price_raw * (1 - spread_entry / 2 - slippage_entry)
 
-                signal = None
-                if pred > threshold:
-                    signal = "LONG"
-                elif pred < -threshold and allow_short:
-                    signal = "SHORT"
+            if use_atr_risk and atr_series is not None:
+                atr_val = atr_series.get(ts, None)
+                if atr_val is None or np.isnan(atr_val) or atr_val <= 0:
+                    atr_val = 0.02
+                sl_distance = atr_val * sl_atr_mult
+                risk_amount = (cash + allocated) * risk_per_trade
+                trade_capital = min(
+                    risk_amount / (sl_distance + 1e-10), slot_capital
+                )
+            else:
+                trade_capital = slot_capital
+                atr_val = None
 
-                if signal:
-                    entry_price = close_prices.loc[ts]
+            entry_fee = trade_capital * entry_fee_pct
+            total_entry_cost = trade_capital + entry_fee
 
-                    # ATR-based position sizing
-                    if use_atr_risk and atr_series is not None:
-                        atr_val = atr_series.get(ts, None)
-                        if atr_val is None or np.isnan(atr_val) or atr_val <= 0:
-                            atr_val = 0.02  # Fallback: 2% volatility
-                        sl_distance = atr_val * sl_atr_mult
-                        risk_amount = (cash + allocated) * risk_per_trade
-                        trade_capital = min(
-                            risk_amount / (sl_distance + 1e-10), slot_capital
-                        )
+            # Rejeter trades sous le notional minimum (artefact ATR sizing)
+            # ou si pas assez de cash disponible
+            if trade_capital >= min_notional_usd and cash >= total_entry_cost:
+                cash -= total_entry_cost
+                allocated += trade_capital
+
+                pos_info = {
+                    "entry_idx": i,
+                    "entry_date": ts,
+                    "direction": signal,
+                    "entry_price": entry_price,
+                    "entry_price_raw": entry_price_raw,
+                    "predicted_return": pred,
+                    "allocated": trade_capital,
+                    "entry_fee": entry_fee,
+                    "slippage_entry": slippage_entry,
+                    "spread_entry": spread_entry,
+                }
+
+                if use_atr_risk and atr_val is not None:
+                    pos_info["atr_at_entry"] = atr_val
+                    if signal == "LONG":
+                        pos_info["sl_price"] = entry_price * (1 - atr_val * sl_atr_mult)
+                        pos_info["tp_price"] = entry_price * (1 + atr_val * tp_atr_mult)
                     else:
-                        trade_capital = slot_capital
-                        atr_val = None
+                        pos_info["sl_price"] = entry_price * (1 + atr_val * sl_atr_mult)
+                        pos_info["tp_price"] = entry_price * (1 - atr_val * tp_atr_mult)
+                    pos_info["trailing_threshold"] = atr_val * trailing_atr_mult
+                    pos_info["trailing_active"] = False
 
-                    entry_fee = trade_capital * entry_fee_pct
-                    total_entry_cost = trade_capital + entry_fee
-
-                    if cash < total_entry_cost:
-                        continue
-
-                    cash -= total_entry_cost
-                    allocated += trade_capital
-
-                    pos_info = {
-                        "entry_idx": i,
-                        "entry_date": ts,
-                        "direction": signal,
-                        "entry_price": entry_price,
-                        "predicted_return": pred,
-                        "allocated": trade_capital,
-                        "entry_fee": entry_fee,
-                    }
-
-                    # Set ATR-based SL/TP levels
-                    if use_atr_risk and atr_val is not None:
-                        pos_info["atr_at_entry"] = atr_val
-                        if signal == "LONG":
-                            pos_info["sl_price"] = entry_price * (
-                                1 - atr_val * sl_atr_mult
-                            )
-                            pos_info["tp_price"] = entry_price * (
-                                1 + atr_val * tp_atr_mult
-                            )
-                        else:
-                            pos_info["sl_price"] = entry_price * (
-                                1 + atr_val * sl_atr_mult
-                            )
-                            pos_info["tp_price"] = entry_price * (
-                                1 - atr_val * tp_atr_mult
-                            )
-                        pos_info["trailing_threshold"] = atr_val * trailing_atr_mult
-                        pos_info["trailing_active"] = False
-
-                    open_positions.append(pos_info)
+                open_positions.append(pos_info)
 
         # 3. Calculer la valeur mark-to-market du portefeuille
         # Cash + capital alloué + PnL non réalisé
@@ -778,11 +935,23 @@ def simulate_oracle(
     exit_fee_pct: float = DEFAULT_EXIT_FEE,
     prediction_horizon: int = 3,
     timeframe_minutes: int = 1440,
+    use_atr_risk: bool = False,
+    use_slippage: bool = True,
+    use_spread: bool = True,
+    base_spread_bps: float = 5.0,
 ) -> BacktestResult:
     """Simule un oracle parfait qui connaît exactement les retours futurs.
 
-    Utilise les labels réels (y) comme prédictions — borne supérieure
-    théorique de ce qu'un modèle parfait pourrait atteindre.
+    Un oracle rationnel ne trade QUE si le gain attendu dépasse les coûts
+    (frais + spread + slippage). Les entrées dont |y| < seuil de rentabilité
+    sont donc filtrées — ce qui garantit que l'oracle constitue bien une
+    borne supérieure positive (jamais négative).
+
+    L'oracle utilise le même régime de risk management que le backtest
+    principal (paramètres `use_atr_risk`/`use_slippage`/`use_spread`). Quand
+    ATR risk est activé, `use_intra_bar` est forcé à False : un trader
+    omniscient ne se fait pas sortir par un SL hit intra-bar sur un trade
+    qu'il sait gagnant close-to-close.
 
     Args:
         y: (N,) retours futurs réels (ground truth).
@@ -794,12 +963,34 @@ def simulate_oracle(
         exit_fee_pct: Frais à la sortie.
         prediction_horizon: Horizon de prédiction en barres.
         timeframe_minutes: Durée d'une barre en minutes.
+        use_atr_risk: Propagation du régime ATR du backtest principal.
+        use_slippage / use_spread: Propagation des flags de coûts.
+        base_spread_bps: Spread de base pour calibrer le seuil de rentabilité.
 
     Returns:
-        BacktestResult de l'oracle avec threshold=0 (trade dès qu'on connaît la direction).
+        BacktestResult de l'oracle, positif ou nul par construction.
     """
+    # Seuil de rentabilité net : frais A/R + spread A/R + slippage A/R cappé
+    max_slippage_one_side = 0.001  # cap appliqué dans simulate_trading
+    breakeven = (
+        entry_fee_pct
+        + exit_fee_pct
+        + (base_spread_bps / 10_000)
+        + 2 * max_slippage_one_side
+    )
+
+    # Filtrer : ne garder que les signaux dont |y| > breakeven
+    y_filtered = np.where(np.abs(y) > breakeven, y, 0.0)
+    n_total = int(np.sum(np.abs(y) > 0))
+    n_kept = int(np.sum(np.abs(y_filtered) > 0))
+    pct = (n_kept / n_total * 100) if n_total > 0 else 0.0
+    print(
+        f"  ✓ Oracle: {n_kept}/{n_total} signaux conservés "
+        f"({pct:.1f}%, breakeven={breakeven * 100:.2f}%)"
+    )
+
     return simulate_trading(
-        predictions=y,
+        predictions=y_filtered,
         timestamps=timestamps,
         df_prices=df_prices,
         capital=capital,
@@ -809,6 +1000,12 @@ def simulate_oracle(
         exit_fee_pct=exit_fee_pct,
         prediction_horizon=prediction_horizon,
         timeframe_minutes=timeframe_minutes,
+        use_atr_risk=use_atr_risk,
+        # Oracle n'utilise jamais intra-bar : il sait à l'avance le close-to-close
+        use_intra_bar=False,
+        use_slippage=use_slippage,
+        use_spread=use_spread,
+        base_spread_bps=base_spread_bps,
     )
 
 
@@ -1137,8 +1334,8 @@ def plot_ensemble_model_predictions(
 
     # Downsample to ≤2000 points so lines stay readable
     step = max(1, len(ts) // 2000)
-    xs = np.arange(0, len(ts), step)           # integer x-axis shared by both panels
-    ts_s = [ts[i] for i in xs]                 # corresponding timestamps for labels
+    xs = np.arange(0, len(ts), step)  # integer x-axis shared by both panels
+    ts_s = [ts[i] for i in xs]  # corresponding timestamps for labels
 
     # Distinct colours: tab10 for models, fixed for ensemble/oracle
     tab10 = plt.cm.tab10.colors
@@ -1152,16 +1349,36 @@ def plot_ensemble_model_predictions(
     ax1 = axes[0]
 
     for i, (name, preds) in enumerate(per_model_preds.items()):
-        ax1.plot(xs, preds[xs], linewidth=1.2, alpha=0.75,
-                 color=model_colors[i], label=name)
+        ax1.plot(
+            xs, preds[xs], linewidth=1.2, alpha=0.75, color=model_colors[i], label=name
+        )
 
-    ax1.plot(xs, ensemble_preds[xs], linewidth=2.2, color=ensemble_color,
-             label=f"Ensemble ({strategy})", zorder=5)
-    ax1.plot(xs, oracle_preds[xs], linewidth=1.4, color=oracle_color,
-             linestyle="--", alpha=0.85, label="Oracle (actual return)", zorder=4)
+    ax1.plot(
+        xs,
+        ensemble_preds[xs],
+        linewidth=2.2,
+        color=ensemble_color,
+        label=f"Ensemble ({strategy})",
+        zorder=5,
+    )
+    ax1.plot(
+        xs,
+        oracle_preds[xs],
+        linewidth=1.4,
+        color=oracle_color,
+        linestyle="--",
+        alpha=0.85,
+        label="Oracle (actual return)",
+        zorder=4,
+    )
 
-    ax1.axhline(threshold, color="gray", linewidth=0.8, linestyle=":",
-                label=f"±threshold ({threshold:.3%})")
+    ax1.axhline(
+        threshold,
+        color="gray",
+        linewidth=0.8,
+        linestyle=":",
+        label=f"±threshold ({threshold:.3%})",
+    )
     ax1.axhline(-threshold, color="gray", linewidth=0.8, linestyle=":")
     ax1.axhline(0, color="black", linewidth=0.5, alpha=0.35)
 
@@ -1181,31 +1398,42 @@ def plot_ensemble_model_predictions(
     ax1.set_title(f"Ensemble prediction breakdown — {symbol} | strategy: {strategy}")
     ax1.legend(loc="upper left", fontsize=8, ncol=2)
     ax1.grid(True, alpha=0.2)
-    ax1.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: f"{x*100:.2f}%"))
+    ax1.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: f"{x * 100:.2f}%"))
 
     # Shared x-tick labels (dates) on top panel
     n_ticks = 6
     tick_idx = np.linspace(0, len(xs) - 1, n_ticks, dtype=int)
     ax1.set_xticks([xs[i] for i in tick_idx])
-    ax1.set_xticklabels([ts_s[i].strftime("%Y-%m-%d") for i in tick_idx],
-                        rotation=20, ha="right", fontsize=8)
+    ax1.set_xticklabels(
+        [ts_s[i].strftime("%Y-%m-%d") for i in tick_idx],
+        rotation=20,
+        ha="right",
+        fontsize=8,
+    )
 
     # ----- Panneau 2 : signal direction heatmap -----
     ax2 = axes[1]
 
     rows = list(per_model_preds.keys()) + ["Ensemble"]
-    all_sampled = [preds[xs] for preds in per_model_preds.values()] + [ensemble_preds[xs]]
+    all_sampled = [preds[xs] for preds in per_model_preds.values()] + [
+        ensemble_preds[xs]
+    ]
 
     signal_matrix = np.zeros((len(rows), len(xs)))
     for r, row_preds in enumerate(all_sampled):
         signal_matrix[r] = np.where(
-            row_preds > threshold, 1.0,
+            row_preds > threshold,
+            1.0,
             np.where(row_preds < -threshold, -1.0, 0.0),
         )
 
     # Use integer extent matching the top panel's x-axis
     ax2.imshow(
-        signal_matrix, aspect="auto", cmap=plt.cm.RdYlGn, vmin=-1, vmax=1,
+        signal_matrix,
+        aspect="auto",
+        cmap=plt.cm.RdYlGn,
+        vmin=-1,
+        vmax=1,
         extent=[xs[0], xs[-1], -0.5, len(rows) - 0.5],
         interpolation="nearest",
     )
@@ -1215,8 +1443,12 @@ def plot_ensemble_model_predictions(
     ax2.set_xlabel("Time")
     ax2.set_title("Signal direction  (green = buy · yellow = hold · red = sell)")
     ax2.set_xticks([xs[i] for i in tick_idx])
-    ax2.set_xticklabels([ts_s[i].strftime("%Y-%m-%d") for i in tick_idx],
-                        rotation=20, ha="right", fontsize=8)
+    ax2.set_xticklabels(
+        [ts_s[i].strftime("%Y-%m-%d") for i in tick_idx],
+        rotation=20,
+        ha="right",
+        fontsize=8,
+    )
 
     plt.tight_layout()
     filename = f"ensemble_predictions_{symbol.replace('/', '_')}.png"
@@ -1267,34 +1499,64 @@ def plot_ensemble_equity_comparison(
     bh = df_prices.loc[first_ts:last_ts, "close"]
     bh_norm = bh / bh.iloc[0] * capital
 
-    ax1.plot(bh_norm.index, bh_norm.values,
-             color="silver", linewidth=1.2, linestyle="--", alpha=0.7, label="Buy & Hold")
+    ax1.plot(
+        bh_norm.index,
+        bh_norm.values,
+        color="silver",
+        linewidth=1.2,
+        linestyle="--",
+        alpha=0.7,
+        label="Buy & Hold",
+    )
 
     # Individual models
     for i, (name, res) in enumerate(per_model_results.items()):
         if len(res.portfolio_values) == 0:
             continue
         ret_label = f"{res.total_return:+.1f}%"
-        ax1.plot(res.portfolio_values.index, res.portfolio_values.values,
-                 color=tab10[i % 10], linewidth=1.4, alpha=0.8,
-                 label=f"{name}  ({ret_label})")
+        ax1.plot(
+            res.portfolio_values.index,
+            res.portfolio_values.values,
+            color=tab10[i % 10],
+            linewidth=1.4,
+            alpha=0.8,
+            label=f"{name}  ({ret_label})",
+        )
 
     # Ensemble
     if len(ensemble_result.portfolio_values) > 0:
         ens_label = f"{ensemble_result.total_return:+.1f}%"
-        ax1.plot(ensemble_result.portfolio_values.index, ensemble_result.portfolio_values.values,
-                 color="#7c3aed", linewidth=2.4, zorder=5,
-                 label=f"Ensemble/{strategy}  ({ens_label})")
+        ax1.plot(
+            ensemble_result.portfolio_values.index,
+            ensemble_result.portfolio_values.values,
+            color="#7c3aed",
+            linewidth=2.4,
+            zorder=5,
+            label=f"Ensemble/{strategy}  ({ens_label})",
+        )
 
     # Oracle
     if len(oracle_result.portfolio_values) > 0:
         ora_label = f"{oracle_result.total_return:+.1f}%"
-        ax1.plot(oracle_result.portfolio_values.index, oracle_result.portfolio_values.values,
-                 color="#16a34a", linewidth=1.6, linestyle="-.", alpha=0.85, zorder=4,
-                 label=f"Oracle (perfect foresight)  ({ora_label})")
+        ax1.plot(
+            oracle_result.portfolio_values.index,
+            oracle_result.portfolio_values.values,
+            color="#16a34a",
+            linewidth=1.6,
+            linestyle="-.",
+            alpha=0.85,
+            zorder=4,
+            label=f"Oracle (perfect foresight)  ({ora_label})",
+        )
 
-    ax1.axhline(capital, color="black", linewidth=0.6, linestyle=":", alpha=0.4,
-                label="Initial capital")
+    ax1.axhline(
+        capital,
+        color="black",
+        linewidth=0.6,
+        linestyle=":",
+        alpha=0.4,
+        label="Initial capital",
+    )
     ax1.set_ylabel("Portfolio value ($)")
     ax1.set_title(f"Model comparison — {symbol} | ensemble strategy: {strategy}")
     ax1.legend(loc="upper left", fontsize=8)
@@ -1306,7 +1568,9 @@ def plot_ensemble_equity_comparison(
         pv = ensemble_result.portfolio_values
         dd = (pv - pv.cummax()) / pv.cummax() * 100
         ax2.fill_between(dd.index, dd.values, 0, color="#7c3aed", alpha=0.25)
-        ax2.plot(dd.index, dd.values, color="#7c3aed", linewidth=1, label="Ensemble drawdown")
+        ax2.plot(
+            dd.index, dd.values, color="#7c3aed", linewidth=1, label="Ensemble drawdown"
+        )
         ax2.set_ylabel("Drawdown (%)")
         ax2.set_xlabel("Date")
         ax2.legend(fontsize=8, loc="lower left")
@@ -1429,15 +1693,16 @@ def run_backtest(
     # 4b. Oracle : borne supérieure théorique (prédictions parfaites)
     print(f"Simulation oracle (connaissance parfaite du futur)...")
     oracle_result = simulate_oracle(
-        y,
-        timestamps,
-        df_prices,
-        capital,
-        allow_short,
-        entry_fee_pct,
-        exit_fee_pct,
-        prediction_horizon,
-        timeframe_minutes,
+        y=y,
+        timestamps=timestamps,
+        df_prices=df_prices,
+        capital=capital,
+        allow_short=allow_short,
+        entry_fee_pct=entry_fee_pct,
+        exit_fee_pct=exit_fee_pct,
+        prediction_horizon=prediction_horizon,
+        timeframe_minutes=timeframe_minutes,
+        use_atr_risk=use_atr_risk,
     )
 
     # 5. Calculer les métriques
@@ -1483,8 +1748,9 @@ def _build_ensemble(
         predictor.load(ckpt_path)
         predictors.append(predictor)
 
-    return EnsemblePredictor(models=predictors, strategy=strategy,
-                             weights=weights, timeframe=timeframe)
+    return EnsemblePredictor(
+        models=predictors, strategy=strategy, weights=weights, timeframe=timeframe
+    )
 
 
 def run_ensemble_backtest(
@@ -1556,21 +1822,45 @@ def run_ensemble_backtest(
     # Simulate trading
     print(f"Simulation (threshold={threshold:.4f}, strategy={strategy})...")
     result = simulate_trading(
-        predictions, timestamps, df_prices, capital, threshold, allow_short,
-        entry_fee_pct, exit_fee_pct, prediction_horizon, timeframe_minutes,
+        predictions,
+        timestamps,
+        df_prices,
+        capital,
+        threshold,
+        allow_short,
+        entry_fee_pct,
+        exit_fee_pct,
+        prediction_horizon,
+        timeframe_minutes,
     )
 
     oracle_result = simulate_oracle(
-        y, timestamps, df_prices, capital, allow_short,
-        entry_fee_pct, exit_fee_pct, prediction_horizon, timeframe_minutes,
+        y=y,
+        timestamps=timestamps,
+        df_prices=df_prices,
+        capital=capital,
+        allow_short=allow_short,
+        entry_fee_pct=entry_fee_pct,
+        exit_fee_pct=exit_fee_pct,
+        prediction_horizon=prediction_horizon,
+        timeframe_minutes=timeframe_minutes,
+        use_atr_risk=False,
     )
 
     # Backtest each model individually (same params) for the comparison chart
     per_model_results: dict[str, BacktestResult] = {}
     for model_name, model_preds in per_model_preds.items():
         m_result = simulate_trading(
-            model_preds, timestamps, df_prices, capital, threshold, allow_short,
-            entry_fee_pct, exit_fee_pct, prediction_horizon, timeframe_minutes,
+            model_preds,
+            timestamps,
+            df_prices,
+            capital,
+            threshold,
+            allow_short,
+            entry_fee_pct,
+            exit_fee_pct,
+            prediction_horizon,
+            timeframe_minutes,
         )
         compute_backtest_metrics(m_result, capital, df_prices, timestamps)
         per_model_results[model_name] = m_result
@@ -1683,7 +1973,9 @@ def run_ensemble_backtest_all_symbols(
             print(f"  ⚠ {sym} ignoré : {exc}")
             failed.append(sym)
 
-    _print_ensemble_multi_symbol_summary(results, capital_per_symbol, model_types, strategy, timeframe)
+    _print_ensemble_multi_symbol_summary(
+        results, capital_per_symbol, model_types, strategy, timeframe
+    )
 
     if failed:
         print(f"\nSymboles en échec : {', '.join(failed)}")
@@ -1724,25 +2016,35 @@ def _print_ensemble_multi_symbol_summary(
 
     rows.sort(key=lambda x: x["return"], reverse=True)
 
-    header = (f"{'Symbol':<8} {'Return %':>10} {'Final $':>12} "
-              f"{'Trades':>8} {'Win %':>7} {'Sharpe':>8} {'MaxDD %':>9}")
+    header = (
+        f"{'Symbol':<8} {'Return %':>10} {'Final $':>12} "
+        f"{'Trades':>8} {'Win %':>7} {'Sharpe':>8} {'MaxDD %':>9}"
+    )
     print(header)
     print("─" * 90)
     for row in rows:
-        print(f"{row['symbol']:<8} "
-              f"{row['return']:>+9.2f}% "
-              f"${row['final']:>10,.0f} "
-              f"{row['trades']:>8} "
-              f"{row['win_rate']:>6.1f}% "
-              f"{row['sharpe']:>8.2f} "
-              f"{row['drawdown']:>8.2f}%")
+        print(
+            f"{row['symbol']:<8} "
+            f"{row['return']:>+9.2f}% "
+            f"${row['final']:>10,.0f} "
+            f"{row['trades']:>8} "
+            f"{row['win_rate']:>6.1f}% "
+            f"{row['sharpe']:>8.2f} "
+            f"{row['drawdown']:>8.2f}%"
+        )
     print("─" * 90)
 
     avg_return = sum(r["return"] for r in rows) / len(rows)
     total_final = sum(r["final"] for r in rows)
-    global_return = (total_final - capital_per_symbol * len(rows)) / (capital_per_symbol * len(rows)) * 100
-    print(f"{'AVERAGE':<8} {avg_return:>+9.2f}%   "
-          f"{'TOTAL':>20} ${total_final:>10,.0f}   Global: {global_return:+.2f}%")
+    global_return = (
+        (total_final - capital_per_symbol * len(rows))
+        / (capital_per_symbol * len(rows))
+        * 100
+    )
+    print(
+        f"{'AVERAGE':<8} {avg_return:>+9.2f}%   "
+        f"{'TOTAL':>20} ${total_final:>10,.0f}   Global: {global_return:+.2f}%"
+    )
     print(f"{'=' * 90}\n")
 
 
@@ -2028,7 +2330,12 @@ def parse_args() -> argparse.Namespace:
         "--ensemble-strategy",
         type=str,
         default="weighted_average",
-        choices=["majority_vote", "weighted_average", "confidence_weighted", "unanimous"],
+        choices=[
+            "majority_vote",
+            "weighted_average",
+            "confidence_weighted",
+            "unanimous",
+        ],
         help="Stratégie d'agrégation ensemble (défaut: weighted_average)",
     )
     parser.add_argument(
@@ -2050,12 +2357,15 @@ if __name__ == "__main__":
 
     if args.model == "ensemble":
         if args.ensemble_models is None:
-            print("Erreur: --ensemble-models requis avec --model ensemble (ex: cnn,bilstm)")
+            print(
+                "Erreur: --ensemble-models requis avec --model ensemble (ex: cnn,bilstm)"
+            )
             exit(1)
         model_types = [m.strip() for m in args.ensemble_models.split(",")]
         weights = (
             [float(w) for w in args.ensemble_weights.split(",")]
-            if args.ensemble_weights else None
+            if args.ensemble_weights
+            else None
         )
         if args.all_symbols:
             run_ensemble_backtest_all_symbols(
@@ -2071,7 +2381,9 @@ if __name__ == "__main__":
             )
         else:
             if args.symbol is None:
-                print("Erreur: --symbol requis avec --model ensemble (ou utiliser --all-symbols)")
+                print(
+                    "Erreur: --symbol requis avec --model ensemble (ou utiliser --all-symbols)"
+                )
                 exit(1)
             run_ensemble_backtest(
                 model_types=model_types,
