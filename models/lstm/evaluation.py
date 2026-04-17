@@ -41,7 +41,7 @@ def load_model(model_path: str, device: torch.device) -> tuple[LSTMModel, dict]:
 
 def evaluate(
     symbol: str | None = None,
-    timeframe: str = DEFAULT_TIMEFRAME,
+    timeframe: str = "1h",
     model_path: str | None = None,
 ):
     """Évalue le modèle LSTM et génère les graphiques.
@@ -87,7 +87,7 @@ def evaluate(
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Évaluation LSTM")
     parser.add_argument("--symbol", type=str, default=None)
-    parser.add_argument("--timeframe", type=str, default=DEFAULT_TIMEFRAME)
+    parser.add_argument("--timeframe", type=str, default="1h")
     parser.add_argument("--model-path", type=str, default=None)
     args = parser.parse_args()
 
