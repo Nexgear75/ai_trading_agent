@@ -1,277 +1,311 @@
-# 📊 Crypto Dataset – Documentation des Features
+# ai_trading_agent
 
-> Dataset généré à partir des données Binance (OHLCV, daily) sur 10 cryptomonnaies.  
-> Ce fichier documente chaque feature ajoutée, sa formule, et sa justification.
+Stack de trading crypto organisée autour du pipeline `données → features → modèle → backtest / live`.
+Huit familles de modèles partagent le même dataset de features et les mêmes harnais de backtest / live.
 
----
-
-## Créer le dataset
-
-La commande suivante téléchargera sur 5 ans 10 crypto et créera l'ensemble des features décrite ci-dessous
-
-```python3
-python3 -m data.main
-```
+Toutes les commandes se lancent **depuis la racine du repo** (pour que les imports
+`from config import ...` fonctionnent).
 
 ---
 
 ## Table des matières
 
-1. [Vue d'ensemble](#vue-densemble)
-2. [Features de structure de bougie](#1-features-de-structure-de-bougie-candle_featurespy)
-3. [Features de momentum](#2-features-de-momentum-momentum_featurespy)
-4. [Features de tendance](#3-features-de-tendance-trend_featurespy)
-5. [Features d'oscillateur](#4-features-doscillateur-oscillator_featurespy)
-6. [Features de volume et volatilité](#5-features-de-volume-et-volatilité-volume_featurespy)
-7. [Label](#6-label--la-cible-à-prédire)
-8. [Pourquoi tout normaliser ?](#pourquoi-tout-normaliser-)
+1. [Installation](#1-installation)
+2. [Télécharger les données et construire les features](#2-télécharger-les-données-et-construire-les-features)
+3. [Modèles disponibles](#3-modèles-disponibles)
+4. [Entraîner un modèle](#4-entraîner-un-modèle)
+5. [Évaluer un modèle](#5-évaluer-un-modèle)
+6. [Backtest sur données historiques](#6-backtest-sur-données-historiques)
+7. [Comparer tous les modèles sur un seul graphe](#7-comparer-tous-les-modèles-sur-un-seul-graphe)
+8. [Test temps réel / live](#8-test-temps-réel--live)
+9. [Référence des features](#9-référence-des-features)
 
 ---
 
-## Vue d'ensemble
+## 1. Installation
 
-Le dataset contient **20 features** par bougie journalière, construites à partir des 5 colonnes brutes Binance : `open`, `high`, `low`, `close`, `volume`.
+```bash
+pip install -r requirements.txt
+```
 
-| Catégorie | Nombre de features | Fichier |
-|---|---|---|
-| Structure de bougie | 4 | `candle_features.py` |
-| Momentum (returns) | 5 | `momentum_features.py` |
-| Tendance (EMAs) | 4 | `trend_features.py` |
-| Oscillateurs | 4 | `oscillator_features.py` |
-| Volume & Volatilité | 3 | `volume_features.py` |
-| **Total** | **20** | |
+Tous les scripts se lancent en mode module avec `python -m <chemin>` — ne jamais
+exécuter les fichiers directement, les imports `from config import ...` casseraient.
 
-Chaque exemple dans le dataset est une **fenêtre de 30 jours consécutifs**, ce qui donne un array de forme `(30, 20)` par sample — l'input idéal pour un CNN 1D, un LSTM ou un GRU.
+Le device est choisi automatiquement : CUDA → Apple MPS → CPU.
 
 ---
 
-## 1. Features de structure de bougie (`candle_features.py`)
+## 2. Télécharger les données et construire les features
 
-Ces features décrivent la **forme géométrique** de chaque bougie japonaise. Ce sont les informations les plus directement lisibles par un trader humain, et donc les premières que le CNN doit apprendre à reconnaître.
+Récupère les OHLCV depuis Binance via `ccxt`, construit les features, écrit un CSV
+par symbole ainsi qu'un `full_dataset.csv` combiné, le tout sous `output/<timeframe>/`.
 
-> **Principe clé :** Toutes ces features sont divisées par `open` pour être exprimées en pourcentage relatif. Ainsi, une bougie BTC à 60 000$ et une bougie BTC à 10 000$ peuvent être comparées directement.
+```bash
+# Par défaut (1d, tous les SYMBOLS de config.py)
+python -m data.main
+
+# Autres timeframes — 1h / 4h / 6h etc. supportés
+python -m data.main --timeframe 6h
+python -m data.main --timeframe 1h
+```
+
+Pipeline :
+
+```
+API Binance (ccxt)
+  └─ data/fetcher.py           → data/raw/<tf>/<SYMBOL>.csv
+        └─ data/features/pipeline.py  (build_features)
+              ├─ candle / momentum / trend
+              ├─ oscillator (RSI, MACD)
+              ├─ volume (+ OBV, volume_directional)
+              ├─ volatility (Bollinger, ATR)
+              └─ temporal (hour/dow sin/cos, uniquement 1h)
+        └─ data/labeling/labeler.py   (add_labels)
+        └─ data/main.py               → output/<tf>/<SYMBOL>.csv + full_dataset.csv
+```
+
+Le pipeline 1d produit 22 features ; le pipeline 1h en produit 30 (horizons
+momentum supplémentaires + features temporelles intraday). L'agent RL utilise
+son propre sous-ensemble figé de 16 features (`models/rl/features.py`) et
+tourne en **6h**.
+
+La configuration est dans `config.py` — `SYMBOLS`, `BACKTEST_SYMBOLS`,
+`TEST_START_DATE`, `WINDOW_SIZES`, `PREDICTION_HORIZONS`, presets d'architecture
+par modèle, frais, slippage, seuils de signal, risque par trade.
 
 ---
 
-### `body` — Corps de la bougie
+## 3. Modèles disponibles
+
+| Clé             | Famille                             | Timeframe natif |
+|-----------------|-------------------------------------|-----------------|
+| `cnn`           | CNN 1-D                             | tout            |
+| `lstm`          | LSTM                                | tout            |
+| `bilstm`        | LSTM bidirectionnel                 | tout            |
+| `cnn_bilstm_am` | CNN + BiLSTM + Attention            | tout            |
+| `transformer`   | Transformer encodeur                | tout            |
+| `patch_tst`     | PatchTST                            | tout            |
+| `xgboost`       | Gradient boosting                   | tout            |
+| `rl`            | Politique PPO (7 actions discrètes) | **6h uniquement** |
+| `ensemble`      | Agrégation des modèles supervisés   | tout            |
+| `compare-all`   | Mode benchmark (pas un modèle)      | tout            |
+
+Chaque dossier modèle suit la même structure :
 
 ```
-body = (close - open) / open
+models/<type>/
+  ├─ <Model>.py          # Architecture nn.Module
+  ├─ data_preparator.py  # Windowing + scaling
+  ├─ training.py
+  ├─ evaluation.py       # Wrapper fin sur utils/evaluation.py
+  ├─ predictor.py        # Adapter BasePredictor utilisé par backtest / live
+  ├─ checkpoints/<tf>/   # best_model.pth + scalers.joblib (gitignored)
+  └─ results/            # Plots d'évaluation
 ```
-
-**Ce que ça mesure :** La direction et l'intensité du mouvement pendant la journée.
-
-- Valeur positive → journée haussière (les acheteurs ont dominé)
-- Valeur négative → journée baissière (les vendeurs ont dominé)
-- Proche de 0 → indécision du marché (Doji)
-
-**Pourquoi c'est pertinent :** C'est la feature la plus fondamentale de l'analyse en chandeliers japonais. Un CNN qui enchaîne plusieurs valeurs de `body` peut détecter des séquences comme "3 grosses bougies vertes consécutives" (momentum haussier) ou "une longue bougie rouge après une série de hausses" (retournement potentiel).
 
 ---
 
-### `upper_wick` — Mèche supérieure
+## 4. Entraîner un modèle
 
+**Modèles supervisés** — même CLI pour toutes les familles, `--symbol` est
+optionnel (omettre pour entraîner sur le dataset multi-symbole combiné) :
+
+```bash
+python -m models.cnn.training
+python -m models.cnn.training --symbol BTC --epochs 100 --batch-size 32 --lr 1e-3 --patience 10
+python -m models.lstm.training         --timeframe 1h
+python -m models.bilstm.training       --timeframe 1h
+python -m models.cnn_bilstm_am.training
+python -m models.transformer.training  --symbol BTC
+python -m models.patch_tst.training
+python -m models.xgboost.training
 ```
-upper_wick = (high - max(open, close)) / open
+
+**Agent RL (PPO)** — forcé en 6h en interne, il faut donc construire le dataset
+6h au préalable :
+
+```bash
+python -m data.main --timeframe 6h
+python -m models.rl.training                  # multi-symbole
+python -m models.rl.training --symbol BTC
 ```
 
-**Ce que ça mesure :** L'amplitude du rejet à la hausse pendant la journée. Le prix est monté jusqu'à `high`, mais les vendeurs ont ramené le cours vers le corps de la bougie.
-
-**Pourquoi c'est pertinent :** Une longue mèche supérieure est un signal de **rejet haussier** — le marché a essayé de monter mais les vendeurs étaient présents à ces niveaux. C'est un indicateur classique de résistance. Combinée avec d'autres features, elle aide le modèle à identifier des zones de retournement.
+Les checkpoints atterrissent dans `models/<type>/checkpoints/[<tf>/]best_model.*`
+(RL utilise `models/rl/checkpoints/best_agent.pth`).
 
 ---
 
-### `lower_wick` — Mèche inférieure
+## 5. Évaluer un modèle
 
+Produit les métriques (MSE/RMSE/MAE/R², direction accuracy) et les plots (courbes
+d'entraînement, prédictions vs réel, résidus, direction accuracy roulante) sous
+`models/<type>/results/`.
+
+```bash
+python -m models.cnn.evaluation --symbol BTC
+python -m models.cnn.evaluation --symbol BTC --model-path models/cnn/checkpoints/best_model.pth
+python -m models.lstm.evaluation      --symbol ETH
+python -m models.transformer.evaluation --symbol BTC --timeframe 1h
+python -m models.xgboost.evaluation   --symbol BTC
+
+# RL : par symbole ou sur toute la liste
+python -m models.rl.evaluation --symbol BTC
+python -m models.rl.evaluation --all
 ```
-lower_wick = (min(open, close) - low) / open
-```
-
-**Ce que ça mesure :** L'amplitude du rejet à la baisse. Symétrique de la mèche supérieure.
-
-**Pourquoi c'est pertinent :** Une longue mèche inférieure signale un **rejet baissier** — les vendeurs ont poussé le prix vers le bas mais les acheteurs ont repris le contrôle. C'est typiquement le signe d'un support fort, potentiellement le début d'un rebond. Le pattern "Hammer" ou "Pin Bar" (corps petit + longue mèche inférieure) est l'un des plus fiables en trading.
 
 ---
 
-### `range` — Amplitude totale de la bougie
+## 6. Backtest sur données historiques
 
+`testing/backtesting.py` rejoue la stratégie sur une tranche figée d'historique,
+applique la même logique de risque et de frais que la boucle live, et écrit un
+résumé + un PNG de courbe d'équité sous `testing/results/`.
+
+```bash
+# Un modèle sur un symbole
+python -m testing.backtesting --model cnn --symbol BTC --capital 10000 --threshold 0.01
+
+# Frais + risk management ATR (SL/TP/trailing) + cutoff out-of-sample
+python -m testing.backtesting --model cnn --symbol BTC \
+    --capital 10000 --threshold 0.01 \
+    --entry-fee 0.001 --exit-fee 0.001 \
+    --atr-risk --test-start-date 2025-01-01
+
+# Balayer tous les SYMBOLS
+python -m testing.backtesting --model transformer --all-symbols --capital 1000
+
+# Politique RL (6h natif)
+python -m testing.backtesting --model rl --symbol BTC --capital 10000
+
+# Ensemble supervisé
+python -m testing.backtesting --model ensemble \
+    --ensemble-models cnn,bilstm,cnn_bilstm_am,transformer \
+    --ensemble-strategy confidence_weighted \
+    --symbol BTC --capital 10000
 ```
-range = (high - low) / open
-```
 
-**Ce que ça mesure :** La volatilité intra-journalière. Plus le `range` est grand, plus la journée a été volatile.
-
-**Pourquoi c'est pertinent :** Un `range` anormalement élevé accompagné d'un fort volume signale souvent un **événement de marché majeur** (cassure d'un niveau, liquidation massive, news). Ces journées ont souvent un impact fort sur les jours suivants. Le CNN peut apprendre à les repérer dans une fenêtre.
+Flags utiles : `--timeframe` (défaut `1d`), `--threshold`, `--allow-short`,
+`--atr-risk`, `--entry-fee`, `--exit-fee`, `--test-start-date`,
+`--ensemble-strategy` (`majority_vote | weighted_average | confidence_weighted | unanimous`),
+`--ensemble-weights`, `--all-symbols`.
 
 ---
 
-## 2. Features de momentum (`momentum_features.py`)
+## 7. Comparer tous les modèles sur un seul graphe
 
-Ces features mesurent la **vitesse et la direction** du mouvement de prix sur différents horizons temporels passés.
+`--model compare-all` benchmarke côte-à-côte l'agent RL, l'ensemble supervisé, et
+chaque modèle supervisé individuel, sur le même symbole et la même plage de
+dates. Les checkpoints manquants sont sautés avec un warning (soft-skip).
 
+```bash
+# Tous les contestants sur BTC (supervisés sur timeframe par défaut, RL sur son 6h natif)
+python -m testing.backtesting --model compare-all --symbol BTC --capital 10000
+
+# Forcer un timeframe spécifique côté supervisé
+python -m testing.backtesting --model compare-all --symbol BTC --timeframe 1h --capital 10000
+
+# Exclure des modèles pas encore entraînés
+python -m testing.backtesting --model compare-all --symbol BTC --exclude patch_tst,transformer
+
+# Fenêtre out-of-sample personnalisée
+python -m testing.backtesting --model compare-all --symbol BTC \
+    --test-start-date 2024-01-01 --capital 10000
 ```
-return_Nd = (close_aujourd'hui - close_il_y_a_N_jours) / close_il_y_a_N_jours
-```
 
-| Feature | Fenêtre | Ce que ça capture |
-|---|---|---|
-| `return_1d` | 1 jour | Momentum immédiat |
-| `return_3d` | 3 jours | Tendance très court terme |
-| `return_7d` | 7 jours | Tendance hebdomadaire |
-| `return_14d` | 14 jours | Tendance bi-mensuelle |
-| `return_21d` | 21 jours | Tendance mensuelle |
+Sorties sous `testing/results/compare_all/` :
 
-**Pourquoi plusieurs horizons ?**
+- `<symbol>_<start>_<end>.csv` — une ligne par contestant, trié par Sharpe.
+- `<symbol>_<start>_<end>.png` — toutes les courbes d'équité (rééchantillonnées
+  en journalier) + buy-and-hold + oracle (perfect foresight), avec un sous-plot
+  de drawdowns.
 
-Un marché peut être haussier sur 21 jours mais en train de corriger sur 3 jours. Donner ces deux informations simultanément au modèle lui permet de distinguer une **correction temporelle dans une tendance haussière** (potentiellement une opportunité d'achat) d'un **vrai retournement de tendance** (signal de vente).
-
-C'est le principe du **multi-timeframe analysis** utilisé par les traders professionnels, ici encodé directement dans les features.
+Note timeframes en compare-all : chaque contestant tourne à sa cadence native
+(RL toujours en 6h, supervisés sur `--timeframe`). Les courbes d'équité sont
+rééchantillonnées en journalier avant d'être superposées ; les métriques restent
+calculées à la fréquence native de chaque contestant.
 
 ---
 
-## 3. Features de tendance (`trend_features.py`)
+## 8. Test temps réel / live
 
-Les moyennes mobiles exponentielles (EMA) lissent le prix pour révéler la tendance sous-jacente, en donnant plus de poids aux données récentes.
+`testing/realtime_testing.py` expose deux modes sur le même code :
 
+- **Live** — interroge Binance toutes les `--interval` secondes et paper-trade.
+- **Backtest** — rejoue les CSV historiques à vitesse configurable.
+
+L'état (positions, ordres ouverts, equity) est checkpointé, on peut reprendre
+ou repartir à zéro avec `--fresh`.
+
+### 8.1 Paper trading live
+
+```bash
+# Minimal
+python -m testing.realtime_testing --symbol BTC/USDT --model cnn --capital 10000 --rrr 2.0
+
+# Config complète depuis JSON
+python -m testing.realtime_testing --config testing/config.json
+
+# Risque resserré
+python -m testing.realtime_testing --symbol BTC/USDT --model bilstm \
+    --capital 10000 --rrr 2.0 --risk 0.01 \
+    --max-drawdown 0.15 --max-daily-trades 5 --cooldown 3600 \
+    --sizing-mode fixed
 ```
-emaX_ratio = EMA(close, X périodes) / close
+
+### 8.2 Rejeu backtest
+
+```bash
+# Historique complet de BTC avec le modèle CNN
+python -m testing.realtime_testing --backtest --symbol BTC --model cnn --rrr 2.0
+
+# Fenêtre restreinte, assez lente pour suivre les décisions
+python -m testing.realtime_testing --backtest --symbol BTC --model cnn \
+    --start-date 2024-01-01 --end-date 2024-12-31 --speed 0.01
 ```
 
-| Feature | Période | Rôle classique |
-|---|---|---|
-| `ema9_ratio` | 9 jours | Tendance très court terme |
-| `ema21_ratio` | 21 jours | Tendance court terme |
-| `ema50_ratio` | 50 jours | Tendance moyen terme |
-| `ema100_ratio` | 100 jours | Tendance long terme |
-
-**Pourquoi diviser par `close` ?**
-
-Un ratio autour de `1.0` signifie que le prix est proche de son EMA. Un ratio de `1.05` signifie que le prix est 5% au-dessus de son EMA → le marché est potentiellement suracheté et une correction est probable. Un ratio de `0.95` → le marché est 5% sous son EMA → potentiellement survendu.
-
-Cette normalisation rend les valeurs **comparables entre BTC, ETH, et toutes les autres cryptos**, quelle que soit leur échelle de prix absolue.
-
-**Pourquoi plusieurs EMAs ?**
-
-Le **croisement d'EMAs** est l'un des signaux les plus utilisés en trading algorithmique. Quand `ema9_ratio < ema50_ratio`, l'EMA courte passe sous l'EMA longue — c'est un signal baissier classique ("death cross"). Le CNN peut apprendre ces configurations sans qu'on les lui code explicitement.
+Flags utiles : `--interval`, `--threshold`, `--allow-short`, `--sizing-mode`,
+`--max-drawdown`, `--max-daily-trades`, `--cooldown`, `--fresh`, et en mode
+backtest `--start-date`, `--end-date`, `--speed`.
 
 ---
 
-## 4. Features d'oscillateurs (`oscillator_features.py`)
+## 9. Référence des features
 
-Les oscillateurs mesurent si un actif est en situation de **surachat ou survente**, indépendamment de la direction de la tendance.
+Voir `data/features/` pour les implémentations. Tour sémantique rapide :
+
+| Catégorie              | Features                                                      | Pourquoi |
+|------------------------|---------------------------------------------------------------|----------|
+| Structure de bougie    | `body`, `upper_wick`, `lower_wick`, `range`, `green_ratio`    | Géométrie en chandeliers japonais, tout divisé par open pour comparabilité inter-crypto. |
+| Momentum               | `return_1d`, `return_3d`, `return_6d`, `return_12d`, `return_24d` (tf 1h) / `return_{1,3,7,14,21}d` (tf 1d) | Momentum multi-horizon — un marché peut être haussier sur 3 semaines et en correction sur 3 jours. |
+| Tendance (EMAs)        | `ema9_ratio`, `ema21_ratio`, `ema50_ratio`, `ema100_ratio`, `price_vs_ma50` | Normalisées autour de 1.0, les écarts montrent l'étirement / compression vs tendance. |
+| Oscillateurs           | `rsi`, `macd`, `macd_signal`, `macd_hist`, `bollinger_position` | Surachat / survente + shifts de momentum + position dans la bande de Bollinger. |
+| Volume & volatilité    | `volume_ratio`, `volume_return`, `volatility`, `obv_normalized`, `volume_directional`, `atr_normalized` | Le volume confirme le prix ; ATR et volatilité réalisée capturent le régime. |
+| Temporel (1h uniquement) | `hour_sin`, `hour_cos`, `dow_sin`, `dow_cos`                | Encode l'heure du jour / jour de la semaine comme features continues. |
+
+**Tout est normalisé** — ratios, pourcentages, scores dans [0, 1] — pour que le
+même modèle généralise à BTC à 60 k$ comme à DOGE à 0,07 $ sans jamais voir de
+prix absolu. La winsorisation au 1ᵉʳ / 99ᵉ percentile et le `RobustScaler`
+(médiane/IQR) sont fittés **uniquement sur le split train**, sauvegardés avec
+le checkpoint via `joblib`, puis réutilisés à l'inférence.
+
+Label (modèles supervisés) :
+
+```
+future_return = close(J+H) / close(J) - 1           # H = PREDICTION_HORIZON[tf]
+```
+
+Les modèles supervisés régressent le `future_return` brut (loss Huber) ; le
+label discret `-1 / 0 / 1` est conservé uniquement pour rapporter la direction
+accuracy.
 
 ---
 
-### `rsi` — Relative Strength Index
+### Convention pour ajouter un nouveau modèle
 
-```
-RSI = 100 - (100 / (1 + moyenne_gains_14j / moyenne_pertes_14j))
-Feature : rsi = RSI / 100  → normalisé entre 0 et 1
-```
+1. Créer `models/<type>/` avec les quatre fichiers : `<Model>.py`,
+   `data_preparator.py`, `training.py`, `evaluation.py`.
+2. Ajouter un `predictor.py` qui hérite de `models.base_predictor.BasePredictor`.
+3. L'enregistrer dans `models/registry.py`.
 
-**Ce que ça mesure :** La force relative des mouvements haussiers vs baissiers sur 14 jours.
-
-- `rsi > 0.70` → surachat (le marché a monté trop vite, correction probable)
-- `rsi < 0.30` → survente (le marché a chuté trop vite, rebond probable)
-- `rsi ≈ 0.50` → marché équilibré
-
-**Pourquoi c'est pertinent :** Le RSI est l'indicateur le plus utilisé au monde en trading. Il capture des informations que les returns seuls ne voient pas — un actif peut avoir un `return_14d` positif mais un RSI en divergence baissière (les nouveaux hauts sont faits avec moins de force), ce qui signale un essoufflement.
-
----
-
-### `macd`, `macd_signal`, `macd_hist` — MACD
-
-```
-MACD      = EMA(12) - EMA(26)
-Signal    = EMA(MACD, 9)
-Histogramme = MACD - Signal
-
-Features normalisées par close pour comparaison inter-crypto
-```
-
-**Ce que ça mesure :** La convergence/divergence de deux moyennes mobiles. C'est essentiellement un indicateur de momentum qui détecte les changements de tendance.
-
-**Pourquoi 3 features et pas une seule ?**
-
-- `macd` seul indique la direction du momentum
-- `macd_signal` est le lissage du MACD — son croisement avec `macd` génère les signaux buy/sell
-- `macd_hist` (la différence entre les deux) montre **l'accélération ou le ralentissement** du momentum — c'est souvent le premier signe d'un retournement, avant même que le croisement se produise
-
-Un CNN qui voit l'évolution de ces 3 valeurs sur 30 jours peut apprendre à reconnaître des patterns de divergence MACD-prix, ce que très peu de modèles simples capturent.
-
----
-
-## 5. Features de volume et volatilité (`volume_features.py`)
-
-Le volume est souvent appelé "le carburant du marché". Un mouvement de prix sans volume est suspect ; avec volume, il est confirmé.
-
----
-
-### `volume_ratio` — Volume relatif
-
-```
-volume_ratio = volume_aujourd'hui / moyenne_mobile_volume(20 jours)
-```
-
-**Ce que ça mesure :** Si le volume du jour est anormalement élevé ou faible par rapport aux 20 derniers jours.
-
-- `volume_ratio > 2.0` → volume 2x supérieur à la normale → événement significatif
-- `volume_ratio < 0.5` → marché apathique, mouvement peu fiable
-
-**Pourquoi c'est pertinent :** En analyse technique, le principe est : *"le volume confirme le prix"*. Une cassure à la hausse avec un `volume_ratio` élevé est beaucoup plus fiable qu'une cassure avec un volume faible. Cette feature permet au modèle de pondérer la fiabilité des mouvements de prix.
-
----
-
-### `volume_return` — Variation du volume
-
-```
-volume_return = (volume_aujourd'hui - volume_hier) / volume_hier
-```
-
-**Ce que ça mesure :** L'accélération ou la décélération du volume, jour après jour.
-
-**Pourquoi c'est pertinent :** Un volume qui augmente progressivement pendant une hausse signale une accumulation institutionnelle. Un volume qui s'effondre pendant une hausse signale un essoufflement. Cette feature capture cette dynamique temporelle que `volume_ratio` seul ne voit pas.
-
----
-
-### `volatility` — Volatilité réalisée
-
-```
-volatility = écart-type des return_1d sur les 14 derniers jours
-```
-
-**Ce que ça mesure :** Le niveau de risque et d'incertitude actuel du marché.
-
-**Pourquoi c'est pertinent :** Les marchés alternent entre phases de **basse volatilité** (consolidation, accumulation silencieuse) et phases de **haute volatilité** (tendances fortes, paniques). Ces régimes de marché ont des comportements très différents. Un CNN entraîné sans cette feature confondrait des patterns identiques dans des contextes de volatilité radicalement différents — avec des conséquences opposées.
-
----
-
-## 6. Label — La cible à prédire
-
-```
-future_return = close(J+3) / close(J) - 1
-
-label =  1  si future_return > +2%   → signal HAUSSE
-label =  0  si -2% ≤ future_return ≤ +2%  → NEUTRE (pas de trade)
-label = -1  si future_return < -2%   → signal BAISSE
-```
-
-**Pourquoi J+3 et pas J+1 ?**
-
-Prédire le lendemain exact est trop sensible au bruit quotidien. Sur 3 jours, les mouvements aléatoires se lissent et les vrais signaux directionnels ressortent mieux.
-
-**Pourquoi un seuil de ±2% ?**
-
-Les mouvements inférieurs à 2% sur les cryptos sont souvent du bruit de marché. En filtrant ces cas neutres, on force le modèle à n'émettre des signaux que quand un vrai mouvement est attendu — ce qui correspond à une stratégie de trading réaliste où l'on ne prend position que sur des opportunités claires.
-
----
-
-## Pourquoi tout normaliser ?
-
-Un réseau de neurones est fondamentalement une machine qui fait des multiplications et des additions. Si une feature vaut 60 000 (prix BTC) et une autre vaut 0.65 (RSI), le gradient de la première va écraser celui de la seconde pendant l'entraînement — le modèle ignorera le RSI.
-
-En exprimant tout en **ratios, pourcentages et scores entre 0 et 1**, toutes les features contribuent de manière équilibrée à l'apprentissage, et le modèle peut être entraîné indifféremment sur BTC, DOGE ou n'importe quelle autre crypto sans jamais voir de valeur absolue.
-
----
-
-*Dataset généré via `main.py` — voir `config.py` pour modifier les paramètres.*
+Il est ensuite automatiquement pris en compte par `--model <type>`,
+`--model ensemble` (comme constituant) et `--model compare-all`.
