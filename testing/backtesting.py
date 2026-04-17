@@ -2076,32 +2076,63 @@ def _run_rl_contestant(
     capital: float,
     test_start_date: str | None,
 ) -> tuple[BacktestResult, pd.DataFrame]:
-    """Run the PPO agent on its native 1h data, return a BacktestResult.
+    """Run the PPO agent on its native 6h data, return a BacktestResult.
 
     The RL agent owns its own env loop (fees + risk guardrails are inside
     TradingEnv), so we don't funnel it through simulate_trading. Instead we
     wrap the equity curve the env produces into a BacktestResult indexed by
-    real 1h timestamps so it lines up with everything else at plot time.
+    real 6h timestamps so it lines up with everything else at plot time.
+
+    The scaler is fitted on data *before* ``test_start_date`` to keep OOS
+    evaluation honest; the env then runs on data *from* ``test_start_date``
+    onward. Without ``test_start_date`` we fall back to an 80/20 split.
     """
     from config import update_global_config
-    update_global_config("1h")
+    update_global_config("6h")
+
+    from sklearn.preprocessing import RobustScaler
 
     from models.rl.agent import PPOAgent
-    from models.rl.data_preparator import prepare_rl_data
     from models.rl.environment import TradingEnv
-    from models.rl.risk_manager import BUY_ACTIONS, SELL_ACTIONS
+    from models.rl.features import FEATURE_COLUMNS as RL_FEATURES
+    from utils.dataset_loader import load_symbol
 
     ckpt = "models/rl/checkpoints/best_agent.pth"
     if not os.path.isfile(ckpt):
         raise FileNotFoundError(ckpt)
 
-    _, df_val, scaler, clip_bounds = prepare_rl_data(symbol, verbose=False)
+    df = load_symbol(symbol, timeframe="6h").sort_index()
+    if "symbol" not in df.columns:
+        df["symbol"] = symbol.upper().replace("/", "_")
 
-    # Honor --test-start-date if it sits inside the RL val split.
+    missing = set(RL_FEATURES) | {"close"}
+    missing -= set(df.columns)
+    if missing:
+        raise ValueError(f"RL dataset missing columns: {missing}")
+
     if test_start_date is not None:
         cutoff = pd.Timestamp(test_start_date)
-        if cutoff > df_val.index[0]:
-            df_val = df_val[df_val.index >= cutoff].copy()
+        df_train = df[df.index < cutoff]
+        df_val = df[df.index >= cutoff].copy()
+        if len(df_train) < 500 or len(df_val) < 200:
+            # Not enough data on either side — fall back to 80/20.
+            split_idx = int(len(df) * 0.8)
+            df_train = df.iloc[:split_idx]
+            df_val = df.iloc[split_idx:].copy()
+    else:
+        split_idx = int(len(df) * 0.8)
+        df_train = df.iloc[:split_idx]
+        df_val = df.iloc[split_idx:].copy()
+
+    # Winsorization bounds + scaler fitted on train only
+    clip_bounds: dict[str, tuple[float, float]] = {}
+    train_feats = df_train[RL_FEATURES].values.copy()
+    for i, col in enumerate(RL_FEATURES):
+        lo = float(np.percentile(train_feats[:, i], 1.0))
+        hi = float(np.percentile(train_feats[:, i], 99.0))
+        clip_bounds[col] = (lo, hi)
+        train_feats[:, i] = np.clip(train_feats[:, i], lo, hi)
+    scaler = RobustScaler().fit(train_feats)
 
     env = TradingEnv(
         df=df_val,
@@ -2205,7 +2236,7 @@ def run_compare_all_backtest(
         - Every registered supervised model with a checkpoint at
           ``models/<type>/checkpoints/<timeframe>/best_model.*``
         - A supervised ensemble built from the available supervised models
-        - The PPO RL agent (runs on 1h regardless of --timeframe)
+        - The PPO RL agent (runs on 6h regardless of --timeframe)
 
     Missing checkpoints are soft-skipped with a warning.
     Metrics are computed at each contestant's native frequency; the equity
