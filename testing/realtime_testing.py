@@ -4,22 +4,330 @@ Module de testing en temps réel avec données Binance live.
 Simule une stratégie de trading sur des données temps réel,
 avec gestion des positions, stop-loss et take-profit basés sur RRR.
 
-Usage:
-    # Mode temps réel (live)
-    python -m testing.realtime_testing --symbol BTC/USDT --model cnn --capital 10000
-    python -m testing.realtime_testing --config testing/config.json
+================================================================================
+EXEMPLES D'UTILISATION
+================================================================================
 
-    # Mode backtest (simulation sur historique)
-    python -m testing.realtime_testing --backtest --symbol BTC --model cnn
-    python -m testing.realtime_testing --backtest --start-date 2024-01-01 --end-date 2024-12-31 --speed 0.1
+MODE TEMPS RÉEL (LIVE):
+-----------------------
+
+1) Mode live basique:
+   python -m testing.realtime_testing --symbol BTC/USDT --model cnn --capital 10000
+
+2) Mode live avec fichier de configuration:
+   python -m testing.realtime_testing --config testing/config.json
+
+3) Mode live avec paramètres de trading personnalisés:
+   python -m testing.realtime_testing --symbol BTC/USDT --model cnn --capital 5000 --threshold 0.015 --rrr 2.5 --risk 0.02
+
+4) Mode live avec risk management avancé:
+   python -m testing.realtime_testing --symbol BTC/USDT --model cnn --capital 10000 --sizing-mode dynamic --max-drawdown 0.15 --cooldown 5 --max-daily-trades 3
+
+5) Mode live repartir à zéro (ignorer l'état sauvegardé):
+   python -m testing.realtime_testing --symbol BTC/USDT --model cnn --fresh
+
+MODE BACKTEST (SIMULATION):
+---------------------------
+
+6) Backtest basique sur historique:
+   python -m testing.realtime_testing --backtest --symbol BTC --model cnn
+
+7) Backtest sur période spécifique:
+   python -m testing.realtime_testing --backtest --symbol BTC --model cnn --start-date 2024-01-01 --end-date 2024-06-30
+
+8) Backtest avec visualisation lente (pour présentation):
+   python -m testing.realtime_testing --backtest --symbol BTC --model cnn --speed 0.1
+
+9) Backtest rapide (instantané):
+   python -m testing.realtime_testing --backtest --symbol BTC --model cnn --speed 0
+
+================================================================================
+OPTIONS DISPONIBLES
+================================================================================
+
+OPTIONS GÉNÉRALES:
+------------------
+
+--config                    Chemin vers un fichier JSON de configuration.
+                            Les options CLI écrasent celles du fichier config.
+                            (défaut: testing/config.json)
+
+--symbol                    Paire de trading (ex: BTC/USDT, ETH/USDT).
+                            Format: CRYPTO/USDT ou CRYPTO/USD
+
+--model                     Type de modèle ML: cnn, lstm, gru, bilstm, xgboost
+                            Doit avoir été entraîné au préalable sur le même timeframe
+
+--timeframe                 Timeframe des bougies: 1d, 1h, 4h, 15m (défaut: 1d)
+                            Doit correspondre au timeframe d'entraînement du modèle
+
+--capital                   Capital initial en USD (défaut: 1000)
+
+--threshold                 Seuil de prédiction pour ouvrir une position (défaut: auto).
+                            Valeurs typiques:
+                            - 1d (daily): 0.01 (1%)
+                            - 1h (hourly): 0.005 (0.5%)
+                            - 4h: 0.008 (0.8%)
+                            Une prédiction > threshold → LONG, < -threshold → SHORT
+
+--allow-short               Autorise les positions SHORT (non supporté en spot Binance live,
+                            uniquement en mode backtest/simulation)
+
+--interval                  Intervalle de vérification en heures (défaut: auto)
+                            Auto = 1 barre = timeframe en heures (ex: 24h pour 1d)
+
+OPTIONS DE RISK MANAGEMENT (RRR):
+---------------------------------
+
+--rrr                       Risk/Reward Ratio (défaut: 2.0 pour 1:2)
+                            Ex: 1.5 pour 1:1.5, 3.0 pour 1:3
+                            Plus élevé = TP plus loin, moins de trades gagnants mais plus gros
+
+--risk                      Pourcentage de risque par trade (défaut: auto)
+                            Valeurs typiques:
+                            - 1d: 0.025 (2.5%)
+                            - 1h: 0.015 (1.5%)
+                            Détermine la distance du SL: SL = entry * (1 ± risk)
+
+OPTIONS DE RISK MANAGEMENT AVANCÉ:
+----------------------------------
+
+--sizing-mode               Mode de sizing des positions:
+                            - fixed: Capital fixe par position (défaut)
+                            - periodic: Rebalance périodique du capital de base
+                            - dynamic: Pourcentage dynamique du portefeuille
+
+--max-drawdown              Circuit breaker: drawdown max avant arrêt (défaut: 0.20 = 20%)
+                            Quand atteint, plus aucune nouvelle position n'est ouverte
+
+--cooldown                  Nombre minimum de barres entre deux ouvertures (défaut: 3)
+                            Évite le sur-trading dans les marchés range
+
+--max-daily-trades          Nombre maximum de trades par jour (défaut: 4)
+                            Protection contre les séries de pertes
+
+--max-position-pct          Pourcentage max du portefeuille par position (défaut: 0.25 = 25%)
+                            Uniquement en mode sizing-mode=dynamic
+
+--max-position-size         Taille max absolue en $ par position (optionnel)
+
+OPTIONS MODE BACKTEST:
+----------------------
+
+--backtest                  Active le mode backtest sur données historiques locales
+
+--start-date                Date de début du backtest (YYYY-MM-DD)
+                            Si non spécifié, utilise les 3 derniers mois d'historique
+
+--end-date                  Date de fin du backtest (YYYY-MM-DD)
+                            Si non spécifié, utilise aujourd'hui
+
+--speed                     Délai entre bougies en secondes (défaut: 0 = instantané)
+                            - 0: Exécution rapide (min 25ms pour affichage dashboard)
+                            - 0.1: Présentation (100ms par bougie, ~2min pour 1 an)
+                            Plus élevé = plus lent, permet de visualiser le trading
+
+--fresh                     Ignore l'état sauvegardé et repart de zéro
+                            Utile pour refaire un backtest propre
+
+================================================================================
+FICHIER DE CONFIGURATION (config.json)
+================================================================================
+
+Exemple de fichier testing/config.json:
+
+{
+  "symbol": "BTC/USDT",
+  "model_type": "cnn",
+  "timeframe": "1d",
+  "capital": 10000.0,
+  "threshold": 0.01,
+  "allow_short": false,
+  "rrr": 2.0,
+  "risk_pct": 0.025,
+  "check_interval_hours": null,
+  "entry_fee_pct": 0.001,
+  "exit_fee_pct": 0.001,
+  "slippage_pct": 0.001,
+  "log_level": "INFO",
+  "sizing_mode": "dynamic",
+  "max_position_pct": 0.25,
+  "max_position_size": null,
+  "rebalance_interval": 50,
+  "max_drawdown_pct": 0.20,
+  "cooldown_bars": 3,
+  "max_trades_per_day": 4,
+  "max_expiration_rate": 0.50
+}
+
+================================================================================
+EXEMPLES DE SCÉNARIOS
+================================================================================
+
+# SCÉNARIO 1: Trading live conservateur sur BTC (recommandé pour débuter)
+# - Capital: 5000$
+# - Seuil élevé (1.5%) pour éviter les faux signaux
+# - RRR 1:2, risque 2% par trade
+# - Max 3 trades/jour, cooldown de 5 barres
+# - Circuit breaker à 15% de drawdown
+python -m testing.realtime_testing \
+  --symbol BTC/USDT \
+  --model cnn \
+  --capital 5000 \
+  --threshold 0.015 \
+  --rrr 2.0 \
+  --risk 0.02 \
+  --max-daily-trades 3 \
+  --cooldown 5 \
+  --max-drawdown 0.15
+
+# SCÉNARIO 2: Trading live agressif avec sizing dynamique
+# - Sizing dynamique: 25% du portefeuille par position
+# - Plus de trades journaliers (6)
+# - Seuil plus bas (0.8%)
+python -m testing.realtime_testing \
+  --symbol BTC/USDT \
+  --model cnn \
+  --capital 10000 \
+  --threshold 0.008 \
+  --sizing-mode dynamic \
+  --max-position-pct 0.25 \
+  --max-daily-trades 6 \
+  --cooldown 2
+
+# SCÉNARIO 3: Backtest rapide pour valider une stratégie
+# - Période: Janvier à Juin 2024
+# - Exécution instantanée
+# - Affiche le dashboard avec les métriques en temps réel
+python -m testing.realtime_testing \
+  --backtest \
+  --symbol BTC \
+  --model cnn \
+  --start-date 2024-01-01 \
+  --end-date 2024-06-30 \
+  --speed 0
+
+# SCÉNARIO 4: Backtest visuel pour présentation/démo
+# - Vitesse lente (0.1s par bougie)
+# - Permet de visualiser chaque décision de trading
+# - ~1min30 de démo pour 1 an de données (1d)
+python -m testing.realtime_testing \
+  --backtest \
+  --symbol BTC \
+  --model cnn \
+  --start-date 2023-01-01 \
+  --end-date 2023-12-31 \
+  --speed 0.1
+
+# SCÉNARIO 5: Reprise d'un trading live après arrêt
+# - Le système sauvegarde automatiquement l'état dans testing/state_<symbol>.json
+# - Relance simple reprend où ça s'est arrêté
+python -m testing.realtime_testing \
+  --symbol BTC/USDT \
+  --model cnn \
+  --capital 10000
+
+# SCÉNARIO 6: Reset complet et nouveau départ
+# --fresh supprime le fichier d'état sauvegardé
+python -m testing.realtime_testing \
+  --symbol BTC/USDT \
+  --model cnn \
+  --capital 10000 \
+  --fresh
+
+# SCÉNARIO 7: Trading sur timeframe court (1h) - Day trading
+# - Utilise un modèle entraîné sur 1h
+# - Seuil adapté à la volatilité intraday
+python -m testing.realtime_testing \
+  --symbol BTC/USDT \
+  --model cnn \
+  --timeframe 1h \
+  --capital 5000 \
+  --threshold 0.005 \
+  --risk 0.015 \
+  --max-daily-trades 8
+
+# SCÉNARIO 8: Comparaison de modèles via backtest
+# Test CNN:
+python -m testing.realtime_testing --backtest --symbol BTC --model cnn --start-date 2024-01-01 --end-date 2024-06-30
+# Test LSTM:
+python -m testing.realtime_testing --backtest --symbol BTC --model lstm --start-date 2024-01-01 --end-date 2024-06-30
+# Test BiLSTM:
+python -m testing.realtime_testing --backtest --symbol BTC --model bilstm --start-date 2024-01-01 --end-date 2024-06-30
+
+# SCÉNARIO 9: Test avec frais réalistes Binance
+# - Entry fee: 0.1% (spot standard)
+# - Slippage: 0.1% (estimation réaliste)
+python -m testing.realtime_testing \
+  --backtest \
+  --symbol BTC \
+  --model cnn \
+  --capital 10000 \
+  --threshold 0.012
+
+# SCÉNARIO 10: Risk management très conservateur
+# - Circuit breaker bas (10%)
+# - Sizing fixe et faible
+# - Cooldown long (10 barres)
+python -m testing.realtime_testing \
+  --symbol BTC/USDT \
+  --model cnn \
+  --capital 10000 \
+  --sizing-mode fixed \
+  --max-drawdown 0.10 \
+  --cooldown 10 \
+  --max-daily-trades 2
+
+================================================================================
+AFFICHAGE EN TEMPS RÉEL (DASHBOARD)
+================================================================================
+
+Le dashboard affiche en temps réel:
+- Status WebSocket (ONLINE/RECONNECTING/OFFLINE)
+- Prix courant et uptime
+- Valeur du portefeuille
+- PnL total (réalisé + non réalisé)
+- Win rate
+- Nombre de trades (gagnants/perdants/ouverts)
+- Positions ouvertes avec:
+  * Direction (LONG/SHORT)
+  * Prix d'entrée et prix courant
+  * PnL non réalisé
+  * Stop-loss et Take-profit
+  * Prédiction du modèle
+
+Event log (40 derniers événements):
+- NEW CANDLE: Nouvelle bougie détectée
+- PREDICTION: Prédiction du modèle
+- OPEN #X: Nouvelle position ouverte
+- CLOSE #X TP/SL/EXPIRATION: Position fermée avec raison et PnL
+- CIRCUIT BREAKER: Activation du circuit breaker
+- REBALANCE: Rebalance du capital (mode periodic)
+
+Commandes durant l'exécution:
+- Ctrl+C: Arrêt gracieux du système
+
+================================================================================
+FICHIERS GÉNÉRÉS
+================================================================================
+
+- testing/state_<symbol>.json: État persistant (positions, trades, capital)
+- testing/config.json: Configuration par défaut
+
+================================================================================
 """
 
 import argparse
+import asyncio
 import json
 import os
+import queue
+import threading
 import time
+from collections import deque
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
+from enum import Enum
 from typing import Optional
 
 import ccxt
@@ -27,15 +335,11 @@ import joblib
 import numpy as np
 import pandas as pd
 import torch
-from rich.console import Console
+import websockets
+from rich.console import Console, Group
+from rich.layout import Layout
+from rich.live import Live
 from rich.panel import Panel
-from rich.progress import (
-    Progress,
-    SpinnerColumn,
-    BarColumn,
-    TextColumn,
-    TimeRemainingColumn,
-)
 from rich.table import Table
 from rich.text import Text
 
@@ -57,14 +361,6 @@ from config import (
 from data.features.pipeline import build_features, FEATURE_COLUMNS, get_feature_columns
 from testing.backtesting import load_model_dynamic, load_scalers
 from utils.dataset_loader import load_symbol
-
-
-# Fréquence de vérification SL/TP en mode live (secondes).
-# Indépendante du timeframe : on surveille les prix toutes les 5 min.
-SLTP_POLL_SECONDS = 300
-
-# Nombre d'erreurs API consécutives avant arrêt gracieux.
-MAX_CONSECUTIVE_ERRORS = 5
 
 
 # ----- Dataclasses ----- #
@@ -112,6 +408,65 @@ class RealtimeState:
     position_counter: int = 0
 
 
+# ----- Connection / streaming ----- #
+
+
+class ConnStatus(Enum):
+    ONLINE = "ONLINE"
+    RECONNECTING = "RECONNECTING"
+    OFFLINE = "OFFLINE"
+
+
+@dataclass
+class ConnectionState:
+    """État de la connexion WebSocket partagé entre le thread stream et le main loop."""
+
+    status: ConnStatus = ConnStatus.OFFLINE
+    last_kline_ts: Optional[datetime] = None
+    current_price: Optional[float] = None
+    reconnect_attempts: int = 0
+    connected_since: Optional[datetime] = None
+    next_retry_in: float = 0.0
+    last_error: Optional[str] = None
+    _lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
+
+    def update(self, **kwargs) -> None:
+        with self._lock:
+            for k, v in kwargs.items():
+                setattr(self, k, v)
+
+    def snapshot(self) -> dict:
+        with self._lock:
+            return {
+                "status": self.status,
+                "last_kline_ts": self.last_kline_ts,
+                "current_price": self.current_price,
+                "reconnect_attempts": self.reconnect_attempts,
+                "connected_since": self.connected_since,
+                "next_retry_in": self.next_retry_in,
+                "last_error": self.last_error,
+            }
+
+
+@dataclass
+class KlineEvent:
+    """Événement de bougie clôturée reçu depuis la WebSocket."""
+
+    ts: datetime
+    open: float
+    high: float
+    low: float
+    close: float
+    volume: float
+
+
+@dataclass
+class ReconnectEvent:
+    """Sentinelle envoyée après une reconnexion réussie pour déclencher un refetch REST."""
+
+    attempts: int
+
+
 # ----- Configuration ----- #
 
 
@@ -132,8 +487,8 @@ def load_config(config_path: str) -> dict:
         "slippage_pct": DEFAULT_SLIPPAGE_PCT,
         "log_level": "INFO",
         # Risk management
-        "sizing_mode": "fixed",  # "fixed", "periodic", "dynamic"
-        "max_position_pct": 0.25,  # Max 25% du portefeuille par position
+        "sizing_mode": "dynamic",  # "fixed", "periodic", "dynamic"
+        "max_position_pct": 0.25,  # 25% du portefeuille par position (mode dynamic)
         "max_position_size": None,  # Max absolu en $ (None = pas de limite)
         "rebalance_interval": 50,  # Rebalance tous les N trades (mode periodic)
         "max_drawdown_pct": 0.20,  # Circuit breaker à 20% de drawdown
@@ -223,6 +578,153 @@ def fetch_initial_history(
         f"  [green]✓[/] {len(df)} bougies récupérées (du {df.index[0].date()} au {df.index[-1].date()})"
     )
     return df
+
+
+# ----- WebSocket stream ----- #
+
+
+BINANCE_WS_URL = "wss://stream.binance.com:443/ws"
+
+
+class BinanceKlineStream:
+    """WebSocket Binance kline stream running in a background asyncio thread.
+
+    Expose une queue thread-safe produisant :
+      - `KlineEvent` à chaque bougie clôturée (k.x == true).
+      - `ReconnectEvent` à chaque reconnexion réussie (pour refetch REST).
+    Met à jour `ConnectionState` (current_price, status, reconnect_attempts) sous lock.
+    Reconnexion infinie avec backoff exponentiel (1→60s).
+    """
+
+    def __init__(self, symbol: str, timeframe: str, conn_state: ConnectionState):
+        self.symbol = symbol
+        self.timeframe = timeframe
+        self.conn_state = conn_state
+        self.queue: "queue.Queue[object]" = queue.Queue(maxsize=100)
+
+        self._stop_event = threading.Event()
+        self._thread: Optional[threading.Thread] = None
+        self._loop: Optional[asyncio.AbstractEventLoop] = None
+
+        symbol_ws = symbol.replace("/", "").lower()
+        self.url = f"{BINANCE_WS_URL}/{symbol_ws}@kline_{timeframe}"
+
+    def start(self) -> None:
+        self._thread = threading.Thread(
+            target=self._run_in_thread, daemon=True, name="binance-ws"
+        )
+        self._thread.start()
+
+    def stop(self) -> None:
+        self._stop_event.set()
+        if self._loop and self._loop.is_running():
+            self._loop.call_soon_threadsafe(lambda: None)
+        if self._thread is not None:
+            self._thread.join(timeout=3.0)
+
+    def _run_in_thread(self) -> None:
+        self._loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self._loop)
+        try:
+            self._loop.run_until_complete(self._consume_forever())
+        finally:
+            self._loop.close()
+
+    async def _consume_forever(self) -> None:
+        attempts = 0
+        while not self._stop_event.is_set():
+            try:
+                async with websockets.connect(
+                    self.url,
+                    ping_interval=180,
+                    ping_timeout=600,
+                    close_timeout=5,
+                    open_timeout=10,
+                ) as ws:
+                    attempts = 0
+                    self.conn_state.update(
+                        status=ConnStatus.ONLINE,
+                        connected_since=datetime.now(timezone.utc),
+                        reconnect_attempts=0,
+                        next_retry_in=0.0,
+                        last_error=None,
+                    )
+                    # Signal reconnect (useful even for the first connect : triggers initial refetch
+                    # only on re-opens; the main loop can choose to ignore the first one if needed)
+                    try:
+                        self.queue.put_nowait(ReconnectEvent(attempts=0))
+                    except queue.Full:
+                        pass
+
+                    async for raw in ws:
+                        if self._stop_event.is_set():
+                            break
+                        self._handle_message(raw)
+
+            except asyncio.CancelledError:
+                break
+            except Exception as exc:
+                self.conn_state.update(last_error=f"{type(exc).__name__}: {exc}"[:200])
+
+            if self._stop_event.is_set():
+                break
+
+            attempts += 1
+            delay = min(60.0, 2 ** min(attempts - 1, 6))
+            self.conn_state.update(
+                status=ConnStatus.RECONNECTING,
+                reconnect_attempts=attempts,
+                next_retry_in=delay,
+                connected_since=None,
+            )
+            # Sleep en petits slices pour pouvoir s'arrêter rapidement
+            slept = 0.0
+            while slept < delay and not self._stop_event.is_set():
+                step = min(0.5, delay - slept)
+                await asyncio.sleep(step)
+                slept += step
+                self.conn_state.update(next_retry_in=max(0.0, delay - slept))
+
+        self.conn_state.update(status=ConnStatus.OFFLINE, next_retry_in=0.0)
+
+    def _handle_message(self, raw: str) -> None:
+        try:
+            msg = json.loads(raw)
+        except (ValueError, TypeError):
+            return
+        k = msg.get("k")
+        if not isinstance(k, dict):
+            return
+
+        try:
+            close = float(k["c"])
+            open_ = float(k["o"])
+            high = float(k["h"])
+            low = float(k["l"])
+            volume = float(k["v"])
+            open_ts_ms = int(k["t"])
+            is_closed = bool(k["x"])
+        except (KeyError, TypeError, ValueError):
+            return
+
+        ts = datetime.fromtimestamp(open_ts_ms / 1000, tz=timezone.utc).replace(
+            tzinfo=None
+        )
+        self.conn_state.update(current_price=close, last_kline_ts=ts)
+
+        if is_closed:
+            event = KlineEvent(
+                ts=ts, open=open_, high=high, low=low, close=close, volume=volume
+            )
+            try:
+                self.queue.put_nowait(event)
+            except queue.Full:
+                # Main loop en retard — on drop le plus ancien pour garder le plus récent.
+                try:
+                    self.queue.get_nowait()
+                    self.queue.put_nowait(event)
+                except queue.Empty:
+                    pass
 
 
 # ----- Feature engineering ----- #
@@ -954,6 +1456,206 @@ def print_summary(state: RealtimeState, initial_capital: float):
         console.print(Panel(curve, title="[bold]EQUITY CURVE[/]", border_style="cyan"))
 
 
+# ----- Live dashboard ----- #
+
+
+class DashboardView:
+    """Rich Live dashboard : status bar + portfolio body + rolling event log.
+
+    Le layout est redrawé ~2 fois/seconde par `Live`. Les events (nouvelles bougies,
+    ouvertures / fermetures de position, prédictions, warnings) sont poussés via
+    `log()` pour apparaître dans le panel du bas — `console.print()` direct est à
+    proscrire pendant le rendu Live.
+    """
+
+    LOG_CAPACITY = 40
+
+    def __init__(self, initial_log: Optional[list[str]] = None):
+        self._log_lock = threading.Lock()
+        self._log: deque[str] = deque(maxlen=self.LOG_CAPACITY)
+        if initial_log:
+            for line in initial_log:
+                self._log.append(line)
+
+        self.layout = Layout()
+        self.layout.split_column(
+            Layout(name="status", size=3),
+            Layout(name="body", ratio=2),
+            Layout(name="log", ratio=3),
+        )
+
+    def log(self, message: str) -> None:
+        ts = datetime.now(timezone.utc).strftime("%H:%M:%S")
+        with self._log_lock:
+            self._log.append(f"[dim]{ts}[/] {message}")
+
+    def _render_status_bar(self, conn: ConnectionState, symbol: str) -> Panel:
+        snap = conn.snapshot()
+        status = snap["status"]
+
+        if status == ConnStatus.ONLINE:
+            dot = Text("●", style="bold green")
+            label = Text(" ONLINE", style="bold green")
+            border = "green"
+        elif status == ConnStatus.RECONNECTING:
+            dot = Text("●", style="bold yellow")
+            retry = snap["next_retry_in"]
+            attempts = snap["reconnect_attempts"]
+            label = Text(
+                f" RECONNECTING  attempt {attempts}  retry in {retry:.0f}s",
+                style="bold yellow",
+            )
+            border = "yellow"
+        else:
+            dot = Text("●", style="bold red")
+            label = Text(" OFFLINE", style="bold red")
+            border = "red"
+
+        price = snap["current_price"]
+        price_txt = f"${price:,.2f}" if price is not None else "—"
+
+        last_ts = snap["last_kline_ts"]
+        if last_ts is not None:
+            age = (
+                datetime.now(timezone.utc).replace(tzinfo=None) - last_ts
+            ).total_seconds()
+            age_txt = f"{age:.0f}s ago" if age < 120 else f"{age / 60:.0f}m ago"
+        else:
+            age_txt = "—"
+
+        since = snap["connected_since"]
+        if since is not None:
+            uptime_sec = (datetime.now(timezone.utc) - since).total_seconds()
+            if uptime_sec < 60:
+                up_txt = f"{uptime_sec:.0f}s"
+            elif uptime_sec < 3600:
+                up_txt = f"{uptime_sec / 60:.0f}m"
+            else:
+                up_txt = f"{uptime_sec / 3600:.1f}h"
+        else:
+            up_txt = "—"
+
+        line = Text()
+        line.append_text(dot)
+        line.append_text(label)
+        line.append(f"   {symbol}  ", style="bold cyan")
+        line.append(f"Price: {price_txt}  ", style="white")
+        line.append(f"| Last kline: {age_txt}  ", style="dim")
+        line.append(f"| Uptime: {up_txt}", style="dim")
+        err = snap.get("last_error")
+        if status == ConnStatus.RECONNECTING and err:
+            line.append(f"  | {err}", style="red")
+        return Panel(line, border_style=border, padding=(0, 1))
+
+    def _render_body(
+        self,
+        state: RealtimeState,
+        current_price: Optional[float],
+        symbol: str,
+        initial_capital: float,
+    ) -> Panel:
+        if current_price is None:
+            return Panel(
+                Text("En attente du premier tick WebSocket...", style="dim italic"),
+                title="Portfolio",
+                border_style="blue",
+            )
+
+        m = _calc_portfolio_metrics(state, current_price, initial_capital)
+
+        table = Table(box=None, show_header=True, padding=(0, 2), expand=True)
+        table.add_column("Portfolio", justify="right")
+        table.add_column("Total PnL", justify="right")
+        table.add_column("Win Rate", justify="right")
+        table.add_column("Trades", justify="center")
+
+        pnl_style = _pnl_color(m["total_pnl"])
+        wr_style = "green" if m["win_rate"] >= 50 else "red"
+        table.add_row(
+            f"${m['portfolio_value']:,.2f}",
+            Text(f"${m['total_pnl']:+,.2f}", style=pnl_style),
+            Text(f"{m['win_rate']:.1f}%", style=wr_style),
+            f"{m['winning_trades']} / {m['total_trades']}  ({len(state.open_positions)} open)",
+        )
+
+        renderables: list = [table]
+
+        if state.open_positions:
+            pos_table = Table(
+                title="Open positions",
+                title_style="bold",
+                show_header=True,
+                box=None,
+                padding=(0, 1),
+                expand=True,
+            )
+            pos_table.add_column("#", style="bold")
+            pos_table.add_column("Dir")
+            pos_table.add_column("Entry", justify="right")
+            pos_table.add_column("Now", justify="right")
+            pos_table.add_column("PnL", justify="right")
+            pos_table.add_column("SL / TP", justify="right", style="dim")
+            pos_table.add_column("Pred", justify="right", style="dim")
+
+            for pos in state.open_positions:
+                if pos.direction == "LONG":
+                    unrealized_pct = (current_price / pos.entry_price - 1) * 100
+                else:
+                    unrealized_pct = (pos.entry_price / current_price - 1) * 100
+                unrealized_val = pos.allocated_capital * unrealized_pct / 100
+                pnl_s = _pnl_color(unrealized_val)
+
+                pos_table.add_row(
+                    str(pos.position_id),
+                    Text(
+                        pos.direction,
+                        style="green" if pos.direction == "LONG" else "red",
+                    ),
+                    f"${pos.entry_price:,.2f}",
+                    f"${current_price:,.2f}",
+                    Text(
+                        f"${unrealized_val:+.2f} ({unrealized_pct:+.2f}%)", style=pnl_s
+                    ),
+                    f"${pos.stop_loss:,.2f} / ${pos.take_profit:,.2f}",
+                    f"{pos.predicted_return * 100:+.2f}%",
+                )
+            renderables.append(pos_table)
+
+        title = (
+            f"{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}  "
+            f"{symbol}  Price: ${current_price:,.2f}"
+        )
+        return Panel(Group(*renderables), title=title, border_style="blue")
+
+    def _render_log(self) -> Panel:
+        with self._log_lock:
+            lines = list(self._log)
+        if not lines:
+            content: Text | Group = Text("(no events yet)", style="dim italic")
+        else:
+            text = Text()
+            for i, line in enumerate(lines):
+                if i > 0:
+                    text.append("\n")
+                text.append_text(Text.from_markup(line))
+            content = text
+        return Panel(content, title="Event log", border_style="dim", padding=(0, 1))
+
+    def refresh(
+        self,
+        state: RealtimeState,
+        conn: ConnectionState,
+        symbol: str,
+        current_price: Optional[float],
+        initial_capital: float,
+    ) -> None:
+        self.layout["status"].update(self._render_status_bar(conn, symbol))
+        self.layout["body"].update(
+            self._render_body(state, current_price, symbol, initial_capital)
+        )
+        self.layout["log"].update(self._render_log())
+
+
 # ----- Main class ----- #
 
 
@@ -1000,7 +1702,7 @@ class RealtimeTester:
         self.check_interval = check_hours * 3600  # en secondes
 
         # ----- Risk management -----
-        self.sizing_mode = config.get("sizing_mode", "fixed")
+        self.sizing_mode = config.get("sizing_mode", "dynamic")
         self.max_position_pct = config.get("max_position_pct", 0.25)
         self.max_position_size = config.get("max_position_size")
         self.rebalance_interval = config.get("rebalance_interval", 50)
@@ -1031,9 +1733,21 @@ class RealtimeTester:
         self.last_candle_time: Optional[datetime] = None
         self.running = False
 
+        # Streaming + dashboard (initialisés dans run()/initialize())
+        self.conn_state = ConnectionState()
+        self.stream: Optional[BinanceKlineStream] = None
+        self.dashboard: Optional[DashboardView] = None
+
         # Chemin du fichier d'état persistant
         symbol_code = self.symbol.replace("/", "_")
         self.state_path = f"testing/state_{symbol_code}.json"
+
+    def _log(self, message: str) -> None:
+        """Log vers le dashboard si actif, sinon vers console directement."""
+        if self.dashboard is not None:
+            self.dashboard.log(message)
+        else:
+            console.print(message)
 
     def _save_state(self):
         """Sauvegarde l'état courant dans un fichier JSON."""
@@ -1243,6 +1957,17 @@ class RealtimeTester:
         )
         console.print("       Appuyez sur Ctrl+C pour arrêter\n")
 
+        # Démarrer le stream WebSocket (live mode uniquement — pas en backtest)
+        self.stream = BinanceKlineStream(
+            symbol=self.symbol,
+            timeframe=self.timeframe,
+            conn_state=self.conn_state,
+        )
+        self.stream.start()
+        console.print(
+            f"  [green]✓[/] WebSocket stream démarré ([dim]{self.stream.url}[/])"
+        )
+
     def process_new_candle(self, current_price: float, candle_time) -> None:
         """
         Traite une nouvelle bougie clôturée : prédiction + ouverture de position.
@@ -1255,8 +1980,8 @@ class RealtimeTester:
             current_price: Prix actuel du marché (bougie en formation) = prix d'entrée.
             candle_time: Timestamp de la nouvelle bougie détectée (pour le log).
         """
-        console.print(
-            f"\n[bold cyan][NEW CANDLE][/] {candle_time} | Entry price: ${current_price:,.2f}"
+        self._log(
+            f"[bold cyan]NEW CANDLE[/] {candle_time} | Entry price: ${current_price:,.2f}"
         )
 
         # Re-fetch l'historique pour avoir les OHLCV finalisés des bougies clôturées.
@@ -1272,9 +1997,7 @@ class RealtimeTester:
             df_closed = df_fresh.iloc[:-1]
             self.df_history = df_fresh  # mise à jour du cache complet
         except Exception as e:
-            console.print(
-                f"  [yellow]WARN[/] Re-fetch échoué ({e}), utilisation du cache"
-            )
+            self._log(f"[yellow]WARN[/] Re-fetch échoué ({e}), utilisation du cache")
             df_closed = self.df_history.iloc[:-1]
 
         # Calculer les features sur les bougies clôturées uniquement
@@ -1292,12 +2015,12 @@ class RealtimeTester:
             pred_style = (
                 "green" if prediction > 0 else "red" if prediction < 0 else "dim"
             )
-            console.print(
-                f"  [bold]PREDICTION[/] [{pred_style}]{prediction * 100:+.2f}%[/]  "
+            self._log(
+                f"[bold]PREDICTION[/] [{pred_style}]{prediction * 100:+.2f}%[/]  "
                 f"[dim](seuil: ±{self.threshold * 100:.2f}%)[/]"
             )
         except Exception as e:
-            console.print(f"  [bold red]ERROR[/] Erreur prédiction: {e}")
+            self._log(f"[bold red]ERROR[/] Erreur prédiction: {e}")
             return
 
         # Générer le signal
@@ -1338,17 +2061,11 @@ class RealtimeTester:
             )
             pnl_style = _pnl_color(pnl)
 
-            close_text = (
-                f"  {pos.direction}  ${pos.entry_price:,.2f} -> ${exit_price:,.2f}\n"
-                f"  PnL: [{pnl_style}]${pnl:+.2f} ({pnl_pct:+.2f}%)[/]   Fees: ${trade.total_fees:.2f}"
-            )
-            console.print(
-                Panel(
-                    close_text,
-                    title=f"[bold]CLOSE #{pos.position_id}[/]  [{reason_style}]{reason}[/]",
-                    border_style=reason_style,
-                    width=50,
-                )
+            self._log(
+                f"[bold][{reason_style}]CLOSE #{pos.position_id} {reason}[/][/]  "
+                f"{pos.direction}  ${pos.entry_price:,.2f} → ${exit_price:,.2f}  "
+                f"[{pnl_style}]${pnl:+.2f} ({pnl_pct:+.2f}%)[/]  "
+                f"[dim]fees: ${trade.total_fees:.2f}[/]"
             )
 
         if positions_to_close:
@@ -1368,87 +2085,36 @@ class RealtimeTester:
                 )
                 exp_rate = exp_count / total_closed
                 if exp_rate > self.max_expiration_rate:
-                    console.print(
-                        f"\n[bold yellow]⚠ EXPIRATION RATE[/] {exp_rate:.0%} des trades expirent "
-                        f"(seuil: {self.max_expiration_rate:.0%}).\n"
-                        f"  Considérez augmenter risk_pct ({self.risk_pct}) ou réduire RRR ({self.rrr})."
+                    self._log(
+                        f"[bold yellow]⚠ EXPIRATION RATE[/] {exp_rate:.0%} des trades expirent "
+                        f"(seuil: {self.max_expiration_rate:.0%}). "
+                        f"Considérez augmenter risk_pct ({self.risk_pct}) ou réduire RRR ({self.rrr})."
                     )
 
             self._save_state()
 
     # ----- Risk management methods ----- #
 
-    def _calculate_slot_capital(
-        self, predicted_return: float = 0.0, atr_value: float | None = None
-    ) -> tuple[float, float, float]:
-        """
-        Calcule la taille de position selon le mode de sizing configuré.
-
-        Returns:
-            (slot_capital, sl_pct, tp_pct) où:
-            - slot_capital: Montant alloué pour la position
-            - sl_pct: Pourcentage pour le stop-loss
-            - tp_pct: Pourcentage pour le take-profit
-        """
+    def _calculate_slot_capital(self) -> float:
+        """Calcule la taille de position selon le mode de sizing configuré."""
         current_total = self.state.capital + self.state.allocated
 
-        # Nouveaux modes: "kelly", "atr_risk", "confidence_weighted", "optimal_rrr"
-        if self.sizing_mode in [
-            "kelly",
-            "atr_risk",
-            "confidence_weighted",
-            "optimal_rrr",
-        ]:
-            from testing.position_sizing import PositionSizer, suggest_improvements
-
-            sizer = PositionSizer(
-                strategy=self.sizing_mode,
-                max_position_pct=self.max_position_pct,
-                max_position_size=self.max_position_size,
-                risk_per_trade=self.risk_pct,
-            )
-
-            # Mettre à jour les stats avec l'historique des trades
-            for trade in self.state.closed_trades:
-                sizer.update_stats(trade.pnl, trade.predicted_return)
-
-            # Calculer le sizing
-            confidence = (
-                min(abs(predicted_return) / self.threshold, 2.0)
-                if self.threshold > 0
-                else 1.0
-            )
-            result = sizer.calculate(
-                portfolio_value=current_total,
-                current_price=0,  # Pas utilisé dans les calculs actuels
-                predicted_return=predicted_return,
-                atr_value=atr_value,
-                confidence=confidence,
-            )
-
-            return result.position_size, result.stop_loss_pct, result.take_profit_pct
-
-        # Modes legacy
         if self.sizing_mode == "fixed":
             slot = self._rebalance_base / self.prediction_horizon
         elif self.sizing_mode == "periodic":
             slot = self._rebalance_base / self.prediction_horizon
-        else:  # "dynamic" — ancien comportement
-            slot = current_total / self.prediction_horizon
+        else:  # "dynamic" — % fixe du portfolio courant
+            slot = current_total * self.max_position_pct
 
-        # Cap : max % du portefeuille
-        if self.max_position_pct is not None:
+        # Cap : max % du portefeuille (appliqué aussi pour fixed/periodic)
+        if self.max_position_pct is not None and self.sizing_mode != "dynamic":
             slot = min(slot, current_total * self.max_position_pct)
 
         # Cap : max absolu
         if self.max_position_size is not None:
             slot = min(slot, self.max_position_size)
 
-        # SL/TP legacy
-        sl_pct = self.risk_pct * 100
-        tp_pct = sl_pct * self.rrr
-
-        return max(slot, 0.0), sl_pct, tp_pct
+        return max(slot, 0.0)
 
     def _update_drawdown(self, portfolio_value: float):
         """Met à jour le high-water mark et active le circuit breaker si nécessaire."""
@@ -1460,8 +2126,8 @@ class RealtimeTester:
 
         if not self._circuit_breaker_active and drawdown >= self.max_drawdown_pct:
             self._circuit_breaker_active = True
-            console.print(
-                f"\n[bold red]⚠ CIRCUIT BREAKER[/] Drawdown {drawdown:.1%} >= "
+            self._log(
+                f"[bold red]⚠ CIRCUIT BREAKER[/] Drawdown {drawdown:.1%} >= "
                 f"seuil {self.max_drawdown_pct:.0%}. Nouvelles positions bloquées."
             )
 
@@ -1474,8 +2140,8 @@ class RealtimeTester:
             old_base = self._rebalance_base
             self._rebalance_base = self.state.capital + self.state.allocated
             self._trades_since_rebalance = 0
-            console.print(
-                f"  [bold cyan]REBALANCE[/] Base capital: "
+            self._log(
+                f"[bold cyan]REBALANCE[/] Base capital: "
                 f"${old_base:,.2f} → ${self._rebalance_base:,.2f}"
             )
 
@@ -1497,8 +2163,8 @@ class RealtimeTester:
             self._current_trade_day = trade_day
             self._daily_trade_count = 0
         if self._daily_trade_count >= self.max_trades_per_day:
-            console.print(
-                f"  [dim]SKIP — Limite journalière atteinte ({self.max_trades_per_day})[/]"
+            self._log(
+                f"[dim]SKIP — Limite journalière atteinte ({self.max_trades_per_day})[/]"
             )
             return
 
@@ -1512,8 +2178,8 @@ class RealtimeTester:
 
         # Guard 4 : Max positions simultanées
         if len(self.state.open_positions) >= self.prediction_horizon:
-            console.print(
-                f"  [dim]SKIP — Max positions atteint ({self.prediction_horizon})[/]"
+            self._log(
+                f"[dim]SKIP — Max positions atteint ({self.prediction_horizon})[/]"
             )
             return
 
@@ -1523,29 +2189,16 @@ class RealtimeTester:
         else:
             entry_price = entry_price * (1 - self.slippage_pct)
 
-        # Calculer la taille de position et les niveaux SL/TP
-        slot_capital, sl_pct, tp_pct = self._calculate_slot_capital(prediction)
-
-        # Ajuster RRR si on utilise les nouveaux modes
-        if self.sizing_mode in [
-            "kelly",
-            "atr_risk",
-            "confidence_weighted",
-            "optimal_rrr",
-        ]:
-            rrr = tp_pct / sl_pct if sl_pct > 0 else self.rrr
-            risk_pct = sl_pct / 100
-        else:
-            rrr = self.rrr
-            risk_pct = self.risk_pct
+        # Calculer la taille de position
+        slot_capital = self._calculate_slot_capital()
 
         position = open_position(
             self.state,
             direction,
             entry_price,
             prediction,
-            rrr,
-            risk_pct,
+            self.rrr,
+            self.risk_pct,
             self.entry_fee_pct,
             slot_capital,
             entry_date,
@@ -1559,158 +2212,147 @@ class RealtimeTester:
 
             qty = position.allocated_capital / entry_price
             pred_style = "green" if prediction > 0 else "red"
-            open_text = (
-                f"  {direction}  Entry: ${entry_price:,.2f}\n"
-                f"  Size: ${position.allocated_capital:,.2f}  ({qty:,.4f} {self.symbol.replace('/USDT', '')})\n"
-                f"  Pred: [{pred_style}]{prediction * 100:+.2f}%[/]  "
+            coin = self.symbol.replace("/USDT", "")
+            self._log(
+                f"[bold cyan]OPEN #{position.position_id}[/]  {direction}  "
+                f"Entry: ${entry_price:,.2f}  "
+                f"Size: ${position.allocated_capital:,.2f} ({qty:,.4f} {coin})  "
+                f"Pred: [{pred_style}]{prediction * 100:+.2f}%[/]  "
                 f"SL: ${position.stop_loss:,.2f}  TP: ${position.take_profit:,.2f}"
             )
-            console.print(
-                Panel(
-                    open_text,
-                    title=f"[bold]OPEN #{position.position_id}[/]",
-                    border_style="cyan",
-                    width=50,
-                )
-            )
         else:
-            console.print(f"  [dim]SKIP — Pas assez de cash[/]")
+            self._log(f"[dim]SKIP — Pas assez de cash[/]")
 
-    def _wait_with_progress(self, seconds: float):
-        """Affiche une barre de progression Rich pendant l'attente."""
-        update_interval = 1
+    def _refetch_history_after_reconnect(self) -> None:
+        """Après une reconnexion WS, refait un fetch REST pour combler les bougies manquées."""
+        try:
+            df_fresh = fetch_latest_ohlcv(
+                self.symbol,
+                limit=self.window_size + 52,
+                exchange=self.exchange,
+                timeframe=self.timeframe,
+            )
+        except Exception as exc:
+            self._log(f"[yellow]WARN[/] Refetch post-reconnect échoué: {exc}")
+            return
 
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[bold blue]Prochain check SL/TP"),
-            BarColumn(bar_width=30),
-            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
-            TimeRemainingColumn(),
-            console=console,
-            transient=True,
-        ) as progress:
-            task = progress.add_task("wait", total=seconds)
-            elapsed = 0
-            while elapsed < seconds and self.running:
-                sleep_step = min(update_interval, seconds - elapsed)
-                time.sleep(sleep_step)
-                elapsed += sleep_step
-                progress.update(task, completed=elapsed)
-
-    def _is_candle_complete(self, candle_time) -> bool:
-        """Vérifie si la bougie précédente est clôturée.
-
-        Quand une nouvelle bougie timestamp apparaît dans les données Binance,
-        la bougie précédente est fermée. On attend juste 5% du timeframe (≥1 min)
-        comme marge de sécurité pour laisser Binance finaliser les données.
-
-        Ex : timeframe 1h → nouvelle bougie à 15:00 → on traite dès 15:03.
-        """
-        now = datetime.now(timezone.utc)
-        candle_dt = (
-            candle_time.to_pydatetime()
-            if hasattr(candle_time, "to_pydatetime")
-            else candle_time
+        self.df_history = df_fresh
+        latest_closed_ts = (
+            df_fresh.index[-2] if len(df_fresh) >= 2 else df_fresh.index[-1]
         )
-        if candle_dt.tzinfo is None:
-            candle_dt = candle_dt.replace(tzinfo=timezone.utc)
-        age = now - candle_dt
-        min_age = timedelta(minutes=max(1, self.minutes_per_bar * 0.05))
-        return age >= min_age
+
+        # Si une (ou plusieurs) bougie(s) ont été clôturées pendant l'offline, rattraper la dernière.
+        if (
+            self.last_candle_time is not None
+            and latest_closed_ts > self.last_candle_time
+        ):
+            missed_close_price = float(df_fresh["close"].iloc[-2])
+            self._log(
+                f"[cyan]GAP FILL[/] bougie manquée {latest_closed_ts} → rattrapage"
+            )
+            self.last_candle_time = latest_closed_ts
+            try:
+                self.process_new_candle(missed_close_price, latest_closed_ts)
+            except Exception as exc:
+                self._log(
+                    f"[red]ERROR[/] process_new_candle (gap fill) a échoué: {exc}"
+                )
 
     def run(self):
-        """Boucle principale.
+        """Boucle principale event-driven, alimentée par la WebSocket Binance.
 
-        Deux fréquences distinctes :
-        - Toutes les SLTP_POLL_SECONDS (5 min) : fetch prix + check SL/TP.
-        - À chaque nouvelle bougie clôturée (~1h pour 1h TF) : prédiction + signal.
-        - Affichage du statut portefeuille toutes les bars (1h).
-
-        Arrêt automatique après MAX_CONSECUTIVE_ERRORS erreurs API.
+        - À chaque tick (prix courant dans `conn_state.current_price`) : check SL/TP.
+        - À chaque bougie clôturée (`KlineEvent`) : prédiction + ouverture position.
+        - À chaque reconnexion (`ReconnectEvent`) : refetch REST pour combler le gap.
+        - Dashboard Rich `Live` rafraîchi ~2×/sec. Reconnexion infinie gérée par le stream.
         """
         self.running = True
-        consecutive_errors = 0
-        last_status_time = datetime.now(timezone.utc)
+        self.dashboard = DashboardView()
+        self.dashboard.log("[green]System started[/] — waiting for first WS tick")
 
-        try:
-            while self.running:
-                current_time = datetime.now(timezone.utc)
+        # Premier tick hérité : si la WS a déjà un prix, pas besoin d'attendre
+        first_reconnect_seen = False
 
-                try:
-                    # Fetch le prix courant (quelques bougies récentes suffisent)
-                    df_latest = fetch_latest_ohlcv(
-                        self.symbol,
-                        limit=5,
-                        exchange=self.exchange,
-                        timeframe=self.timeframe,
+        with Live(
+            self.dashboard.layout,
+            console=console,
+            refresh_per_second=2,
+            screen=False,
+            transient=False,
+        ):
+            try:
+                while self.running:
+                    try:
+                        event = self.stream.queue.get(timeout=1.0)
+                    except queue.Empty:
+                        event = None
+
+                    snap = self.conn_state.snapshot()
+                    current_price = snap["current_price"]
+                    now_utc = datetime.now(timezone.utc)
+
+                    if isinstance(event, ReconnectEvent):
+                        if not first_reconnect_seen:
+                            # Première connexion : pas besoin de refetch, l'init a déjà amorcé
+                            first_reconnect_seen = True
+                            self.dashboard.log(
+                                "[green]WebSocket connected[/] — streaming klines"
+                            )
+                        else:
+                            self.dashboard.log(
+                                f"[cyan]Reconnected[/] (after {event.attempts} attempts) — "
+                                f"refetching history via REST"
+                            )
+                            self._refetch_history_after_reconnect()
+                    elif isinstance(event, KlineEvent):
+                        # Bougie clôturée confirmée par le WS (k.x == true)
+                        if (
+                            self.last_candle_time is None
+                            or event.ts > self.last_candle_time
+                        ):
+                            self.last_candle_time = event.ts
+                            try:
+                                self.process_new_candle(event.close, event.ts)
+                            except Exception as exc:
+                                self._log(
+                                    f"[red]ERROR[/] process_new_candle a échoué: {exc}"
+                                )
+
+                    # Check SL/TP à chaque itération (réactivité ~1s)
+                    if current_price is not None and self.state.open_positions:
+                        try:
+                            self._check_and_close_positions(current_price, now_utc)
+                        except Exception as exc:
+                            self._log(
+                                f"[red]ERROR[/] _check_and_close_positions: {exc}"
+                            )
+
+                    # Refresh le dashboard (uptime/status evolue même sans event)
+                    self.dashboard.refresh(
+                        state=self.state,
+                        conn=self.conn_state,
+                        symbol=self.symbol,
+                        current_price=current_price,
+                        initial_capital=self.initial_capital,
                     )
-                    current_price = df_latest["close"].iloc[-1]
-                    consecutive_errors = 0
 
-                    # 1. Toujours : monitorer SL/TP (toutes les 5 min)
-                    if self.state.open_positions:
-                        self._check_and_close_positions(current_price, current_time)
+            except KeyboardInterrupt:
+                self.dashboard.log("[yellow]STOP[/] Interruption détectée (Ctrl+C)")
 
-                    # 2. Détecter une nouvelle bougie clôturée
-                    latest_time = df_latest.index[-1]
-                    if latest_time > self.last_candle_time:
-                        if self._is_candle_complete(latest_time):
-                            # Nouvelle bougie confirmée → signal
-                            self.last_candle_time = latest_time
-                            self.process_new_candle(current_price, latest_time)
-                            print_status(
-                                self.state,
-                                current_price,
-                                self.symbol,
-                                self.initial_capital,
-                            )
-                            last_status_time = current_time
-                        else:
-                            console.print(
-                                f"[dim][{current_time.strftime('%H:%M')}] "
-                                f"Nouvelle bougie {latest_time} en attente de confirmation...[/]"
-                            )
-                    else:
-                        # Afficher le statut au rythme d'une barre (pas toutes les 5 min)
-                        secs_since_status = (
-                            current_time - last_status_time
-                        ).total_seconds()
-                        if secs_since_status >= self.minutes_per_bar * 60:
-                            print_status(
-                                self.state,
-                                current_price,
-                                self.symbol,
-                                self.initial_capital,
-                            )
-                            last_status_time = current_time
-                        else:
-                            console.print(
-                                f"[dim][{current_time.strftime('%H:%M')}] "
-                                f"Prix: ${current_price:,.2f}  "
-                                f"| Prochaine bougie: {self.last_candle_time}  "
-                                f"| Positions: {len(self.state.open_positions)}[/]"
-                            )
-
-                except Exception as e:
-                    consecutive_errors += 1
-                    console.print(f"[bold red]ERROR[/] {current_time}: {e}")
-                    if consecutive_errors >= MAX_CONSECUTIVE_ERRORS:
-                        console.print(
-                            f"  [bold red]FATAL[/] {MAX_CONSECUTIVE_ERRORS} erreurs consécutives "
-                            f"— arrêt du système."
-                        )
-                        break
-
-                # Attendre 5 min avant le prochain check SL/TP
-                self._wait_with_progress(SLTP_POLL_SECONDS)
-
-        except KeyboardInterrupt:
-            console.print("\n\n[bold yellow]STOP[/] Interruption détectée (Ctrl+C)")
-            self.shutdown()
+        # Hors du Live context : prints redeviennent directs
+        self.shutdown()
 
     def shutdown(self):
         """Arrêt gracieux du système."""
         self.running = False
+
+        # Stopper le stream WS
+        if self.stream is not None:
+            self.stream.stop()
+            self.stream = None
+
+        # Désactiver le routage dashboard (les prints finaux vont à la console)
+        self.dashboard = None
 
         # Afficher le résumé final
         print_summary(self.state, self.initial_capital)
@@ -1816,89 +2458,145 @@ class RealtimeTester:
         console.print(
             f"  [green]✓[/] {len(df_full)} bougies chargées ({df_full.index[0].date()} → {df_full.index[-1].date()})"
         )
+
+        # Commencer à window_size + 50 pour avoir assez d'historique pour les features
+        start_idx = self.window_size + 50
+
+        # Initialiser le dashboard et simuler une connexion ONLINE
+        self.dashboard = DashboardView(
+            initial_log=[
+                "[dim]BACKTEST MODE — Simulating live trading on historical data[/]",
+                f"[dim]Period: {df_full.index[start_idx].date()} → {df_full.index[-1].date()}[/]",
+            ]
+        )
+        self.conn_state.update(
+            status=ConnStatus.ONLINE,
+            connected_since=datetime.now(timezone.utc),
+            reconnect_attempts=0,
+            next_retry_in=0.0,
+            last_error=None,
+        )
+
         speed_str = "instantané" if speed == 0 else f"{speed}s par bougie"
         console.print(
             f"\n[bold]BACKTEST[/] Démarrage de la simulation...  Speed: {speed_str}\n"
         )
 
-        # Simuler le passage du temps
-        # Commencer à window_size + 50 pour avoir assez d'historique pour les features
-        start_idx = self.window_size + 50
-
         self.running = True
 
-        try:
-            for i in range(start_idx, len(df_full)):
-                if not self.running:
-                    break
+        with Live(
+            self.dashboard.layout,
+            console=console,
+            refresh_per_second=4,
+            screen=False,
+            transient=False,
+        ):
+            try:
+                for i in range(start_idx, len(df_full)):
+                    if not self.running:
+                        break
 
-                # Simuler l'historique disponible à ce moment
-                df_history = df_full.iloc[: i + 1].copy()
-                current_time = df_history.index[-1]
-                current_price = df_history["close"].iloc[-1]
+                    # Simuler l'historique disponible à ce moment
+                    df_history = df_full.iloc[: i + 1].copy()
+                    current_time = df_history.index[-1]
+                    current_price = float(df_history["close"].iloc[-1])
 
-                # Vérifier et fermer les positions
-                self._check_and_close_positions(current_price, current_time)
-
-                # Circuit breaker : stop trading si drawdown trop élevé
-                if self._circuit_breaker_active:
-                    continue
-
-                # Calculer les features et prédire
-                try:
-                    X_scaled, _ = prepare_live_features(
-                        df_history,
-                        self.feature_scaler,
-                        self.clip_bounds,
-                        timeframe=self.timeframe,
-                        window_size=self.window_size,
-                    )
-                    prediction = predict_return(
-                        self.model, X_scaled, self.target_scaler, self.device
-                    )
-                except Exception as e:
-                    console.print(
-                        f"  [bold red]ERROR[/] Erreur prédiction à {current_time}: {e}"
-                    )
-                    continue
-
-                # Générer le signal
-                signal = None
-                if prediction > self.threshold:
-                    signal = "LONG"
-                elif prediction < -self.threshold and self.allow_short:
-                    signal = "SHORT"
-
-                # Ouvrir une position si signal
-                if signal:
-                    self._open_new_position(
-                        signal, current_price, prediction, current_time
+                    # Mettre à jour le prix dans la conn_state (last_kline_ts = now pour afficher "0s ago")
+                    self.conn_state.update(
+                        current_price=current_price,
+                        last_kline_ts=datetime.now(timezone.utc).replace(tzinfo=None),
                     )
 
-                # Afficher le statut ~1x par jour calendaire (adapté au timeframe)
-                bars_per_day = max(1, round(1440 / self.minutes_per_bar))
-                if (i - start_idx) % bars_per_day == 0 or i == len(df_full) - 1:
-                    print_status_backtest(
-                        self.state,
-                        current_price,
-                        self.symbol,
-                        current_time,
-                        i - start_idx,
-                        len(df_full) - start_idx,
-                        self.initial_capital,
+                    # Événement bougie dans le log
+                    self._log(
+                        f"[bold cyan]CANDLE[/] {current_time} | Price: ${current_price:,.2f}"
                     )
 
-                # Petite pause si demandée
-                if speed > 0:
-                    time.sleep(speed)
+                    # Vérifier et fermer les positions
+                    self._check_and_close_positions(current_price, current_time)
 
-            # Simulation terminée
-            console.print("\n[bold green]BACKTEST[/] Simulation terminée!")
-            self.shutdown()
+                    # Refresh après les fermetures éventuelles
+                    self.dashboard.refresh(
+                        state=self.state,
+                        conn=self.conn_state,
+                        symbol=self.symbol,
+                        current_price=current_price,
+                        initial_capital=self.initial_capital,
+                    )
 
-        except KeyboardInterrupt:
-            console.print("\n\n[bold yellow]STOP[/] Interruption détectée (Ctrl+C)")
-            self.shutdown()
+                    # Circuit breaker : stop trading si drawdown trop élevé
+                    if self._circuit_breaker_active:
+                        time.sleep(max(speed, 0.025))
+                        continue
+
+                    # Calculer les features et prédire
+                    try:
+                        X_scaled, _ = prepare_live_features(
+                            df_history,
+                            self.feature_scaler,
+                            self.clip_bounds,
+                            timeframe=self.timeframe,
+                            window_size=self.window_size,
+                        )
+                        prediction = predict_return(
+                            self.model, X_scaled, self.target_scaler, self.device
+                        )
+                        pred_style = (
+                            "green"
+                            if prediction > 0
+                            else "red"
+                            if prediction < 0
+                            else "dim"
+                        )
+                        self._log(
+                            f"[bold]PREDICTION[/] [{pred_style}]{prediction * 100:+.2f}%[/]  "
+                            f"[dim](threshold: ±{self.threshold * 100:.2f}%)[/]"
+                        )
+                    except Exception as e:
+                        self._log(
+                            f"[bold red]ERROR[/] Prédiction à {current_time}: {e}"
+                        )
+                        time.sleep(max(speed, 0.025))
+                        continue
+
+                    # Générer le signal
+                    if prediction > self.threshold:
+                        self._open_new_position(
+                            "LONG", current_price, prediction, current_time
+                        )
+                    elif prediction < -self.threshold and self.allow_short:
+                        self._open_new_position(
+                            "SHORT", current_price, prediction, current_time
+                        )
+
+                    # Refresh dashboard
+                    self.dashboard.refresh(
+                        state=self.state,
+                        conn=self.conn_state,
+                        symbol=self.symbol,
+                        current_price=current_price,
+                        initial_capital=self.initial_capital,
+                    )
+
+                    time.sleep(max(speed, 0.025))
+
+            except KeyboardInterrupt:
+                self.dashboard.log("[yellow]STOP[/] Interruption détectée (Ctrl+C)")
+
+        # Hors du contexte Live — affichage final
+        self.dashboard = None
+        self.running = False
+        console.print("\n[bold green]BACKTEST[/] Simulation terminée!")
+        print_summary(self.state, self.initial_capital)
+        if self.state.open_positions:
+            console.print(
+                f"\n[bold yellow]WARNING[/] {len(self.state.open_positions)} positions encore ouvertes:"
+            )
+            for pos in self.state.open_positions:
+                console.print(
+                    f"   [bold]#{pos.position_id}[/] {pos.direction} | Entry: ${pos.entry_price:,.2f}"
+                )
+        console.print("\n[bold]SHUTDOWN[/] Backtest terminé.")
 
 
 # ----- CLI ----- #
@@ -1973,7 +2671,7 @@ def parse_args():
         "--speed",
         type=float,
         default=0,
-        help="Délai entre bougies en mode backtest (secondes, 0 = instantané)",
+        help="Délai entre bougies en mode backtest (secondes, 0 = min 25ms pour afficher le dashboard, 0.1 recommandé pour présentation)",
     )
     parser.add_argument(
         "--fresh",
