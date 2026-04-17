@@ -8,6 +8,7 @@ AVAILABLE_MODELS: dict[str, tuple[str, str]] = {
     "cnn": ("models.cnn.predictor", "CNNPredictor"),
     "bilstm": ("models.bilstm.predictor", "BiLSTMPredictor"),
     "cnn_bilstm_am": ("models.cnn_bilstm_am.predictor", "CnnBiLstmAmPredictor"),
+    "transformer": ("models.transformer.predictor", "TransformerPredictor"),
     "patch_tst": ("models.patch_tst.predictor", "PatchTSTPredictor"),
     "xgboost": ("models.xgboost.predictor", "XGBoostPredictor"),
 }
