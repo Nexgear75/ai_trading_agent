@@ -47,10 +47,12 @@ def load_model(model_path: str, device: torch.device, window_size: int = None) -
     ckpt_window_size = checkpoint.get("window_size", 30)
     ckpt_n_features = checkpoint.get("n_features", len(FEATURE_COLUMNS))
     ckpt_model_cfg = checkpoint.get("model_cfg", {})
+    ckpt_task = checkpoint.get("task", "regression")
 
     model = CNNBiLSTMAM(
         window_size=ckpt_window_size,
         n_features=ckpt_n_features,
+        task=ckpt_task,
         **ckpt_model_cfg,
     ).to(device)
     model.load_state_dict(checkpoint["model_state"])
@@ -92,7 +94,7 @@ def evaluate(
 
     # Charger modèle, données, et scalers
     model, history = load_model(model_path, device, window_size=window_size)
-    _, val_loader, _, _, _, close_val = prepare_data(symbol=symbol, timeframe=timeframe)
+    _, val_loader, _, _, _, close_val, _ = prepare_data(symbol=symbol, timeframe=timeframe)
     scalers = joblib.load(paths["scalers"])
 
     # Create results directory for this timeframe
