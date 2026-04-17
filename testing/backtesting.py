@@ -4,8 +4,139 @@ Module de backtesting générique pour tous les modèles du projet.
 Simule une stratégie de trading basée sur les prédictions d'un modèle ML,
 calcule les métriques de performance et génère une courbe d'équité.
 
-Usage:
-    python -m testing.backtesting --model cnn --symbol BTC --capital 10000 --threshold 0.01
+================================================================================
+EXEMPLES D'UTILISATION
+================================================================================
+
+1) Backtest simple sur un seul symbole:
+   python -m testing.backtesting --model cnn --symbol BTC --capital 10000
+
+2) Backtest avec seuil de prédiction personnalisé:
+   python -m testing.backtesting --model cnn --symbol BTC --capital 10000 --threshold 0.02
+
+3) Backtest avec positions short autorisées:
+   python -m testing.backtesting --model cnn --symbol BTC --allow-short --threshold 0.015
+
+4) Backtest sur tous les symboles définis dans SYMBOLS:
+   python -m testing.backtesting --model cnn --all-symbols --capital 1000
+
+5) Backtest avec risk management ATR-based (SL/TP/trailing stop):
+   python -m testing.backtesting --model cnn --symbol BTC --atr-risk --threshold 0.01
+
+6) Backtest avec frais personnalisés:
+   python -m testing.backtesting --model cnn --symbol BTC --entry-fee 0.0005 --exit-fee 0.0005
+
+7) Backtest avec date de début personnalisée (out-of-sample):
+   python -m testing.backtesting --model cnn --symbol BTC --test-start-date 2024-06-01
+
+8) Backtest sur timeframe différent:
+   python -m testing.backtesting --model cnn --symbol BTC --timeframe 1h --threshold 0.005
+
+9) Backtest ensemble de modèles (ensemble):
+   python -m testing.backtesting --model ensemble --symbol BTC --ensemble-models cnn,bilstm --ensemble-strategy weighted_average
+
+10) Backtest ensemble avec poids personnalisés:
+    python -m testing.backtesting --model ensemble --symbol BTC --ensemble-models cnn,bilstm,gru --ensemble-weights 0.5,0.3,0.2
+
+11) Backtest ensemble sur tous les symboles:
+    python -m testing.backtesting --model ensemble --all-symbols --ensemble-models cnn,bilstm --ensemble-strategy majority_vote
+
+================================================================================
+OPTIONS DISPONIBLES
+================================================================================
+
+--model (required)          Type du modèle: cnn, lstm, gru, bilstm, xgboost, ensemble, etc.
+
+--symbol                    Symbole de la crypto (ex: BTC, ETH). Requis sauf avec --all-symbols.
+
+--capital                   Capital initial (défaut: 1000). En mode --all-symbols, c'est le
+                            capital par symbole.
+
+--threshold                 Seuil de prédiction pour ouvrir une position (défaut: 0.0).
+                            Une prédiction > threshold déclenche un LONG, < -threshold un SHORT.
+                            Valeurs typiques: 0.005 (0.5%) à 0.03 (3%).
+
+--allow-short               Autorise les positions SHORT sur les prédictions négatives.
+
+--timeframe                 Timeframe du modèle: 1d, 1h, 4h, 15m (défaut: 1d).
+                            Doit correspondre au timeframe sur lequel le modèle est entraîné.
+
+--model-path                Chemin vers un checkpoint spécifique (optionnel).
+                            Défaut: models/<model>/checkpoints/<timeframe>/best_model.pth
+
+--entry-fee                 Frais à l'entrée en pourcentage (ex: 0.001 = 0.1%, défaut: 0.1%).
+
+--exit-fee                  Frais à la sortie en pourcentage (ex: 0.001 = 0.1%, défaut: 0.1%).
+
+--atr-risk                  Active le risk management ATR-based avec:
+                            - Stop-loss basé sur l'ATR (0.75x ATR)
+                            - Take-profit basé sur l'ATR (1.5x ATR)
+                            - Trailing stop (2.5x ATR threshold)
+                            - Cooldown après 5 pertes consécutives
+
+--test-start-date           Date de début pour le test out-of-sample (ex: 2025-01-01).
+                            Si non spécifié, utilise TEST_START_DATE du config.
+
+--all-symbols               Tester sur tous les symboles définis dans config.SYMBOLS.
+                            Le capital spécifié est alloué PAR symbole.
+
+--ensemble-models           Liste des modèles pour l'ensemble, séparés par virgule.
+                            Ex: cnn,bilstm,cnn_bilstm_am. Requis si --model ensemble.
+
+--ensemble-strategy         Stratégie d'agrégation pour l'ensemble:
+                            - majority_vote: Vote majoritaire
+                            - weighted_average: Moyenne pondérée (défaut)
+                            - confidence_weighted: Pondéré par la confiance
+                            - unanimous: Tous les modèles doivent être d'accord
+
+--ensemble-weights          Poids personnalisés pour chaque modèle, séparés par virgule.
+                            Ex: 0.5,0.3,0.2. Défaut: poids égaux.
+
+================================================================================
+EXEMPLES DE SCÉNARIOS
+================================================================================
+
+# Scénario 1: Backtest conservateur sur BTC
+# - Seuil élevé (2%) pour filtrer les signaux faibles
+# - Sans short (uniquement LONG)
+python -m testing.backtesting --model cnn --symbol BTC --capital 10000 --threshold 0.02
+
+# Scénario 2: Backtest agressif multi-symboles avec ATR risk
+# - Seuil bas (0.8%) pour plus de trades
+# - Short autorisé
+# - Risk management ATR pour protéger le capital
+# - Capital de 500$ par symbole
+python -m testing.backtesting --model cnn --all-symbols --capital 500 --threshold 0.008 --allow-short --atr-risk
+
+# Scénario 3: Backtest avec frais de trading réalistes
+# - Binance spot: 0.1% entry + 0.1% exit
+# - Comparaison avec frais réduits (VIP)
+python -m testing.backtesting --model cnn --symbol BTC --entry-fee 0.001 --exit-fee 0.001
+
+# Scénario 4: Ensemble de modèles avec stratégie conservative
+# - Unanimous: tous les modèles doivent être d'accord
+# - Réduit les faux signaux mais aussi le nombre de trades
+python -m testing.backtesting --model ensemble --symbol BTC --ensemble-models cnn,lstm,gru --ensemble-strategy unanimous --threshold 0.01
+
+# Scénario 5: Backtest sur timeframe court (1h) pour day-trading simulation
+# - Seuil adapté à la volatilité intraday
+# - Risk management crucial sur des horizons courts
+python -m testing.backtesting --model cnn --symbol BTC --timeframe 1h --threshold 0.005 --atr-risk
+
+# Scénario 6: Validation sur période récente (stress test)
+# - Test sur les 6 derniers mois uniquement
+# - Vérifie la robustesse du modèle sur données récentes
+python -m testing.backtesting --model cnn --symbol BTC --test-start-date 2024-06-01
+
+# Scénario 7: Comparaison modèles individuels vs ensemble
+# Test individuel CNN:
+python -m testing.backtesting --model cnn --symbol BTC --capital 10000 --threshold 0.01
+# Test individuel LSTM:
+python -m testing.backtesting --model lstm --symbol BTC --capital 10000 --threshold 0.01
+# Test ensemble pondéré:
+python -m testing.backtesting --model ensemble --symbol BTC --ensemble-models cnn,lstm --ensemble-strategy weighted_average --threshold 0.01
+
+================================================================================
 """
 
 import argparse
@@ -852,9 +983,7 @@ def simulate_trading(
                     atr_val = 0.02
                 sl_distance = atr_val * sl_atr_mult
                 risk_amount = (cash + allocated) * risk_per_trade
-                trade_capital = min(
-                    risk_amount / (sl_distance + 1e-10), slot_capital
-                )
+                trade_capital = min(risk_amount / (sl_distance + 1e-10), slot_capital)
             else:
                 trade_capital = slot_capital
                 atr_val = None
