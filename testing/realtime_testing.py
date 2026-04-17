@@ -4,14 +4,317 @@ Module de testing en temps réel avec données Binance live.
 Simule une stratégie de trading sur des données temps réel,
 avec gestion des positions, stop-loss et take-profit basés sur RRR.
 
-Usage:
-    # Mode temps réel (live)
-    python -m testing.realtime_testing --symbol BTC/USDT --model cnn --capital 10000
-    python -m testing.realtime_testing --config testing/config.json
+================================================================================
+EXEMPLES D'UTILISATION
+================================================================================
 
-    # Mode backtest (simulation sur historique)
-    python -m testing.realtime_testing --backtest --symbol BTC --model cnn
-    python -m testing.realtime_testing --backtest --start-date 2024-01-01 --end-date 2024-12-31 --speed 0.1
+MODE TEMPS RÉEL (LIVE):
+-----------------------
+
+1) Mode live basique:
+   python -m testing.realtime_testing --symbol BTC/USDT --model cnn --capital 10000
+
+2) Mode live avec fichier de configuration:
+   python -m testing.realtime_testing --config testing/config.json
+
+3) Mode live avec paramètres de trading personnalisés:
+   python -m testing.realtime_testing --symbol BTC/USDT --model cnn --capital 5000 --threshold 0.015 --rrr 2.5 --risk 0.02
+
+4) Mode live avec risk management avancé:
+   python -m testing.realtime_testing --symbol BTC/USDT --model cnn --capital 10000 --sizing-mode dynamic --max-drawdown 0.15 --cooldown 5 --max-daily-trades 3
+
+5) Mode live repartir à zéro (ignorer l'état sauvegardé):
+   python -m testing.realtime_testing --symbol BTC/USDT --model cnn --fresh
+
+MODE BACKTEST (SIMULATION):
+---------------------------
+
+6) Backtest basique sur historique:
+   python -m testing.realtime_testing --backtest --symbol BTC --model cnn
+
+7) Backtest sur période spécifique:
+   python -m testing.realtime_testing --backtest --symbol BTC --model cnn --start-date 2024-01-01 --end-date 2024-06-30
+
+8) Backtest avec visualisation lente (pour présentation):
+   python -m testing.realtime_testing --backtest --symbol BTC --model cnn --speed 0.1
+
+9) Backtest rapide (instantané):
+   python -m testing.realtime_testing --backtest --symbol BTC --model cnn --speed 0
+
+================================================================================
+OPTIONS DISPONIBLES
+================================================================================
+
+OPTIONS GÉNÉRALES:
+------------------
+
+--config                    Chemin vers un fichier JSON de configuration.
+                            Les options CLI écrasent celles du fichier config.
+                            (défaut: testing/config.json)
+
+--symbol                    Paire de trading (ex: BTC/USDT, ETH/USDT).
+                            Format: CRYPTO/USDT ou CRYPTO/USD
+
+--model                     Type de modèle ML: cnn, lstm, gru, bilstm, xgboost
+                            Doit avoir été entraîné au préalable sur le même timeframe
+
+--timeframe                 Timeframe des bougies: 1d, 1h, 4h, 15m (défaut: 1d)
+                            Doit correspondre au timeframe d'entraînement du modèle
+
+--capital                   Capital initial en USD (défaut: 1000)
+
+--threshold                 Seuil de prédiction pour ouvrir une position (défaut: auto).
+                            Valeurs typiques:
+                            - 1d (daily): 0.01 (1%)
+                            - 1h (hourly): 0.005 (0.5%)
+                            - 4h: 0.008 (0.8%)
+                            Une prédiction > threshold → LONG, < -threshold → SHORT
+
+--allow-short               Autorise les positions SHORT (non supporté en spot Binance live,
+                            uniquement en mode backtest/simulation)
+
+--interval                  Intervalle de vérification en heures (défaut: auto)
+                            Auto = 1 barre = timeframe en heures (ex: 24h pour 1d)
+
+OPTIONS DE RISK MANAGEMENT (RRR):
+---------------------------------
+
+--rrr                       Risk/Reward Ratio (défaut: 2.0 pour 1:2)
+                            Ex: 1.5 pour 1:1.5, 3.0 pour 1:3
+                            Plus élevé = TP plus loin, moins de trades gagnants mais plus gros
+
+--risk                      Pourcentage de risque par trade (défaut: auto)
+                            Valeurs typiques:
+                            - 1d: 0.025 (2.5%)
+                            - 1h: 0.015 (1.5%)
+                            Détermine la distance du SL: SL = entry * (1 ± risk)
+
+OPTIONS DE RISK MANAGEMENT AVANCÉ:
+----------------------------------
+
+--sizing-mode               Mode de sizing des positions:
+                            - fixed: Capital fixe par position (défaut)
+                            - periodic: Rebalance périodique du capital de base
+                            - dynamic: Pourcentage dynamique du portefeuille
+
+--max-drawdown              Circuit breaker: drawdown max avant arrêt (défaut: 0.20 = 20%)
+                            Quand atteint, plus aucune nouvelle position n'est ouverte
+
+--cooldown                  Nombre minimum de barres entre deux ouvertures (défaut: 3)
+                            Évite le sur-trading dans les marchés range
+
+--max-daily-trades          Nombre maximum de trades par jour (défaut: 4)
+                            Protection contre les séries de pertes
+
+--max-position-pct          Pourcentage max du portefeuille par position (défaut: 0.25 = 25%)
+                            Uniquement en mode sizing-mode=dynamic
+
+--max-position-size         Taille max absolue en $ par position (optionnel)
+
+OPTIONS MODE BACKTEST:
+----------------------
+
+--backtest                  Active le mode backtest sur données historiques locales
+
+--start-date                Date de début du backtest (YYYY-MM-DD)
+                            Si non spécifié, utilise les 3 derniers mois d'historique
+
+--end-date                  Date de fin du backtest (YYYY-MM-DD)
+                            Si non spécifié, utilise aujourd'hui
+
+--speed                     Délai entre bougies en secondes (défaut: 0 = instantané)
+                            - 0: Exécution rapide (min 25ms pour affichage dashboard)
+                            - 0.1: Présentation (100ms par bougie, ~2min pour 1 an)
+                            Plus élevé = plus lent, permet de visualiser le trading
+
+--fresh                     Ignore l'état sauvegardé et repart de zéro
+                            Utile pour refaire un backtest propre
+
+================================================================================
+FICHIER DE CONFIGURATION (config.json)
+================================================================================
+
+Exemple de fichier testing/config.json:
+
+{
+  "symbol": "BTC/USDT",
+  "model_type": "cnn",
+  "timeframe": "1d",
+  "capital": 10000.0,
+  "threshold": 0.01,
+  "allow_short": false,
+  "rrr": 2.0,
+  "risk_pct": 0.025,
+  "check_interval_hours": null,
+  "entry_fee_pct": 0.001,
+  "exit_fee_pct": 0.001,
+  "slippage_pct": 0.001,
+  "log_level": "INFO",
+  "sizing_mode": "dynamic",
+  "max_position_pct": 0.25,
+  "max_position_size": null,
+  "rebalance_interval": 50,
+  "max_drawdown_pct": 0.20,
+  "cooldown_bars": 3,
+  "max_trades_per_day": 4,
+  "max_expiration_rate": 0.50
+}
+
+================================================================================
+EXEMPLES DE SCÉNARIOS
+================================================================================
+
+# SCÉNARIO 1: Trading live conservateur sur BTC (recommandé pour débuter)
+# - Capital: 5000$
+# - Seuil élevé (1.5%) pour éviter les faux signaux
+# - RRR 1:2, risque 2% par trade
+# - Max 3 trades/jour, cooldown de 5 barres
+# - Circuit breaker à 15% de drawdown
+python -m testing.realtime_testing \
+  --symbol BTC/USDT \
+  --model cnn \
+  --capital 5000 \
+  --threshold 0.015 \
+  --rrr 2.0 \
+  --risk 0.02 \
+  --max-daily-trades 3 \
+  --cooldown 5 \
+  --max-drawdown 0.15
+
+# SCÉNARIO 2: Trading live agressif avec sizing dynamique
+# - Sizing dynamique: 25% du portefeuille par position
+# - Plus de trades journaliers (6)
+# - Seuil plus bas (0.8%)
+python -m testing.realtime_testing \
+  --symbol BTC/USDT \
+  --model cnn \
+  --capital 10000 \
+  --threshold 0.008 \
+  --sizing-mode dynamic \
+  --max-position-pct 0.25 \
+  --max-daily-trades 6 \
+  --cooldown 2
+
+# SCÉNARIO 3: Backtest rapide pour valider une stratégie
+# - Période: Janvier à Juin 2024
+# - Exécution instantanée
+# - Affiche le dashboard avec les métriques en temps réel
+python -m testing.realtime_testing \
+  --backtest \
+  --symbol BTC \
+  --model cnn \
+  --start-date 2024-01-01 \
+  --end-date 2024-06-30 \
+  --speed 0
+
+# SCÉNARIO 4: Backtest visuel pour présentation/démo
+# - Vitesse lente (0.1s par bougie)
+# - Permet de visualiser chaque décision de trading
+# - ~1min30 de démo pour 1 an de données (1d)
+python -m testing.realtime_testing \
+  --backtest \
+  --symbol BTC \
+  --model cnn \
+  --start-date 2023-01-01 \
+  --end-date 2023-12-31 \
+  --speed 0.1
+
+# SCÉNARIO 5: Reprise d'un trading live après arrêt
+# - Le système sauvegarde automatiquement l'état dans testing/state_<symbol>.json
+# - Relance simple reprend où ça s'est arrêté
+python -m testing.realtime_testing \
+  --symbol BTC/USDT \
+  --model cnn \
+  --capital 10000
+
+# SCÉNARIO 6: Reset complet et nouveau départ
+# --fresh supprime le fichier d'état sauvegardé
+python -m testing.realtime_testing \
+  --symbol BTC/USDT \
+  --model cnn \
+  --capital 10000 \
+  --fresh
+
+# SCÉNARIO 7: Trading sur timeframe court (1h) - Day trading
+# - Utilise un modèle entraîné sur 1h
+# - Seuil adapté à la volatilité intraday
+python -m testing.realtime_testing \
+  --symbol BTC/USDT \
+  --model cnn \
+  --timeframe 1h \
+  --capital 5000 \
+  --threshold 0.005 \
+  --risk 0.015 \
+  --max-daily-trades 8
+
+# SCÉNARIO 8: Comparaison de modèles via backtest
+# Test CNN:
+python -m testing.realtime_testing --backtest --symbol BTC --model cnn --start-date 2024-01-01 --end-date 2024-06-30
+# Test LSTM:
+python -m testing.realtime_testing --backtest --symbol BTC --model lstm --start-date 2024-01-01 --end-date 2024-06-30
+# Test BiLSTM:
+python -m testing.realtime_testing --backtest --symbol BTC --model bilstm --start-date 2024-01-01 --end-date 2024-06-30
+
+# SCÉNARIO 9: Test avec frais réalistes Binance
+# - Entry fee: 0.1% (spot standard)
+# - Slippage: 0.1% (estimation réaliste)
+python -m testing.realtime_testing \
+  --backtest \
+  --symbol BTC \
+  --model cnn \
+  --capital 10000 \
+  --threshold 0.012
+
+# SCÉNARIO 10: Risk management très conservateur
+# - Circuit breaker bas (10%)
+# - Sizing fixe et faible
+# - Cooldown long (10 barres)
+python -m testing.realtime_testing \
+  --symbol BTC/USDT \
+  --model cnn \
+  --capital 10000 \
+  --sizing-mode fixed \
+  --max-drawdown 0.10 \
+  --cooldown 10 \
+  --max-daily-trades 2
+
+================================================================================
+AFFICHAGE EN TEMPS RÉEL (DASHBOARD)
+================================================================================
+
+Le dashboard affiche en temps réel:
+- Status WebSocket (ONLINE/RECONNECTING/OFFLINE)
+- Prix courant et uptime
+- Valeur du portefeuille
+- PnL total (réalisé + non réalisé)
+- Win rate
+- Nombre de trades (gagnants/perdants/ouverts)
+- Positions ouvertes avec:
+  * Direction (LONG/SHORT)
+  * Prix d'entrée et prix courant
+  * PnL non réalisé
+  * Stop-loss et Take-profit
+  * Prédiction du modèle
+
+Event log (40 derniers événements):
+- NEW CANDLE: Nouvelle bougie détectée
+- PREDICTION: Prédiction du modèle
+- OPEN #X: Nouvelle position ouverte
+- CLOSE #X TP/SL/EXPIRATION: Position fermée avec raison et PnL
+- CIRCUIT BREAKER: Activation du circuit breaker
+- REBALANCE: Rebalance du capital (mode periodic)
+
+Commandes durant l'exécution:
+- Ctrl+C: Arrêt gracieux du système
+
+================================================================================
+FICHIERS GÉNÉRÉS
+================================================================================
+
+- testing/state_<symbol>.json: État persistant (positions, trades, capital)
+- testing/config.json: Configuration par défaut
+
+================================================================================
 """
 
 import argparse
@@ -174,24 +477,24 @@ def load_config(config_path: str) -> dict:
         "model_type": "cnn",
         "timeframe": DEFAULT_TIMEFRAME,
         "capital": 1000.0,
-        "threshold": None,          # None = auto (SIGNAL_THRESHOLDS[timeframe])
+        "threshold": None,  # None = auto (SIGNAL_THRESHOLDS[timeframe])
         "allow_short": False,
         "rrr": 2.0,
-        "risk_pct": None,           # None = auto (RISK_PCTS[timeframe])
+        "risk_pct": None,  # None = auto (RISK_PCTS[timeframe])
         "check_interval_hours": None,  # None = auto (1 barre = minutes_per_bar/60 h)
         "entry_fee_pct": DEFAULT_ENTRY_FEE,
         "exit_fee_pct": DEFAULT_EXIT_FEE,
         "slippage_pct": DEFAULT_SLIPPAGE_PCT,
         "log_level": "INFO",
         # Risk management
-        "sizing_mode": "dynamic",        # "fixed", "periodic", "dynamic"
-        "max_position_pct": 0.25,       # 25% du portefeuille par position (mode dynamic)
-        "max_position_size": None,      # Max absolu en $ (None = pas de limite)
-        "rebalance_interval": 50,       # Rebalance tous les N trades (mode periodic)
-        "max_drawdown_pct": 0.20,       # Circuit breaker à 20% de drawdown
-        "cooldown_bars": 3,             # Min 3 barres entre deux ouvertures
-        "max_trades_per_day": 4,        # Max 4 trades par jour
-        "max_expiration_rate": 0.50,    # Warning si >50% d'expirations
+        "sizing_mode": "dynamic",  # "fixed", "periodic", "dynamic"
+        "max_position_pct": 0.25,  # 25% du portefeuille par position (mode dynamic)
+        "max_position_size": None,  # Max absolu en $ (None = pas de limite)
+        "rebalance_interval": 50,  # Rebalance tous les N trades (mode periodic)
+        "max_drawdown_pct": 0.20,  # Circuit breaker à 20% de drawdown
+        "cooldown_bars": 3,  # Min 3 barres entre deux ouvertures
+        "max_trades_per_day": 4,  # Max 4 trades par jour
+        "max_expiration_rate": 0.50,  # Warning si >50% d'expirations
     }
 
     if os.path.exists(config_path):
@@ -205,7 +508,9 @@ def load_config(config_path: str) -> dict:
 # ----- Fetching données temps réel ----- #
 
 
-def fetch_latest_ohlcv(symbol: str, limit: int = 100, exchange=None, timeframe: str = DEFAULT_TIMEFRAME) -> pd.DataFrame:
+def fetch_latest_ohlcv(
+    symbol: str, limit: int = 100, exchange=None, timeframe: str = DEFAULT_TIMEFRAME
+) -> pd.DataFrame:
     """
     Récupère les dernières bougies OHLCV depuis Binance.
 
@@ -231,7 +536,9 @@ def fetch_latest_ohlcv(symbol: str, limit: int = 100, exchange=None, timeframe: 
                     f"Impossible de récupérer les données après {max_retries} tentatives: {e}"
                 )
             wait_time = 2**attempt  # Exponential backoff
-            console.print(f"  [yellow]RETRY[/] Erreur API, nouvelle tentative dans {wait_time}s...")
+            console.print(
+                f"  [yellow]RETRY[/] Erreur API, nouvelle tentative dans {wait_time}s..."
+            )
             time.sleep(wait_time)
 
     df = pd.DataFrame(
@@ -244,7 +551,9 @@ def fetch_latest_ohlcv(symbol: str, limit: int = 100, exchange=None, timeframe: 
 
 
 def fetch_initial_history(
-    symbol: str, min_bars: int = WINDOW_SIZE + 50, exchange=None,
+    symbol: str,
+    min_bars: int = WINDOW_SIZE + 50,
+    exchange=None,
     timeframe: str = DEFAULT_TIMEFRAME,
 ) -> pd.DataFrame:
     """
@@ -259,8 +568,12 @@ def fetch_initial_history(
     Returns:
         DataFrame OHLCV avec suffisamment d'historique
     """
-    console.print(f"[bold]INIT[/] Récupération de l'historique {symbol} ({min_bars} bougies [{timeframe}] minimum)...")
-    df = fetch_latest_ohlcv(symbol, limit=min_bars, exchange=exchange, timeframe=timeframe)
+    console.print(
+        f"[bold]INIT[/] Récupération de l'historique {symbol} ({min_bars} bougies [{timeframe}] minimum)..."
+    )
+    df = fetch_latest_ohlcv(
+        symbol, limit=min_bars, exchange=exchange, timeframe=timeframe
+    )
     console.print(
         f"  [green]✓[/] {len(df)} bougies récupérées (du {df.index[0].date()} au {df.index[-1].date()})"
     )
@@ -297,7 +610,9 @@ class BinanceKlineStream:
         self.url = f"{BINANCE_WS_URL}/{symbol_ws}@kline_{timeframe}"
 
     def start(self) -> None:
-        self._thread = threading.Thread(target=self._run_in_thread, daemon=True, name="binance-ws")
+        self._thread = threading.Thread(
+            target=self._run_in_thread, daemon=True, name="binance-ws"
+        )
         self._thread.start()
 
     def stop(self) -> None:
@@ -392,11 +707,15 @@ class BinanceKlineStream:
         except (KeyError, TypeError, ValueError):
             return
 
-        ts = datetime.fromtimestamp(open_ts_ms / 1000, tz=timezone.utc).replace(tzinfo=None)
+        ts = datetime.fromtimestamp(open_ts_ms / 1000, tz=timezone.utc).replace(
+            tzinfo=None
+        )
         self.conn_state.update(current_price=close, last_kline_ts=ts)
 
         if is_closed:
-            event = KlineEvent(ts=ts, open=open_, high=high, low=low, close=close, volume=volume)
+            event = KlineEvent(
+                ts=ts, open=open_, high=high, low=low, close=close, volume=volume
+            )
             try:
                 self.queue.put_nowait(event)
             except queue.Full:
@@ -412,8 +731,11 @@ class BinanceKlineStream:
 
 
 def prepare_live_features(
-    df: pd.DataFrame, feature_scaler, clip_bounds: np.ndarray | None = None,
-    timeframe: str = DEFAULT_TIMEFRAME, window_size: int = WINDOW_SIZE,
+    df: pd.DataFrame,
+    feature_scaler,
+    clip_bounds: np.ndarray | None = None,
+    timeframe: str = DEFAULT_TIMEFRAME,
+    window_size: int = WINDOW_SIZE,
 ) -> tuple[np.ndarray, pd.DataFrame]:
     """
     Calcule les features pour la dernière fenêtre de données.
@@ -523,7 +845,9 @@ def calculate_sl_tp(
 
 
 def check_position_exit(
-    position: RealtimePosition, current_price: float, current_time: datetime,
+    position: RealtimePosition,
+    current_price: float,
+    current_time: datetime,
     slippage_pct: float = 0.0,
     prediction_horizon: int = PREDICTION_HORIZON,
     minutes_per_bar: int = 1440,
@@ -736,7 +1060,9 @@ def _calc_portfolio_metrics(
 
     # PnL total = différence entre la valeur actuelle du portfolio et le capital initial
     # Inclut le PnL réalisé, non réalisé et les frais d'entrée des positions ouvertes
-    total_pnl = (portfolio_value - initial_capital) if initial_capital > 0 else closed_pnl
+    total_pnl = (
+        (portfolio_value - initial_capital) if initial_capital > 0 else closed_pnl
+    )
 
     return {
         "portfolio_value": portfolio_value,
@@ -752,11 +1078,20 @@ def _calc_portfolio_metrics(
 # ----- Affichage ----- #
 
 
-def print_header(symbol: str, model_type: str, capital: float, rrr: float,
-                 prediction_horizon: int = PREDICTION_HORIZON, timeframe: str = DEFAULT_TIMEFRAME,
-                 threshold: float = 0.01, risk_pct: float = 0.025,
-                 sizing_mode: str = "fixed", max_drawdown_pct: float = 0.20,
-                 cooldown_bars: int = 3, max_trades_per_day: int = 4):
+def print_header(
+    symbol: str,
+    model_type: str,
+    capital: float,
+    rrr: float,
+    prediction_horizon: int = PREDICTION_HORIZON,
+    timeframe: str = DEFAULT_TIMEFRAME,
+    threshold: float = 0.01,
+    risk_pct: float = 0.025,
+    sizing_mode: str = "fixed",
+    max_drawdown_pct: float = 0.20,
+    cooldown_bars: int = 3,
+    max_trades_per_day: int = 4,
+):
     """Affiche l'en-tête du système."""
     table = Table(show_header=False, box=None, padding=(0, 2))
     table.add_column(style="bold cyan")
@@ -773,10 +1108,14 @@ def print_header(symbol: str, model_type: str, capital: float, rrr: float,
     table.add_row("Cooldown", f"{cooldown_bars} bars")
     table.add_row("Max/Day", str(max_trades_per_day))
 
-    console.print(Panel(table, title="REALTIME TRADING SIMULATION", border_style="cyan"))
+    console.print(
+        Panel(table, title="REALTIME TRADING SIMULATION", border_style="cyan")
+    )
 
 
-def print_status(state: RealtimeState, current_price: float, symbol: str, initial_capital: float = 0):
+def print_status(
+    state: RealtimeState, current_price: float, symbol: str, initial_capital: float = 0
+):
     """Affiche le statut courant du portefeuille (mode live)."""
     m = _calc_portfolio_metrics(state, current_price, initial_capital)
 
@@ -824,7 +1163,9 @@ def print_status(state: RealtimeState, current_price: float, symbol: str, initia
     if pos_lines:
         # Render table + positions together
         console.print()
-        console.print(Panel(table, title=title, subtitle="OPEN POSITIONS ↓", border_style="blue"))
+        console.print(
+            Panel(table, title=title, subtitle="OPEN POSITIONS ↓", border_style="blue")
+        )
         for line in pos_lines:
             console.print(line)
         console.print()
@@ -969,7 +1310,13 @@ def print_summary(state: RealtimeState, initial_capital: float):
     """Affiche le résumé final enrichi avec métriques avancées et equity curve."""
     total_trades = len(state.closed_trades)
     if total_trades == 0:
-        console.print(Panel("[dim]Aucun trade exécuté.[/]", title="FINAL SUMMARY", border_style="yellow"))
+        console.print(
+            Panel(
+                "[dim]Aucun trade exécuté.[/]",
+                title="FINAL SUMMARY",
+                border_style="yellow",
+            )
+        )
         return
 
     winning_trades = [t for t in state.closed_trades if t.pnl > 0]
@@ -987,7 +1334,11 @@ def print_summary(state: RealtimeState, initial_capital: float):
 
     avg_win = np.mean([t.pnl for t in winning_trades]) if winning_trades else 0
     avg_loss = np.mean([t.pnl for t in losing_trades]) if losing_trades else 0
-    profit_factor = abs(sum(t.pnl for t in winning_trades) / sum(t.pnl for t in losing_trades)) if losing_trades and sum(t.pnl for t in losing_trades) != 0 else float("inf")
+    profit_factor = (
+        abs(sum(t.pnl for t in winning_trades) / sum(t.pnl for t in losing_trades))
+        if losing_trades and sum(t.pnl for t in losing_trades) != 0
+        else float("inf")
+    )
 
     # Max drawdown
     equity = [initial_capital]
@@ -1007,7 +1358,9 @@ def print_summary(state: RealtimeState, initial_capital: float):
     # Durée moyenne des trades
     durations = []
     for t in state.closed_trades:
-        entry = t.entry_date.replace(tzinfo=None) if t.entry_date.tzinfo else t.entry_date
+        entry = (
+            t.entry_date.replace(tzinfo=None) if t.entry_date.tzinfo else t.entry_date
+        )
         exit_ = t.exit_date.replace(tzinfo=None) if t.exit_date.tzinfo else t.exit_date
         durations.append((exit_ - entry).total_seconds() / 86400)
     avg_duration = np.mean(durations) if durations else 0
@@ -1050,12 +1403,19 @@ def print_summary(state: RealtimeState, initial_capital: float):
     trade_table.add_column(style="bold", no_wrap=True)
     trade_table.add_column(justify="right", no_wrap=True)
 
-    trade_table.add_row("Trades", f"{len(winning_trades)} W / {len(losing_trades)} L  ({total_trades} total)")
+    trade_table.add_row(
+        "Trades",
+        f"{len(winning_trades)} W / {len(losing_trades)} L  ({total_trades} total)",
+    )
     trade_table.add_row("Win Rate", Text(f"{win_rate:.1f}%", style=wr_style))
     pf_str = f"{profit_factor:.2f}" if profit_factor != float("inf") else "∞"
     trade_table.add_row("P. Factor", pf_str)
-    trade_table.add_row("Avg Win", Text(f"${avg_win:,.2f}", style="green") if avg_win > 0 else "$0.00")
-    trade_table.add_row("Avg Loss", Text(f"${avg_loss:,.2f}", style="red") if avg_loss < 0 else "$0.00")
+    trade_table.add_row(
+        "Avg Win", Text(f"${avg_win:,.2f}", style="green") if avg_win > 0 else "$0.00"
+    )
+    trade_table.add_row(
+        "Avg Loss", Text(f"${avg_loss:,.2f}", style="red") if avg_loss < 0 else "$0.00"
+    )
     trade_table.add_row("Best", _pnl_text(best_trade))
     trade_table.add_row("Worst", _pnl_text(worst_trade))
     trade_table.add_row("Avg Dur.", f"{avg_duration:.1f} days")
@@ -1086,7 +1446,9 @@ def print_summary(state: RealtimeState, initial_capital: float):
     full_layout.add_row(bottom_layout)
 
     console.print()
-    console.print(Panel(full_layout, title="[bold]FINAL SUMMARY[/]", border_style="cyan"))
+    console.print(
+        Panel(full_layout, title="[bold]FINAL SUMMARY[/]", border_style="cyan")
+    )
 
     # ----- Equity curve ----- #
     curve = _build_equity_curve(state, initial_capital)
@@ -1154,7 +1516,9 @@ class DashboardView:
 
         last_ts = snap["last_kline_ts"]
         if last_ts is not None:
-            age = (datetime.now(timezone.utc).replace(tzinfo=None) - last_ts).total_seconds()
+            age = (
+                datetime.now(timezone.utc).replace(tzinfo=None) - last_ts
+            ).total_seconds()
             age_txt = f"{age:.0f}s ago" if age < 120 else f"{age / 60:.0f}m ago"
         else:
             age_txt = "—"
@@ -1243,10 +1607,15 @@ class DashboardView:
 
                 pos_table.add_row(
                     str(pos.position_id),
-                    Text(pos.direction, style="green" if pos.direction == "LONG" else "red"),
+                    Text(
+                        pos.direction,
+                        style="green" if pos.direction == "LONG" else "red",
+                    ),
                     f"${pos.entry_price:,.2f}",
                     f"${current_price:,.2f}",
-                    Text(f"${unrealized_val:+.2f} ({unrealized_pct:+.2f}%)", style=pnl_s),
+                    Text(
+                        f"${unrealized_val:+.2f} ({unrealized_pct:+.2f}%)", style=pnl_s
+                    ),
                     f"${pos.stop_loss:,.2f} / ${pos.take_profit:,.2f}",
                     f"{pos.predicted_return * 100:+.2f}%",
                 )
@@ -1281,7 +1650,9 @@ class DashboardView:
         initial_capital: float,
     ) -> None:
         self.layout["status"].update(self._render_status_bar(conn, symbol))
-        self.layout["body"].update(self._render_body(state, current_price, symbol, initial_capital))
+        self.layout["body"].update(
+            self._render_body(state, current_price, symbol, initial_capital)
+        )
         self.layout["log"].update(self._render_log())
 
 
@@ -1312,22 +1683,21 @@ class RealtimeTester:
         # Threshold auto : adapté à l'horizon temporel du timeframe
         raw_threshold = config.get("threshold")
         self.threshold = (
-            raw_threshold if raw_threshold is not None
+            raw_threshold
+            if raw_threshold is not None
             else SIGNAL_THRESHOLDS.get(self.timeframe, 0.01)
         )
 
         # risk_pct auto : calibré sur ~1 ATR du timeframe
         raw_risk = config.get("risk_pct")
         self.risk_pct = (
-            raw_risk if raw_risk is not None
-            else RISK_PCTS.get(self.timeframe, 0.025)
+            raw_risk if raw_risk is not None else RISK_PCTS.get(self.timeframe, 0.025)
         )
 
         # Intervalle de check auto : 1 barre = minutes_per_bar minutes
         raw_interval = config.get("check_interval_hours")
         check_hours = (
-            raw_interval if raw_interval is not None
-            else self.minutes_per_bar / 60
+            raw_interval if raw_interval is not None else self.minutes_per_bar / 60
         )
         self.check_interval = check_hours * 3600  # en secondes
 
@@ -1385,7 +1755,9 @@ class RealtimeTester:
             "capital": self.state.capital,
             "allocated": self.state.allocated,
             "position_counter": self.state.position_counter,
-            "last_candle_time": str(self.last_candle_time) if self.last_candle_time else None,
+            "last_candle_time": str(self.last_candle_time)
+            if self.last_candle_time
+            else None,
             "open_positions": [
                 {
                     "entry_date": pos.entry_date.isoformat(),
@@ -1402,8 +1774,12 @@ class RealtimeTester:
             ],
             "closed_trades": [
                 {
-                    "entry_date": t.entry_date.isoformat() if hasattr(t.entry_date, 'isoformat') else str(t.entry_date),
-                    "exit_date": t.exit_date.isoformat() if hasattr(t.exit_date, 'isoformat') else str(t.exit_date),
+                    "entry_date": t.entry_date.isoformat()
+                    if hasattr(t.entry_date, "isoformat")
+                    else str(t.entry_date),
+                    "exit_date": t.exit_date.isoformat()
+                    if hasattr(t.exit_date, "isoformat")
+                    else str(t.exit_date),
                     "direction": t.direction,
                     "entry_price": t.entry_price,
                     "exit_price": t.exit_price,
@@ -1419,9 +1795,13 @@ class RealtimeTester:
             "risk_management": {
                 "peak_portfolio_value": self._peak_value,
                 "circuit_breaker_active": self._circuit_breaker_active,
-                "last_entry_time": self._last_entry_time.isoformat() if self._last_entry_time else None,
+                "last_entry_time": self._last_entry_time.isoformat()
+                if self._last_entry_time
+                else None,
                 "daily_trade_count": self._daily_trade_count,
-                "current_trade_day": str(self._current_trade_day) if self._current_trade_day else None,
+                "current_trade_day": str(self._current_trade_day)
+                if self._current_trade_day
+                else None,
                 "trades_since_rebalance": self._trades_since_rebalance,
                 "rebalance_base_capital": self._rebalance_base,
             },
@@ -1484,27 +1864,44 @@ class RealtimeTester:
         self._peak_value = rm.get("peak_portfolio_value", self.initial_capital)
         self._circuit_breaker_active = rm.get("circuit_breaker_active", False)
         last_entry = rm.get("last_entry_time")
-        self._last_entry_time = datetime.fromisoformat(last_entry) if last_entry else None
+        self._last_entry_time = (
+            datetime.fromisoformat(last_entry) if last_entry else None
+        )
         self._daily_trade_count = rm.get("daily_trade_count", 0)
         trade_day = rm.get("current_trade_day")
-        self._current_trade_day = datetime.fromisoformat(trade_day).date() if trade_day else None
+        self._current_trade_day = (
+            datetime.fromisoformat(trade_day).date() if trade_day else None
+        )
         self._trades_since_rebalance = rm.get("trades_since_rebalance", 0)
         self._rebalance_base = rm.get("rebalance_base_capital", self.initial_capital)
 
         n_pos = len(self.state.open_positions)
         n_trades = len(self.state.closed_trades)
-        console.print(f"  [green]✓[/] État restauré: {n_pos} positions ouvertes, {n_trades} trades passés")
+        console.print(
+            f"  [green]✓[/] État restauré: {n_pos} positions ouvertes, {n_trades} trades passés"
+        )
         if self._circuit_breaker_active:
-            console.print(f"  [bold red]⚠ Circuit breaker actif[/] (drawdown >= {self.max_drawdown_pct:.0%})")
+            console.print(
+                f"  [bold red]⚠ Circuit breaker actif[/] (drawdown >= {self.max_drawdown_pct:.0%})"
+            )
         return True
 
     def initialize(self):
         """Initialise le système: charge le modèle, récupère l'historique."""
-        print_header(self.symbol, self.model_type, self.initial_capital, self.rrr,
-                     prediction_horizon=self.prediction_horizon, timeframe=self.timeframe,
-                     threshold=self.threshold, risk_pct=self.risk_pct,
-                     sizing_mode=self.sizing_mode, max_drawdown_pct=self.max_drawdown_pct,
-                     cooldown_bars=self.cooldown_bars, max_trades_per_day=self.max_trades_per_day)
+        print_header(
+            self.symbol,
+            self.model_type,
+            self.initial_capital,
+            self.rrr,
+            prediction_horizon=self.prediction_horizon,
+            timeframe=self.timeframe,
+            threshold=self.threshold,
+            risk_pct=self.risk_pct,
+            sizing_mode=self.sizing_mode,
+            max_drawdown_pct=self.max_drawdown_pct,
+            cooldown_bars=self.cooldown_bars,
+            max_trades_per_day=self.max_trades_per_day,
+        )
 
         # Device
         self.device = torch.device("mps" if torch.mps.is_available() else "cpu")
@@ -1515,8 +1912,12 @@ class RealtimeTester:
         console.print("  [green]✓[/] Exchange Binance initialisé")
 
         # Charger modèle et scalers
-        console.print(f"[bold]INIT[/] Chargement du modèle {self.model_type} [{self.timeframe}]...")
-        self.model, _ = load_model_dynamic(self.model_type, self.device, timeframe=self.timeframe)
+        console.print(
+            f"[bold]INIT[/] Chargement du modèle {self.model_type} [{self.timeframe}]..."
+        )
+        self.model, _ = load_model_dynamic(
+            self.model_type, self.device, timeframe=self.timeframe
+        )
         self.scalers = load_scalers(self.model_type, timeframe=self.timeframe)
         self.feature_scaler = self.scalers["feature_scaler"]
         self.target_scaler = self.scalers["target_scaler"]
@@ -1524,11 +1925,15 @@ class RealtimeTester:
         if self.clip_bounds is not None:
             console.print("  [green]✓[/] Modèle, scalers et clip_bounds chargés")
         else:
-            console.print("  [yellow]✓[/] Modèle et scalers chargés [dim](clip_bounds absent, re-entraîner le modèle)[/]")
+            console.print(
+                "  [yellow]✓[/] Modèle et scalers chargés [dim](clip_bounds absent, re-entraîner le modèle)[/]"
+            )
 
         # Verrouiller short en mode live (spot Binance ne supporte pas le short)
         if self.allow_short:
-            console.print("  [bold yellow]WARNING[/] Short selling non supporté en spot Binance. Désactivé.")
+            console.print(
+                "  [bold yellow]WARNING[/] Short selling non supporté en spot Binance. Désactivé."
+            )
             self.allow_short = False
 
         # Restaurer l'état si disponible
@@ -1536,8 +1941,10 @@ class RealtimeTester:
 
         # Récupérer l'historique initial
         self.df_history = fetch_initial_history(
-            self.symbol, min_bars=self.window_size + 50,
-            exchange=self.exchange, timeframe=self.timeframe,
+            self.symbol,
+            min_bars=self.window_size + 50,
+            exchange=self.exchange,
+            timeframe=self.timeframe,
         )
         if self.last_candle_time is None:
             self.last_candle_time = self.df_history.index[-1]
@@ -1545,7 +1952,9 @@ class RealtimeTester:
 
         check_h = self.check_interval / 3600
         console.print(f"\n[bold]INIT[/] Démarrage de la boucle principale...")
-        console.print(f"       Threshold: {self.threshold * 100:.2f}%  |  Intervalle: {check_h:.1f}h par bougie [{self.timeframe}]")
+        console.print(
+            f"       Threshold: {self.threshold * 100:.2f}%  |  Intervalle: {check_h:.1f}h par bougie [{self.timeframe}]"
+        )
         console.print("       Appuyez sur Ctrl+C pour arrêter\n")
 
         # Démarrer le stream WebSocket (live mode uniquement — pas en backtest)
@@ -1555,7 +1964,9 @@ class RealtimeTester:
             conn_state=self.conn_state,
         )
         self.stream.start()
-        console.print(f"  [green]✓[/] WebSocket stream démarré ([dim]{self.stream.url}[/])")
+        console.print(
+            f"  [green]✓[/] WebSocket stream démarré ([dim]{self.stream.url}[/])"
+        )
 
     def process_new_candle(self, current_price: float, candle_time) -> None:
         """
@@ -1592,13 +2003,18 @@ class RealtimeTester:
         # Calculer les features sur les bougies clôturées uniquement
         try:
             X_scaled, _ = prepare_live_features(
-                df_closed, self.feature_scaler, self.clip_bounds,
-                timeframe=self.timeframe, window_size=self.window_size,
+                df_closed,
+                self.feature_scaler,
+                self.clip_bounds,
+                timeframe=self.timeframe,
+                window_size=self.window_size,
             )
             prediction = predict_return(
                 self.model, X_scaled, self.target_scaler, self.device
             )
-            pred_style = "green" if prediction > 0 else "red" if prediction < 0 else "dim"
+            pred_style = (
+                "green" if prediction > 0 else "red" if prediction < 0 else "dim"
+            )
             self._log(
                 f"[bold]PREDICTION[/] [{pred_style}]{prediction * 100:+.2f}%[/]  "
                 f"[dim](seuil: ±{self.threshold * 100:.2f}%)[/]"
@@ -1619,7 +2035,10 @@ class RealtimeTester:
 
         for pos in self.state.open_positions:
             should_exit, reason, exit_price = check_position_exit(
-                pos, current_price, current_time, self.slippage_pct,
+                pos,
+                current_price,
+                current_time,
+                self.slippage_pct,
                 prediction_horizon=self.prediction_horizon,
                 minutes_per_bar=self.minutes_per_bar,
             )
@@ -1637,7 +2056,9 @@ class RealtimeTester:
             self.state.open_positions.remove(pos)
 
             pnl_pct = pnl / pos.allocated_capital * 100
-            reason_style = {"TP": "green", "SL": "red", "EXPIRATION": "yellow"}.get(reason, "dim")
+            reason_style = {"TP": "green", "SL": "red", "EXPIRATION": "yellow"}.get(
+                reason, "dim"
+            )
             pnl_style = _pnl_color(pnl)
 
             self._log(
@@ -1659,7 +2080,9 @@ class RealtimeTester:
             # Warning taux d'expiration (tous les 50 trades)
             total_closed = len(self.state.closed_trades)
             if total_closed > 0 and total_closed % 50 == 0:
-                exp_count = sum(1 for t in self.state.closed_trades if t.exit_reason == "EXPIRATION")
+                exp_count = sum(
+                    1 for t in self.state.closed_trades if t.exit_reason == "EXPIRATION"
+                )
                 exp_rate = exp_count / total_closed
                 if exp_rate > self.max_expiration_rate:
                     self._log(
@@ -1740,18 +2163,24 @@ class RealtimeTester:
             self._current_trade_day = trade_day
             self._daily_trade_count = 0
         if self._daily_trade_count >= self.max_trades_per_day:
-            self._log(f"[dim]SKIP — Limite journalière atteinte ({self.max_trades_per_day})[/]")
+            self._log(
+                f"[dim]SKIP — Limite journalière atteinte ({self.max_trades_per_day})[/]"
+            )
             return
 
         # Guard 3 : Cooldown
         if self._last_entry_time is not None and entry_date is not None:
-            bars_since = (entry_date - self._last_entry_time).total_seconds() / (self.minutes_per_bar * 60)
+            bars_since = (entry_date - self._last_entry_time).total_seconds() / (
+                self.minutes_per_bar * 60
+            )
             if bars_since < self.cooldown_bars:
                 return
 
         # Guard 4 : Max positions simultanées
         if len(self.state.open_positions) >= self.prediction_horizon:
-            self._log(f"[dim]SKIP — Max positions atteint ({self.prediction_horizon})[/]")
+            self._log(
+                f"[dim]SKIP — Max positions atteint ({self.prediction_horizon})[/]"
+            )
             return
 
         # Appliquer le slippage à l'entrée
@@ -1783,7 +2212,7 @@ class RealtimeTester:
 
             qty = position.allocated_capital / entry_price
             pred_style = "green" if prediction > 0 else "red"
-            coin = self.symbol.replace('/USDT', '')
+            coin = self.symbol.replace("/USDT", "")
             self._log(
                 f"[bold cyan]OPEN #{position.position_id}[/]  {direction}  "
                 f"Entry: ${entry_price:,.2f}  "
@@ -1808,10 +2237,15 @@ class RealtimeTester:
             return
 
         self.df_history = df_fresh
-        latest_closed_ts = df_fresh.index[-2] if len(df_fresh) >= 2 else df_fresh.index[-1]
+        latest_closed_ts = (
+            df_fresh.index[-2] if len(df_fresh) >= 2 else df_fresh.index[-1]
+        )
 
         # Si une (ou plusieurs) bougie(s) ont été clôturées pendant l'offline, rattraper la dernière.
-        if self.last_candle_time is not None and latest_closed_ts > self.last_candle_time:
+        if (
+            self.last_candle_time is not None
+            and latest_closed_ts > self.last_candle_time
+        ):
             missed_close_price = float(df_fresh["close"].iloc[-2])
             self._log(
                 f"[cyan]GAP FILL[/] bougie manquée {latest_closed_ts} → rattrapage"
@@ -1820,7 +2254,9 @@ class RealtimeTester:
             try:
                 self.process_new_candle(missed_close_price, latest_closed_ts)
             except Exception as exc:
-                self._log(f"[red]ERROR[/] process_new_candle (gap fill) a échoué: {exc}")
+                self._log(
+                    f"[red]ERROR[/] process_new_candle (gap fill) a échoué: {exc}"
+                )
 
     def run(self):
         """Boucle principale event-driven, alimentée par la WebSocket Binance.
@@ -1870,19 +2306,26 @@ class RealtimeTester:
                             self._refetch_history_after_reconnect()
                     elif isinstance(event, KlineEvent):
                         # Bougie clôturée confirmée par le WS (k.x == true)
-                        if self.last_candle_time is None or event.ts > self.last_candle_time:
+                        if (
+                            self.last_candle_time is None
+                            or event.ts > self.last_candle_time
+                        ):
                             self.last_candle_time = event.ts
                             try:
                                 self.process_new_candle(event.close, event.ts)
                             except Exception as exc:
-                                self._log(f"[red]ERROR[/] process_new_candle a échoué: {exc}")
+                                self._log(
+                                    f"[red]ERROR[/] process_new_candle a échoué: {exc}"
+                                )
 
                     # Check SL/TP à chaque itération (réactivité ~1s)
                     if current_price is not None and self.state.open_positions:
                         try:
                             self._check_and_close_positions(current_price, now_utc)
                         except Exception as exc:
-                            self._log(f"[red]ERROR[/] _check_and_close_positions: {exc}")
+                            self._log(
+                                f"[red]ERROR[/] _check_and_close_positions: {exc}"
+                            )
 
                     # Refresh le dashboard (uptime/status evolue même sans event)
                     self.dashboard.refresh(
@@ -1949,20 +2392,31 @@ class RealtimeTester:
         table.add_row("RRR", f"1:{self.rrr}")
         table.add_row("Horizon", f"{self.prediction_horizon} bars [{self.timeframe}]")
         table.add_row("Threshold", f"{self.threshold * 100:.2f}%")
-        table.add_row("SL / TP", f"{self.risk_pct * 100:.2f}% / {self.risk_pct * self.rrr * 100:.2f}%")
+        table.add_row(
+            "SL / TP",
+            f"{self.risk_pct * 100:.2f}% / {self.risk_pct * self.rrr * 100:.2f}%",
+        )
         table.add_row("Sizing", self.sizing_mode)
         table.add_row("Max DD", f"{self.max_drawdown_pct:.0%}")
         table.add_row("Cooldown", f"{self.cooldown_bars} bars")
         table.add_row("Max/Day", str(self.max_trades_per_day))
-        console.print(Panel(table, title="BACKTEST MODE (Realtime Simulation)", border_style="cyan"))
+        console.print(
+            Panel(
+                table, title="BACKTEST MODE (Realtime Simulation)", border_style="cyan"
+            )
+        )
 
         # Device
         self.device = torch.device("mps" if torch.mps.is_available() else "cpu")
         console.print(f"[bold]INIT[/] Device: {self.device}")
 
         # Charger modèle et scalers
-        console.print(f"[bold]INIT[/] Chargement du modèle {self.model_type} [{self.timeframe}]...")
-        self.model, _ = load_model_dynamic(self.model_type, self.device, timeframe=self.timeframe)
+        console.print(
+            f"[bold]INIT[/] Chargement du modèle {self.model_type} [{self.timeframe}]..."
+        )
+        self.model, _ = load_model_dynamic(
+            self.model_type, self.device, timeframe=self.timeframe
+        )
         self.scalers = load_scalers(self.model_type, timeframe=self.timeframe)
         self.feature_scaler = self.scalers["feature_scaler"]
         self.target_scaler = self.scalers["target_scaler"]
@@ -1970,15 +2424,21 @@ class RealtimeTester:
         if self.clip_bounds is not None:
             console.print("  [green]✓[/] Modèle, scalers et clip_bounds chargés")
         else:
-            console.print("  [yellow]✓[/] Modèle et scalers chargés [dim](clip_bounds absent, re-entraîner le modèle)[/]")
+            console.print(
+                "  [yellow]✓[/] Modèle et scalers chargés [dim](clip_bounds absent, re-entraîner le modèle)[/]"
+            )
 
         # Verrouiller short (spot Binance ne supporte pas le short)
         if self.allow_short:
-            console.print("  [bold yellow]WARNING[/] Short selling non supporté en spot Binance. Désactivé.")
+            console.print(
+                "  [bold yellow]WARNING[/] Short selling non supporté en spot Binance. Désactivé."
+            )
             self.allow_short = False
 
         # Charger les données historiques depuis le CSV local
-        console.print(f"[bold]INIT[/] Chargement des données historiques {self.symbol}...")
+        console.print(
+            f"[bold]INIT[/] Chargement des données historiques {self.symbol}..."
+        )
         symbol_code = self.symbol.replace("/USDT", "").replace("/USD", "")
         df_full = load_symbol(symbol_code, timeframe=self.timeframe)
 
@@ -2003,10 +2463,12 @@ class RealtimeTester:
         start_idx = self.window_size + 50
 
         # Initialiser le dashboard et simuler une connexion ONLINE
-        self.dashboard = DashboardView(initial_log=[
-            "[dim]BACKTEST MODE — Simulating live trading on historical data[/]",
-            f"[dim]Period: {df_full.index[start_idx].date()} → {df_full.index[-1].date()}[/]",
-        ])
+        self.dashboard = DashboardView(
+            initial_log=[
+                "[dim]BACKTEST MODE — Simulating live trading on historical data[/]",
+                f"[dim]Period: {df_full.index[start_idx].date()} → {df_full.index[-1].date()}[/]",
+            ]
+        )
         self.conn_state.update(
             status=ConnStatus.ONLINE,
             connected_since=datetime.now(timezone.utc),
@@ -2016,7 +2478,9 @@ class RealtimeTester:
         )
 
         speed_str = "instantané" if speed == 0 else f"{speed}s par bougie"
-        console.print(f"\n[bold]BACKTEST[/] Démarrage de la simulation...  Speed: {speed_str}\n")
+        console.print(
+            f"\n[bold]BACKTEST[/] Démarrage de la simulation...  Speed: {speed_str}\n"
+        )
 
         self.running = True
 
@@ -2068,27 +2532,42 @@ class RealtimeTester:
                     # Calculer les features et prédire
                     try:
                         X_scaled, _ = prepare_live_features(
-                            df_history, self.feature_scaler, self.clip_bounds,
-                            timeframe=self.timeframe, window_size=self.window_size,
+                            df_history,
+                            self.feature_scaler,
+                            self.clip_bounds,
+                            timeframe=self.timeframe,
+                            window_size=self.window_size,
                         )
                         prediction = predict_return(
                             self.model, X_scaled, self.target_scaler, self.device
                         )
-                        pred_style = "green" if prediction > 0 else "red" if prediction < 0 else "dim"
+                        pred_style = (
+                            "green"
+                            if prediction > 0
+                            else "red"
+                            if prediction < 0
+                            else "dim"
+                        )
                         self._log(
                             f"[bold]PREDICTION[/] [{pred_style}]{prediction * 100:+.2f}%[/]  "
                             f"[dim](threshold: ±{self.threshold * 100:.2f}%)[/]"
                         )
                     except Exception as e:
-                        self._log(f"[bold red]ERROR[/] Prédiction à {current_time}: {e}")
+                        self._log(
+                            f"[bold red]ERROR[/] Prédiction à {current_time}: {e}"
+                        )
                         time.sleep(max(speed, 0.025))
                         continue
 
                     # Générer le signal
                     if prediction > self.threshold:
-                        self._open_new_position("LONG", current_price, prediction, current_time)
+                        self._open_new_position(
+                            "LONG", current_price, prediction, current_time
+                        )
                     elif prediction < -self.threshold and self.allow_short:
-                        self._open_new_position("SHORT", current_price, prediction, current_time)
+                        self._open_new_position(
+                            "SHORT", current_price, prediction, current_time
+                        )
 
                     # Refresh dashboard
                     self.dashboard.refresh(
@@ -2141,7 +2620,9 @@ def parse_args():
         "--model", type=str, default=None, help="Type de modèle (cnn, lstm, gru)"
     )
     parser.add_argument(
-        "--timeframe", type=str, default=None,
+        "--timeframe",
+        type=str,
+        default=None,
         help=f"Timeframe du modèle (ex: 1d, 1h, 4h — défaut: {DEFAULT_TIMEFRAME})",
     )
     parser.add_argument("--capital", type=float, default=None, help="Capital initial")
@@ -2199,28 +2680,40 @@ def parse_args():
     )
     # Risk management
     parser.add_argument(
-        "--sizing-mode", type=str, default=None,
+        "--sizing-mode",
+        type=str,
+        default=None,
         choices=["fixed", "periodic", "dynamic"],
         help="Mode de sizing des positions (defaut: fixed)",
     )
     parser.add_argument(
-        "--max-drawdown", type=float, default=None,
+        "--max-drawdown",
+        type=float,
+        default=None,
         help="Max drawdown avant circuit breaker (ex: 0.20 pour 20%%)",
     )
     parser.add_argument(
-        "--cooldown", type=int, default=None,
+        "--cooldown",
+        type=int,
+        default=None,
         help="Barres minimum entre deux ouvertures de position",
     )
     parser.add_argument(
-        "--max-daily-trades", type=int, default=None,
+        "--max-daily-trades",
+        type=int,
+        default=None,
         help="Nombre max de trades par jour",
     )
     parser.add_argument(
-        "--max-position-pct", type=float, default=None,
+        "--max-position-pct",
+        type=float,
+        default=None,
         help="Max %% du portefeuille par position (ex: 0.25 pour 25%%)",
     )
     parser.add_argument(
-        "--max-position-size", type=float, default=None,
+        "--max-position-size",
+        type=float,
+        default=None,
         help="Max absolu en $ par position",
     )
     return parser.parse_args()
