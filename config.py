@@ -41,6 +41,7 @@ WINDOW_SIZES: dict = {
     "1d": 30,   # 30 jours
     "1h": 72,   # 3 jours
     "4h": 120,  # 20 jours
+    "6h": 120,  # 30 jours (contexte utilisé par l'agent RL PPO)
     "1w": 20,   # 20 semaines
 }
 
@@ -52,6 +53,7 @@ PREDICTION_HORIZONS: dict = {
     "1d": 3,    # prédire le rendement 3 jours plus tard
     "1h": 6,    # prédire le rendement 6 heures plus tard
     "4h": 1,    # prédire le rendement de la prochaine bougie 4h
+    "6h": 4,    # prédire le rendement 24 heures plus tard
     "1w": 1,    # prédire le rendement de la semaine suivante
 }
 START_DATE = "2020-01-01"
@@ -64,6 +66,7 @@ SIGNAL_THRESHOLDS: dict = {
     "1d": 0.010,   # 1.0%  sur 3 jours
     "1h": 0.003,   # 0.3%  sur 6 heures
     "4h": 0.005,   # 0.5%  sur 4 heures
+    "6h": 0.005,   # 0.5%  sur 24 heures (non utilisé par RL)
     "1w": 0.020,   # 2.0%  sur 1 semaine
 }
 
@@ -74,6 +77,7 @@ RISK_PCTS: dict = {
     "1d": 0.025,   # 2.5%  SL / 5.0% TP (rrr=2)
     "1h": 0.008,   # 0.8%  SL / 1.6% TP (rrr=2)  ← 1 ATR sur 6h
     "4h": 0.015,   # 1.5%  SL / 3.0% TP (rrr=2)
+    "6h": 0.012,   # 1.2%  SL / 2.4% TP (rrr=2) — entre 4h et 1d
     "1w": 0.040,   # 4.0%  SL / 8.0% TP (rrr=2)
 }
 
@@ -238,6 +242,70 @@ def get_cnn_bilstm_am_config(timeframe: str = DEFAULT_TIMEFRAME) -> dict:
         "dropout_lstm": 0.0,
         "dropout_fc": 0.3,
     }
+
+
+# ----- Architecture XGBoost par timeframe -----
+XGBOOST_CONFIGS: dict = {
+    "1d": {
+        "n_estimators": 1000,
+        "max_depth": 6,
+        "learning_rate": 0.05,
+        "early_stopping_rounds": 50,
+    },
+    "1h": {
+        "n_estimators": 1500,
+        "max_depth": 8,
+        "learning_rate": 0.03,
+        "early_stopping_rounds": 80,
+    },
+}
+
+
+def get_xgboost_config(timeframe: str = DEFAULT_TIMEFRAME) -> dict:
+    """Retourne la config d'hyperparamètres XGBoost pour le timeframe donné."""
+    if timeframe not in XGBOOST_CONFIGS:
+        raise ValueError(
+            f"No XGBoost config for timeframe '{timeframe}'. "
+            f"Configured timeframes: {list(XGBOOST_CONFIGS.keys())}. "
+            "Add an explicit entry in XGBOOST_CONFIGS."
+        )
+    return XGBOOST_CONFIGS[timeframe]
+
+
+# ----- Architecture PatchTST par timeframe -----
+PATCHTST_CONFIGS: dict = {
+    "1d": {
+        "patch_len": 6,
+        "stride": 3,
+        "d_model": 64,
+        "n_heads": 4,
+        "n_layers": 3,
+        "d_ff": 128,
+        "dropout": 0.2,
+        "dropout_fc": 0.3,
+    },
+    "1h": {
+        "patch_len": 12,
+        "stride": 6,
+        "d_model": 64,
+        "n_heads": 4,
+        "n_layers": 3,
+        "d_ff": 128,
+        "dropout": 0.2,
+        "dropout_fc": 0.3,
+    },
+}
+
+
+def get_patchtst_config(timeframe: str = DEFAULT_TIMEFRAME) -> dict:
+    """Retourne la config d'architecture PatchTST pour le timeframe donné."""
+    if timeframe not in PATCHTST_CONFIGS:
+        raise ValueError(
+            f"No PatchTST config for timeframe '{timeframe}'. "
+            f"Configured timeframes: {list(PATCHTST_CONFIGS.keys())}. "
+            "Add an explicit entry in PATCHTST_CONFIGS."
+        )
+    return PATCHTST_CONFIGS[timeframe]
 
 
 # ----- Frais de transaction (en pourcentage, ex: 0.001 = 0.1%)

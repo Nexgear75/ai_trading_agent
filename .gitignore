@@ -7,3 +7,5 @@ raw/
 *.joblib
 runs/
 shell.nix
+.DS_Store
+*.bak

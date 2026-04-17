@@ -512,6 +512,53 @@ def simulate_trading(
     return result
 
 
+# ----- Oracle ----- #
+
+
+def simulate_oracle(
+    y: np.ndarray,
+    timestamps: np.ndarray,
+    df_prices: pd.DataFrame,
+    capital: float = 10_000.0,
+    allow_short: bool = False,
+    entry_fee_pct: float = DEFAULT_ENTRY_FEE,
+    exit_fee_pct: float = DEFAULT_EXIT_FEE,
+    prediction_horizon: int = 3,
+    timeframe_minutes: int = 1440,
+) -> BacktestResult:
+    """Simule un oracle parfait qui connaît exactement les retours futurs.
+
+    Utilise les labels réels (y) comme prédictions — borne supérieure
+    théorique de ce qu'un modèle parfait pourrait atteindre.
+
+    Args:
+        y: (N,) retours futurs réels (ground truth).
+        timestamps: (N,) timestamps correspondants.
+        df_prices: DataFrame avec colonne 'close'.
+        capital: Capital initial.
+        allow_short: Si True, autorise les positions short sur retours négatifs.
+        entry_fee_pct: Frais à l'entrée.
+        exit_fee_pct: Frais à la sortie.
+        prediction_horizon: Horizon de prédiction en barres.
+        timeframe_minutes: Durée d'une barre en minutes.
+
+    Returns:
+        BacktestResult de l'oracle avec threshold=0 (trade dès qu'on connaît la direction).
+    """
+    return simulate_trading(
+        predictions=y,
+        timestamps=timestamps,
+        df_prices=df_prices,
+        capital=capital,
+        threshold=0.0,
+        allow_short=allow_short,
+        entry_fee_pct=entry_fee_pct,
+        exit_fee_pct=exit_fee_pct,
+        prediction_horizon=prediction_horizon,
+        timeframe_minutes=timeframe_minutes,
+    )
+
+
 # ----- Métriques ----- #
 
 
@@ -607,7 +654,13 @@ def compute_backtest_metrics(
             result.annualized_return = (total_ret ** (365 / n_days) - 1) * 100
 
 
-def print_summary(result: BacktestResult, symbol: str, model_type: str, capital: float):
+def print_summary(
+    result: BacktestResult,
+    symbol: str,
+    model_type: str,
+    capital: float,
+    oracle_result: Optional["BacktestResult"] = None,
+):
     """Affiche un résumé formaté des résultats du backtest."""
     print(f"\n{'='*60}")
     print(f"BACKTEST RESULTS")
@@ -647,7 +700,26 @@ def print_summary(result: BacktestResult, symbol: str, model_type: str, capital:
     print(f"Total Fees Paid:     ${result.total_fees_paid:,.2f}")
     print(f"Avg Fees/Trade:      ${result.avg_fees_per_trade:.2f}")
     print(f"Fee Impact:          {result.fee_impact_pct:.2f}%")
-    print(f"{'='*60}\n")
+    print(f"{'='*60}")
+
+    if oracle_result is not None and oracle_result.n_trades > 0:
+        oracle_final = oracle_result.portfolio_values.iloc[-1] if len(oracle_result.portfolio_values) > 0 else capital
+        efficiency = (result.total_return / oracle_result.total_return * 100) if oracle_result.total_return != 0 else 0.0
+        print(f"ORACLE COMPARISON (perfect foresight upper bound)")
+        print(f"{'='*60}")
+        print(f"Oracle Total Return:    {oracle_result.total_return:+.2f}%")
+        print(f"Oracle Ann. Return:     {oracle_result.annualized_return:+.2f}%")
+        print(f"Oracle Sharpe:          {oracle_result.sharpe_ratio:.2f}")
+        print(f"Oracle Max Drawdown:    {oracle_result.max_drawdown:.2f}%")
+        print(f"Oracle Final Capital:   ${oracle_final:,.2f}")
+        print(f"Oracle Trades:          {oracle_result.n_trades}")
+        print(f"Oracle Win Rate:        {oracle_result.win_rate:.1f}%")
+        print(f"Oracle Total Fees:      ${oracle_result.total_fees_paid:,.2f}")
+        print(f"{'='*60}")
+        print(f"Model Efficiency:       {efficiency:.1f}% of oracle")
+        print(f"{'='*60}")
+
+    print()
 
 
 # ----- Graphiques ----- #
@@ -661,11 +733,13 @@ def plot_equity_curve(
     capital: float,
     df_prices: pd.DataFrame,
     timestamps: np.ndarray,
+    oracle_result: Optional[BacktestResult] = None,
 ):
     """Génère et sauvegarde la courbe d'équité avec annotations.
 
     Inclut :
         - Courbe de valeur du portefeuille
+        - Courbe oracle (borne supérieure théorique) si fournie
         - Drawdown en sous-graphique
         - Courbe buy-and-hold pour comparaison
 
@@ -677,6 +751,7 @@ def plot_equity_curve(
         capital: Capital initial.
         df_prices: DataFrame avec les prix pour le benchmark.
         timestamps: Timestamps du backtest.
+        oracle_result: BacktestResult de l'oracle (optionnel).
     """
     if len(result.portfolio_values) == 0:
         print("Pas de données pour générer le graphique")
@@ -696,9 +771,18 @@ def plot_equity_curve(
     # Graphique principal : equity curve
     ax1 = axes[0]
     ax1.plot(result.portfolio_values.index, result.portfolio_values.values,
-             label="Strategy", linewidth=1.5, color="blue")
+             label=f"Strategy ({model_type.upper()})", linewidth=1.5, color="blue")
     ax1.plot(bh_normalized.index, bh_normalized.values,
              label="Buy & Hold", linewidth=1.5, color="gray", alpha=0.7, linestyle="--")
+
+    if oracle_result is not None and len(oracle_result.portfolio_values) > 0:
+        ax1.plot(
+            oracle_result.portfolio_values.index,
+            oracle_result.portfolio_values.values,
+            label=f"Oracle (perfect foresight) +{oracle_result.total_return:.1f}%",
+            linewidth=1.5, color="green", alpha=0.8, linestyle="-.",
+        )
+
     ax1.axhline(capital, color="black", linestyle=":", alpha=0.5, label="Initial Capital")
 
     ax1.set_ylabel("Portfolio Value ($)")
@@ -813,14 +897,22 @@ def run_backtest(
         entry_fee_pct, exit_fee_pct, prediction_horizon, timeframe_minutes
     )
 
+    # 4b. Oracle : borne supérieure théorique (prédictions parfaites)
+    print(f"Simulation oracle (connaissance parfaite du futur)...")
+    oracle_result = simulate_oracle(
+        y, timestamps, df_prices, capital, allow_short,
+        entry_fee_pct, exit_fee_pct, prediction_horizon, timeframe_minutes
+    )
+
     # 5. Calculer les métriques
     compute_backtest_metrics(result, capital, df_prices, timestamps)
+    compute_backtest_metrics(oracle_result, capital, df_prices, timestamps)
 
     # 6. Afficher et sauvegarder les résultats
-    print_summary(result, symbol, model_type, capital)
+    print_summary(result, symbol, model_type, capital, oracle_result=oracle_result)
 
     results_dir = f"models/{model_type}/results/{timeframe}"
-    plot_equity_curve(result, results_dir, symbol, model_type, capital, df_prices, timestamps)
+    plot_equity_curve(result, results_dir, symbol, model_type, capital, df_prices, timestamps, oracle_result=oracle_result)
 
     return result
 
