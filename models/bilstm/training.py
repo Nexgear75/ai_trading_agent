@@ -70,7 +70,7 @@ def _run_val_epoch(model, loader, criterion, device):
 
 def train(
     symbol: str | None = None,
-    timeframe: str = DEFAULT_TIMEFRAME,
+    timeframe: str = "1h",
     cfg: TrainCfg | None = None,
 ):
     """Entraîne le modèle BiLSTM avec early stopping."""
@@ -155,7 +155,7 @@ def train(
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Entraînement BiLSTM")
     parser.add_argument("--symbol", type=str, default=None)
-    parser.add_argument("--timeframe", type=str, default=DEFAULT_TIMEFRAME)
+    parser.add_argument("--timeframe", type=str, default="1h")
     parser.add_argument("--epochs", type=int, default=200)
     parser.add_argument("--batch-size", type=int, default=32)
     parser.add_argument("--lr", type=float, default=1e-3)
