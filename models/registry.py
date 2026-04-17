@@ -6,6 +6,7 @@ from models.base_predictor import BasePredictor
 AVAILABLE_MODELS: dict[str, tuple[str, str]] = {
     "rl": ("models.rl.predictor", "RLPredictor"),
     "cnn": ("models.cnn.predictor", "CNNPredictor"),
+    "lstm": ("models.lstm.predictor", "LSTMPredictor"),
     "bilstm": ("models.bilstm.predictor", "BiLSTMPredictor"),
     "cnn_bilstm_am": ("models.cnn_bilstm_am.predictor", "CnnBiLstmAmPredictor"),
     "transformer": ("models.transformer.predictor", "TransformerPredictor"),
