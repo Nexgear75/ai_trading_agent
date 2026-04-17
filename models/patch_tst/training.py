@@ -9,6 +9,7 @@ import joblib
 import numpy as np
 import torch
 import torch.nn as nn
+from torch.amp import GradScaler, autocast
 from tqdm import tqdm
 
 from config import DEFAULT_TIMEFRAME, get_timeframe_config, get_patchtst_config
@@ -82,7 +83,13 @@ def train(
     print(f"  Checkpoint: {paths['dir']}")
     print(f"{'=' * 60}\n")
 
-    device = torch.device("mps" if torch.mps.is_available() else "cpu")
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+        torch.backends.cudnn.benchmark = True
+    elif torch.mps.is_available():
+        device = torch.device("mps")
+    else:
+        device = torch.device("cpu")
     print(f"Device: {device}")
 
     # Données
@@ -97,9 +104,19 @@ def train(
         n_features=len(feature_cols),
         **patchtst_cfg,
     ).to(device)
+
+    # torch.compile pour PyTorch 2.x (nécessite Triton, non dispo sur Windows)
+    if hasattr(torch, "compile") and device.type == "cuda" and os.name != "nt":
+        model = torch.compile(model)
+        print("torch.compile activé")
+
     criterion = nn.HuberLoss(delta=1.0)
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-3)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
+
+    # Mixed precision (AMP) — float16 sur CUDA pour ~2x throughput
+    use_amp = device.type == "cuda"
+    scaler = GradScaler(enabled=use_amp)
 
     # Training loop
     best_val_loss = float("inf")
@@ -112,21 +129,21 @@ def train(
         train_loss = 0.0
         pbar = tqdm(train_loader, desc=f"Epoch {epoch:3d}/{epochs} [Train]", leave=False)
         for X_batch, y_batch in pbar:
-            X_batch, y_batch = X_batch.to(device), y_batch.to(device)
+            X_batch = X_batch.to(device, non_blocking=True)
+            y_batch = y_batch.to(device, non_blocking=True)
 
-            optimizer.zero_grad()
-            preds = model(X_batch)
-            loss = criterion(preds, y_batch)
-            loss.backward()
+            optimizer.zero_grad(set_to_none=True)
+            with autocast(device.type, enabled=use_amp):
+                preds = model(X_batch)
+                loss = criterion(preds, y_batch)
+            scaler.scale(loss).backward()
+            scaler.unscale_(optimizer)
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
-            optimizer.step()
+            scaler.step(optimizer)
+            scaler.update()
 
             train_loss += loss.item() * len(X_batch)
             pbar.set_postfix(loss=f"{loss.item():.5f}")
-
-            del preds, loss
-            if device.type == "mps":
-                torch.mps.empty_cache()
 
         train_loss /= len(train_loader.dataset)
 
@@ -136,15 +153,14 @@ def train(
         correct_dir = 0
         with torch.no_grad():
             for X_batch, y_batch in val_loader:
-                X_batch, y_batch = X_batch.to(device), y_batch.to(device)
-                preds = model(X_batch)
-                loss = criterion(preds, y_batch)
+                X_batch = X_batch.to(device, non_blocking=True)
+                y_batch = y_batch.to(device, non_blocking=True)
+                with autocast(device.type, enabled=use_amp):
+                    preds = model(X_batch)
+                    loss = criterion(preds, y_batch)
                 val_loss += loss.item() * len(X_batch)
 
                 correct_dir += ((preds > 0) == (y_batch > 0)).sum().item()
-
-                if device.type == "mps":
-                    torch.mps.empty_cache()
 
         val_loss /= len(val_loader.dataset)
         dir_acc = correct_dir / len(val_loader.dataset)
@@ -155,8 +171,6 @@ def train(
         # Garbage collection périodique
         if epoch % 5 == 0:
             gc.collect()
-            if device.type == "mps":
-                torch.mps.empty_cache()
 
         current_lr = optimizer.param_groups[0]["lr"]
         tqdm.write(

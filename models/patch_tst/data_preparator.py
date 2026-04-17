@@ -144,8 +144,20 @@ def prepare_data(
     del X_train, X_val, y_train, y_val
     gc.collect()
 
-    train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True, num_workers=0)
-    val_loader = DataLoader(val_ds, batch_size=batch_size, shuffle=False, num_workers=0)
+    # Optimisation DataLoader : pin_memory pour transfert CPU→GPU asynchrone,
+    # num_workers pour chargement parallèle
+    use_cuda = torch.cuda.is_available()
+    loader_kwargs = {
+        "pin_memory": use_cuda,
+        "num_workers": 2 if use_cuda else 0,
+        "persistent_workers": use_cuda,
+    }
+    train_loader = DataLoader(
+        train_ds, batch_size=batch_size, shuffle=True, **loader_kwargs,
+    )
+    val_loader = DataLoader(
+        val_ds, batch_size=batch_size, shuffle=False, **loader_kwargs,
+    )
 
     print(f"Train: {len(train_ds)} samples | Val: {len(val_ds)} samples")
 

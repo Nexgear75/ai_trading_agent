@@ -89,7 +89,12 @@ def evaluate(
     else:
         scalers_path = os.path.join(os.path.dirname(model_path), "scalers.joblib")
 
-    device = torch.device("mps" if torch.mps.is_available() else "cpu")
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+    elif torch.mps.is_available():
+        device = torch.device("mps")
+    else:
+        device = torch.device("cpu")
 
     print(f"\n{'=' * 60}")
     print("  ÉVALUATION PatchTST")

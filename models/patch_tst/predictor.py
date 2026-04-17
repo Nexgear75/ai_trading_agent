@@ -11,7 +11,12 @@ class PatchTSTPredictor(SupervisedPredictor):
     def __init__(self, timeframe: str = DEFAULT_TIMEFRAME) -> None:
         super().__init__(timeframe)
         self._model = None
-        self._device = torch.device("mps" if torch.mps.is_available() else "cpu")
+        if torch.cuda.is_available():
+            self._device = torch.device("cuda")
+        elif torch.mps.is_available():
+            self._device = torch.device("mps")
+        else:
+            self._device = torch.device("cpu")
 
     @property
     def name(self) -> str:

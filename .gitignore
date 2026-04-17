@@ -9,3 +9,5 @@ runs/
 shell.nix
 .DS_Store
 *.bak
+output/
+**/results/
