@@ -34,4 +34,17 @@ def add_volume_features(
     df["volume_return"] = df["volume"].pct_change()
     df["volatility"] = df["close"].pct_change().rolling(vol_window).std()
 
+    # ----- OBV (On-Balance Volume) normalisé -----
+    direction = df["close"].diff().apply(lambda x: 1 if x > 0 else (-1 if x < 0 else 0))
+    obv = (direction * df["volume"]).cumsum()
+    obv_ma = obv.rolling(volume_window).mean()
+    obv_std = obv.rolling(volume_window).std().replace(0, 1e-10)
+    df["obv_normalized"] = (obv - obv_ma) / obv_std
+
+    # ----- Volume directionnel : pression achat vs vente -----
+    is_bullish = df["close"] > df["open"]
+    buy_vol = df["volume"].where(is_bullish, 0).rolling(volume_window).sum()
+    total_vol = df["volume"].rolling(volume_window).sum()
+    df["volume_directional"] = buy_vol / (total_vol + 1e-10)
+
     return df
