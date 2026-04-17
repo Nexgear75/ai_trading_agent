@@ -270,6 +270,41 @@ def get_cnn_bilstm_am_config(timeframe: str = DEFAULT_TIMEFRAME) -> dict:
     }
 
 
+# ----- Architecture Transformer par timeframe -----
+# channels = (d_model, nhead, num_layers). d_model doit être divisible par nhead.
+TRANSFORMER_CONFIGS: dict = {
+    "1d": {
+        "channels": [64, 4, 3],
+        "kernel_sizes": [3, 3, 3],   # ignoré par le Transformer
+        "dropout_conv": 0.2,
+        "dropout_fc": 0.3,
+        "pool_size": 5,              # 30 % 5 == 0 ✓ MPS
+    },
+    "1h": {
+        "channels": [64, 4, 3],
+        "kernel_sizes": [5, 5, 3],
+        "dropout_conv": 0.2,
+        "dropout_fc": 0.3,
+        "pool_size": 8,              # 72 % 8 == 0 ✓ MPS
+    },
+}
+
+
+def get_transformer_config(timeframe: str = DEFAULT_TIMEFRAME) -> dict:
+    """Retourne la config d'architecture Transformer pour le timeframe donné."""
+    if timeframe in TRANSFORMER_CONFIGS:
+        return TRANSFORMER_CONFIGS[timeframe]
+    window_size = get_timeframe_config(timeframe)["window_size"]
+    pool_size = next(p for p in range(8, 0, -1) if window_size % p == 0)
+    return {
+        "channels": [64, 4, 3],
+        "kernel_sizes": [3, 3, 3],
+        "dropout_conv": 0.2,
+        "dropout_fc": 0.3,
+        "pool_size": pool_size,
+    }
+
+
 # ----- Architecture XGBoost par timeframe -----
 XGBOOST_CONFIGS: dict = {
     "1d": {

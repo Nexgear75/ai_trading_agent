@@ -7,7 +7,7 @@ import torch
 import torch.nn as nn
 from tqdm import tqdm
 
-from config import DEFAULT_TIMEFRAME, get_timeframe_config, get_cnn_config
+from config import DEFAULT_TIMEFRAME, get_timeframe_config, get_transformer_config
 from data.features.pipeline import get_feature_columns
 from models.transformer.Transformer import Transformer
 from models.transformer.data_preparator import prepare_data
@@ -45,8 +45,8 @@ def train(
     # Get timeframe configuration
     tf_config = get_timeframe_config(timeframe)
     window_size = tf_config["window_size"]
-    # get_cnn_config retourne maintenant (d_model, nhead, num_layers) dans "channels"
-    cnn_cfg = get_cnn_config(timeframe)
+    # channels = (d_model, nhead, num_layers) — d_model divisible par nhead
+    cnn_cfg = get_transformer_config(timeframe)
     feature_cols = get_feature_columns(timeframe)
 
     # Setup checkpoint paths for this timeframe
@@ -62,7 +62,7 @@ def train(
     print(f"  Checkpoint: {paths['dir']}")
     print(f"{'=' * 60}\n")
 
-    device = torch.device("mps" if torch.mps.is_available() else "cpu")
+    device = torch.device("mps" if torch.mps.is_available() else "cuda" if torch.cuda.is_available() else "cpu")
     print(f"Device: {device}")
 
     # Données
