@@ -1,0 +1,63 @@
+# Project State
+
+## Project Reference
+
+See: .planning/PROJECT.md (updated 2026-04-25)
+
+**Core value:** The bot executes trades reliably and the dashboard shows exactly what it's doing — positions, PnL, and model predictions live on the chart.
+
+**Current focus:** Phase 1 — Foundation & Auth
+
+## Current Position
+
+Phase: 1 of 4 (Foundation & Auth)
+Plan: 0 of ? in current phase
+Status: Ready to plan
+Last activity: 2026-04-25 — Roadmap created
+Progress: [░░░░░░░░░░] 0%
+
+## Performance Metrics
+
+**Velocity:**
+- Total plans completed: 0
+- Average duration: -
+- Total execution time: 0 hours
+
+**By Phase:**
+
+| Phase | Plans | Total | Avg/Plan |
+|-------|-------|-------|----------|
+| - | - | - | - |
+
+**Recent Trend:** N/A (project start)
+
+## Accumulated Context
+
+### Decisions
+
+Decisions are logged in PROJECT.md Key Decisions table.
+
+Recent decisions affecting current work:
+- Roadmap compressed to 4 phases (coarse granularity)
+- Auth + DB in Phase 1 (foundation before features)
+- Trading Engine + API merged (tightly coupled, avoids mocking)
+
+### Pending Todos
+
+None yet.
+
+### Blockers/Concerns
+
+None yet.
+
+## Deferred Items
+
+| Category | Item | Status | Deferred At |
+|----------|------|--------|-------------|
+| - | - | - | - |
+
+## Session Continuity
+
+Last session: 2026-04-25
+Stopped at: Roadmap created, ready for Phase 1 planning
+Resume file: None
