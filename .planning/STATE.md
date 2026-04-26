@@ -12,9 +12,9 @@ See: .planning/PROJECT.md (updated 2026-04-25)
 
 Phase: 1 of 4 (Foundation & Auth)
 Plan: 0 of ? in current phase
-Status: Ready to plan
-Last activity: 2026-04-25 — Roadmap created
-Progress: [░░░░░░░░░░] 0%
+Status: Context gathered, ready for planning
+Last activity: 2026-04-25 — Phase 1 context captured
+Progress: [▓░░░░░░░░░] 10%
 
 ## Performance Metrics
 
@@ -41,6 +41,11 @@ Recent decisions affecting current work:
 - Roadmap compressed to 4 phases (coarse granularity)
 - Auth + DB in Phase 1 (foundation before features)
 - Trading Engine + API merged (tightly coupled, avoids mocking)
+- SQLite WAL mode + indexes from day one
+- PyJWT + JWKS for backend JWT verification (not supabase-py)
+- Monorepo with /frontend + /backend at project root
+- Alembic autogenerate from SQLAlchemy models
+- Dedicated login page (email/password), Supabase PKCE flow
 
 ### Pending Todos
 
@@ -59,5 +64,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-04-25
-Stopped at: Roadmap created, ready for Phase 1 planning
-Resume file: None
+Stopped at: Phase 1 context gathered, ready for planning
+Resume file: .planning/phases/01-foundation-auth/01-CONTEXT.md
