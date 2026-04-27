@@ -327,6 +327,20 @@ import time
 import urllib.request
 import urllib.parse
 from collections import deque
+
+# Tentative de chargement des variables d'environnement depuis .env
+def load_env_file(path=".env"):
+    if os.path.exists(path):
+        with open(path, "r") as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                if "=" in line:
+                    key, value = line.split("=", 1)
+                    os.environ[key.strip()] = value.strip().strip('"').strip("'")
+
+load_env_file()
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
