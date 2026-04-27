@@ -1939,16 +1939,27 @@ class RealtimeTester:
         # Restaurer l'état si disponible
         self._load_state()
 
-        # Récupérer l'historique initial
+        # Récupérer l'historique initial.
+        # +110 = warmup pour les indicateurs techniques (rolling(100) dans
+        # add_trend_features crée 99 NaN rows supprimés par dropna).
         self.df_history = fetch_initial_history(
             self.symbol,
-            min_bars=self.window_size + 50,
+            min_bars=self.window_size + 110,
             exchange=self.exchange,
             timeframe=self.timeframe,
         )
         if self.last_candle_time is None:
-            self.last_candle_time = self.df_history.index[-1]
-        console.print(f"  [green]✓[/] Dernière bougie: {self.last_candle_time}")
+            # df_history.index[-1] = bougie en cours de formation (open_time courant).
+            # Le WS émet KlineEvent(ts=open_time) quand cette bougie clôture, soit la
+            # même valeur que index[-1] : le test `event.ts > last_candle_time` dans
+            # run() filtrerait alors la première clôture et aucune prédiction ne serait
+            # émise. On ancre last_candle_time sur la dernière bougie CLÔTURÉE.
+            self.last_candle_time = (
+                self.df_history.index[-2]
+                if len(self.df_history) >= 2
+                else self.df_history.index[-1]
+            )
+        console.print(f"  [green]✓[/] Dernière bougie clôturée: {self.last_candle_time}")
 
         check_h = self.check_interval / 3600
         console.print(f"\n[bold]INIT[/] Démarrage de la boucle principale...")
@@ -1985,11 +1996,12 @@ class RealtimeTester:
         )
 
         # Re-fetch l'historique pour avoir les OHLCV finalisés des bougies clôturées.
-        # On prend window_size + 50 bougies et on exclut la dernière (en formation).
+        # +115 = window_size + warmup (rolling(100) crée 99 NaN) + 1 (bougie en
+        # formation exclue) + 15 de marge.
         try:
             df_fresh = fetch_latest_ohlcv(
                 self.symbol,
-                limit=self.window_size + 52,
+                limit=self.window_size + 115,
                 exchange=self.exchange,
                 timeframe=self.timeframe,
             )
@@ -2228,7 +2240,7 @@ class RealtimeTester:
         try:
             df_fresh = fetch_latest_ohlcv(
                 self.symbol,
-                limit=self.window_size + 52,
+                limit=self.window_size + 115,
                 exchange=self.exchange,
                 timeframe=self.timeframe,
             )
@@ -2448,19 +2460,25 @@ class RealtimeTester:
         if end_date:
             df_full = df_full[df_full.index <= end_date]
 
-        # S'assurer qu'on a assez d'historique pour les features
-        min_required = self.window_size + 100
+        # Warm-up : la plus longue fenêtre de build_features est SMA(max(periods))
+        # = SMA(100) dans le pipeline trend (1d et 1h). Tant qu'on n'a pas 100 barres
+        # valides, dropna() supprime quasiment tout et prepare_live_features lève
+        # ValueError. On démarre donc à window_size + INDICATOR_WARMUP pour que la
+        # toute première itération produise déjà une fenêtre complète.
+        INDICATOR_WARMUP = 100
+        start_idx = self.window_size + INDICATOR_WARMUP
+
+        # S'assurer qu'on a assez d'historique pour la 1ère fenêtre + ≥1 itération
+        min_required = start_idx + 1
         if len(df_full) < min_required:
             raise ValueError(
-                f"Pas assez de données: {len(df_full)} < {min_required} requis"
+                f"Pas assez de données: {len(df_full)} < {min_required} requis "
+                f"(window_size={self.window_size} + warm-up indicateurs={INDICATOR_WARMUP} + 1 itération)"
             )
 
         console.print(
             f"  [green]✓[/] {len(df_full)} bougies chargées ({df_full.index[0].date()} → {df_full.index[-1].date()})"
         )
-
-        # Commencer à window_size + 50 pour avoir assez d'historique pour les features
-        start_idx = self.window_size + 50
 
         # Initialiser le dashboard et simuler une connexion ONLINE
         self.dashboard = DashboardView(
@@ -2728,7 +2746,10 @@ def main():
 
     # Override avec les arguments CLI
     if args.symbol:
-        config["symbol"] = args.symbol
+        sym = args.symbol
+        if "/" not in sym:
+            sym = sym + "/USDT"
+        config["symbol"] = sym
     if args.model:
         config["model_type"] = args.model
     if args.timeframe:
