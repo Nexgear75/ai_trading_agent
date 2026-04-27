@@ -1,0 +1,23 @@
+services:
+  trading-bot:
+    build: .
+    container_name: ai-trading-bot
+    volumes:
+      # Permet de conserver l'état du trading (positions, capital) sur le VPS
+      - ./testing:/app/testing
+      # Optionnel: si vous avez des modèles sauvegardés localement
+      - ./models:/app/models
+    # Votre commande spécifique
+    # NOTE: l'argument --fresh réinitialise l'état à chaque démarrage du conteneur.
+    # Pour reprendre une session interrompue, retirez --fresh après le premier lancement réussi.
+    command: >
+      python -m testing.realtime_testing 
+      --symbol LINK/USDT 
+      --model cnn_bilstm_am 
+      --rrr 2.0 
+      --capital 1000 
+      --timeframe 1h 
+      --threshold 0.015 
+      --fresh 
+      --sizing-mode dynamic
+    restart: unless-stopped
