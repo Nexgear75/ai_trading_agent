@@ -2,6 +2,9 @@ services:
   trading-bot:
     build: .
     container_name: ai-trading-bot
+    environment:
+      - TELEGRAM_TOKEN=${TELEGRAM_TOKEN}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
     volumes:
       # Permet de conserver l'état du trading (positions, capital) sur le VPS
       - ./testing:/app/testing
