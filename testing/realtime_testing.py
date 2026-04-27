@@ -324,6 +324,8 @@ import os
 import queue
 import threading
 import time
+import urllib.request
+import urllib.parse
 from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -1749,6 +1751,42 @@ class RealtimeTester:
         else:
             console.print(message)
 
+    def _notify(self, message: str) -> None:
+        """Envoie une notification Telegram."""
+        token = os.getenv("TELEGRAM_TOKEN")
+        chat_id = os.getenv("TELEGRAM_CHAT_ID")
+        
+        if not token or not chat_id:
+            return
+
+        # Nettoyer les tags Rich [bold], [green], etc. pour Telegram (HTML)
+        clean_msg = message.replace("[bold]", "<b>").replace("[/bold]", "</b>")
+        clean_msg = clean_msg.replace("[green]", "<b>").replace("[/green]", "</b>")
+        clean_msg = clean_msg.replace("[red]", "<b>").replace("[/red]", "</b>")
+        clean_msg = clean_msg.replace("[cyan]", "<b>").replace("[/cyan]", "</b>")
+        clean_msg = clean_msg.replace("[yellow]", "<b>").replace("[/yellow]", "</b>")
+        clean_msg = clean_msg.replace("[dim]", "<i>").replace("[/dim]", "</i>")
+        # Supprimer les tags restants
+        import re
+        clean_msg = re.sub(r"\[/?.*?\]", "", clean_msg)
+
+        try:
+            url = f"https://api.telegram.org/bot{token}/sendMessage"
+            data = urllib.parse.urlencode({
+                "chat_id": chat_id,
+                "text": clean_msg,
+                "parse_mode": "HTML"
+            }).encode()
+            req = urllib.request.Request(url, data=data)
+            with urllib.request.urlopen(req, timeout=5) as response:
+                pass
+        except Exception as e:
+            # On log l'erreur sans notifier (pour éviter une boucle infinie)
+            if self.dashboard is not None:
+                self.dashboard.log(f"[red]Telegram Error:[/] {e}")
+            else:
+                print(f"Telegram Error: {e}")
+
     def _save_state(self):
         """Sauvegarde l'état courant dans un fichier JSON."""
         state_data = {
@@ -1963,6 +2001,12 @@ class RealtimeTester:
 
         check_h = self.check_interval / 3600
         console.print(f"\n[bold]INIT[/] Démarrage de la boucle principale...")
+        self._notify(
+            f"🤖 <b>AI Trading Agent Started</b>\n"
+            f"📈 Symbol: {self.symbol}\n"
+            f"💰 Capital: ${self.initial_capital:,.2f}\n"
+            f"🕒 Timeframe: {self.timeframe}"
+        )
         console.print(
             f"       Threshold: {self.threshold * 100:.2f}%  |  Intervalle: {check_h:.1f}h par bougie [{self.timeframe}]"
         )
@@ -2079,6 +2123,12 @@ class RealtimeTester:
                 f"[{pnl_style}]${pnl:+.2f} ({pnl_pct:+.2f}%)[/]  "
                 f"[dim]fees: ${trade.total_fees:.2f}[/]"
             )
+            emoji = "✅" if pnl > 0 else "❌"
+            self._notify(
+                f"{emoji} <b>CLOSE #{pos.position_id} {reason}</b> on {self.symbol}\n"
+                f"{pos.direction}: ${pos.entry_price:,.2f} → ${exit_price:,.2f}\n"
+                f"💰 PnL: <b>${pnl:+.2f} ({pnl_pct:+.2f}%)</b>"
+            )
 
         if positions_to_close:
             # Rebalance check (mode periodic)
@@ -2138,10 +2188,12 @@ class RealtimeTester:
 
         if not self._circuit_breaker_active and drawdown >= self.max_drawdown_pct:
             self._circuit_breaker_active = True
-            self._log(
+            msg = (
                 f"[bold red]⚠ CIRCUIT BREAKER[/] Drawdown {drawdown:.1%} >= "
                 f"seuil {self.max_drawdown_pct:.0%}. Nouvelles positions bloquées."
             )
+            self._log(msg)
+            self._notify(f"🛑 <b>CIRCUIT BREAKER ACTIVATED</b>\nDrawdown: {drawdown:.1%}\nSystem will stop opening new positions.")
 
     def _check_rebalance(self):
         """Rebalance la base de capital en mode 'periodic' après N trades fermés."""
@@ -2231,6 +2283,12 @@ class RealtimeTester:
                 f"Size: ${position.allocated_capital:,.2f} ({qty:,.4f} {coin})  "
                 f"Pred: [{pred_style}]{prediction * 100:+.2f}%[/]  "
                 f"SL: ${position.stop_loss:,.2f}  TP: ${position.take_profit:,.2f}"
+            )
+            self._notify(
+                f"🚀 <b>OPEN #{position.position_id}</b> {direction} on {self.symbol}\n"
+                f"💰 Entry: ${entry_price:,.2f}\n"
+                f"🛡️ SL: ${position.stop_loss:,.2f} | 🎯 TP: ${position.take_profit:,.2f}\n"
+                f"📊 Prediction: {prediction * 100:+.2f}%"
             )
         else:
             self._log(f"[dim]SKIP — Pas assez de cash[/]")
