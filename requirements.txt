@@ -10,3 +10,4 @@ seaborn
 gymnasium
 rich
 tqdm
+websockets>=12.0
