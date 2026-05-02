@@ -11,3 +11,6 @@ shell.nix
 *.bak
 output/
 **/results/
+.env
+logs/
+testing/state_*.json

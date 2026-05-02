@@ -1735,6 +1735,7 @@ class RealtimeTester:
         self._last_entry_time: Optional[datetime] = None
         self._daily_trade_count = 0
         self._current_trade_day: Optional[object] = None  # date object
+        self._last_summary_date: Optional[object] = None  # date object — last UTC day a summary was sent
 
         self.state = RealtimeState(capital=self.initial_capital)
         self.df_history: Optional[pd.DataFrame] = None
@@ -1800,6 +1801,46 @@ class RealtimeTester:
                 self.dashboard.log(f"[red]Telegram Error:[/] {e}")
             else:
                 print(f"Telegram Error: {e}")
+
+    def _send_daily_summary(self, current_price: float, summary_date) -> None:
+        """Envoie un récap Telegram des trades clôturés sur summary_date (UTC)."""
+        day_trades = [
+            t for t in self.state.closed_trades
+            if hasattr(t.exit_date, "date") and t.exit_date.date() == summary_date
+        ]
+        m = _calc_portfolio_metrics(self.state, current_price or 0, self.initial_capital)
+
+        n = len(day_trades)
+        wins = [t for t in day_trades if t.pnl > 0]
+        day_pnl = sum(t.pnl for t in day_trades)
+        day_pnl_pct = (day_pnl / self.initial_capital * 100) if self.initial_capital else 0
+        win_rate = (len(wins) / n * 100) if n else 0
+        tp = sum(1 for t in day_trades if t.exit_reason == "TP")
+        sl = sum(1 for t in day_trades if t.exit_reason == "SL")
+        exp = sum(1 for t in day_trades if t.exit_reason == "EXPIRATION")
+        emoji = "📈" if day_pnl >= 0 else "📉"
+
+        msg = (
+            f"{emoji} <b>Daily Summary</b> {summary_date.isoformat()} on {self.symbol}\n"
+            f"Trades: <b>{n}</b>  (W {len(wins)} / L {n - len(wins)}, WR {win_rate:.0f}%)\n"
+            f"Exits: TP {tp} • SL {sl} • EXP {exp}\n"
+            f"Day PnL: <b>${day_pnl:+,.2f} ({day_pnl_pct:+.2f}%)</b>\n"
+            f"\n"
+            f"💼 Portfolio: <b>${m['portfolio_value']:,.2f}</b>\n"
+            f"Total PnL: <b>${m['total_pnl']:+,.2f}</b>  |  Open: {len(self.state.open_positions)}\n"
+            f"All-time: {m['total_trades']} trades, WR {m['win_rate']:.0f}%"
+        )
+        self._notify(msg)
+
+    def _maybe_send_daily_summary(self, current_price: Optional[float], now: datetime) -> None:
+        """Envoie un récap quand la date UTC change (1×/jour)."""
+        today = now.date()
+        if self._last_summary_date is None:
+            self._last_summary_date = today
+            return
+        if today > self._last_summary_date:
+            self._send_daily_summary(current_price or 0, self._last_summary_date)
+            self._last_summary_date = today
 
     def _save_state(self):
         """Sauvegarde l'état courant dans un fichier JSON."""
@@ -2410,6 +2451,9 @@ class RealtimeTester:
                             self._log(
                                 f"[red]ERROR[/] _check_and_close_positions: {exc}"
                             )
+
+                    # Récap quotidien Telegram (1×/jour à minuit UTC)
+                    self._maybe_send_daily_summary(current_price, now_utc)
 
                     # Refresh le dashboard (uptime/status evolue même sans event)
                     self.dashboard.refresh(

@@ -2,25 +2,27 @@ services:
   trading-bot:
     build: .
     container_name: ai-trading-bot
-    environment:
-      - TELEGRAM_TOKEN=${TELEGRAM_TOKEN}
-      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
+    env_file:
+      - .env
     volumes:
-      # Permet de conserver l'état du trading (positions, capital) sur le VPS
+      # Persist trading state (positions, capital) across restarts
       - ./testing:/app/testing
-      # Optionnel: si vous avez des modèles sauvegardés localement
+      # Mount models so you can swap checkpoints without rebuilding
       - ./models:/app/models
-    # Votre commande spécifique
-    # NOTE: l'argument --fresh réinitialise l'état à chaque démarrage du conteneur.
-    # Pour reprendre une session interrompue, retirez --fresh après le premier lancement réussi.
+      # Persistent logs on host (optional, in addition to docker logs)
+      - ./logs:/app/logs
     command: >
-      python -m testing.realtime_testing 
-      --symbol LINK/USDT 
-      --model cnn_bilstm_am 
-      --rrr 2.0 
-      --capital 1000 
-      --timeframe 1h 
-      --threshold 0.015 
-      --fresh 
+      python -m testing.realtime_testing
+      --symbol LINK/USDT
+      --model cnn_bilstm_am
+      --rrr 2.0
+      --capital 1000
+      --timeframe 1h
+      --threshold 0.015
       --sizing-mode dynamic
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"

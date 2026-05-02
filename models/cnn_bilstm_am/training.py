@@ -82,6 +82,11 @@ def train(
     print(f"Device: {device}")
 
     # Données
+    if task == "classification":
+        raise NotImplementedError(
+            "Classification mode requires a dedicated prepare_data; "
+            "current cnn.prepare_data only supports regression."
+        )
     (
         train_loader,
         val_loader,
@@ -89,14 +94,12 @@ def train(
         target_scaler,
         clip_bounds,
         _,
-        pos_weight,
     ) = prepare_data(
         symbol=symbol,
         timeframe=timeframe,
         batch_size=batch_size,
-        task=task,
-        classification_threshold=classification_threshold,
     )
+    pos_weight = None
 
     # Modèle
     model = CNNBiLSTMAM(

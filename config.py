@@ -13,6 +13,7 @@ SYMBOLS = [
 
 BACKTEST_SYMBOLS = [
     "LINK/USDT",
+    "TRX/USDT",
 ]
 
 # ----- Timeframes Supportés -----

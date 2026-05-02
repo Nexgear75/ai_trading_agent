@@ -1,0 +1,29 @@
+.git
+.github
+.venv
+.idea
+.claude
+.planning
+__pycache__
+**/__pycache__
+*.pyc
+.DS_Store
+.env
+.env.*
+!.env.example
+
+# Heavy data not needed at runtime (realtime_testing fetches via ccxt)
+data/raw/
+output/
+results/
+runs/
+
+# Local state and logs (mounted as volumes)
+testing/state_*.json
+logs/
+
+# Docs / dev artifacts
+docs/
+tests/
+*.bak
+README.md
