@@ -553,7 +553,8 @@ def fetch_latest_ohlcv(
                 )
             wait_time = 2**attempt  # Exponential backoff
             console.print(
-                f"  [yellow]RETRY[/] Erreur API, nouvelle tentative dans {wait_time}s..."
+                f"  [yellow]RETRY[/] Erreur API ({type(e).__name__}: {e}), "
+                f"nouvelle tentative dans {wait_time}s..."
             )
             time.sleep(wait_time)
 
